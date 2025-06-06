@@ -1,0 +1,30 @@
+# SSH daemon configuration for bastion server
+Port 22
+Protocol 2
+
+# Authentication
+PermitRootLogin no
+PasswordAuthentication yes
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+
+# Security
+PermitEmptyPasswords no
+ChallengeResponseAuthentication no
+UsePAM yes
+
+# Logging
+SyslogFacility AUTH
+LogLevel INFO
+
+# Connection settings
+ClientAliveInterval 60
+ClientAliveCountMax 3
+MaxAuthTries 3
+MaxSessions 10
+
+# Subsystems
+Subsystem sftp /usr/lib/openssh/sftp-server
+
+# Allow specific users
+AllowUsers sqlterm

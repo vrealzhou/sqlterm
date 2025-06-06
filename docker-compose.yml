@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: sqlterm-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+    networks:
+      - sqlterm-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  postgres:
+    image: postgres:15
+    container_name: sqlterm-postgres
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - sqlterm-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d testdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  bastion:
+    build:
+      context: .
+      dockerfile: docker/bastion/Dockerfile
+    container_name: sqlterm-bastion
+    ports:
+      - "2222:22"
+    volumes:
+      - ./target/release/sqlterm:/usr/local/bin/sqlterm:ro
+      - ./docker/bastion/ssh_keys:/etc/ssh/keys:ro
+    networks:
+      - sqlterm-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      - SSH_ENABLE_PASSWORD_AUTH=true
+      - SSH_USERS=sqlterm:1000:1000
+
+  adminer:
+    image: adminer
+    container_name: sqlterm-adminer
+    ports:
+      - "8080:8080"
+    networks:
+      - sqlterm-network
+    depends_on:
+      - mysql
+      - postgres
+
+volumes:
+  mysql_data:
+  postgres_data:
+
+networks:
+  sqlterm-network:
+    driver: bridge

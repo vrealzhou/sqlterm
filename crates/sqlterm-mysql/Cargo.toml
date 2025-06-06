@@ -1,0 +1,11 @@
+[package]
+name = "sqlterm-mysql"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sqlterm-core = { path = "../sqlterm-core" }
+sqlx = { workspace = true, features = ["mysql", "chrono", "uuid"] }
+async-trait = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
