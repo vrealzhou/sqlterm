@@ -22,7 +22,7 @@ services:
       retries: 10
 
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
     container_name: sqlterm-postgres
     environment:
       POSTGRES_DB: testdb
@@ -41,6 +41,22 @@ services:
       timeout: 5s
       retries: 5
 
+  sqlite:
+    image: alpine:3.18
+    container_name: sqlterm-sqlite
+    volumes:
+      - sqlite_data:/data
+      - ./docker/sqlite:/init
+    networks:
+      - sqlterm-network
+    command: >
+      sh -c "
+        apk add --no-cache sqlite &&
+        chmod +x /init/create_db.sh &&
+        /init/create_db.sh &&
+        tail -f /dev/null
+      "
+
   bastion:
     build:
       context: .
@@ -51,6 +67,7 @@ services:
     volumes:
       - ./target/release/sqlterm:/usr/local/bin/sqlterm:ro
       - ./docker/bastion/ssh_keys:/etc/ssh/keys:ro
+      - sqlite_data:/data:ro
     networks:
       - sqlterm-network
     depends_on:
@@ -58,6 +75,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      sqlite:
+        condition: service_started
     environment:
       - SSH_ENABLE_PASSWORD_AUTH=true
       - SSH_USERS=sqlterm:1000:1000
@@ -76,6 +95,7 @@ services:
 volumes:
   mysql_data:
   postgres_data:
+  sqlite_data:
 
 networks:
   sqlterm-network:

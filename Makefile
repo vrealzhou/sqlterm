@@ -45,6 +45,9 @@ dev-connect-mysql:
 dev-connect-postgres:
 	cargo run --bin sqlterm connect --db-type postgres --host localhost --port 5432 --database testdb --username testuser
 
+dev-connect-sqlite:
+	cargo run --bin sqlterm connect --db-type sqlite --database ./testdb.sqlite --username sqlite
+
 # Code quality targets
 check:
 	cargo check --workspace
@@ -91,9 +94,17 @@ test-postgres:
 	@echo "Testing PostgreSQL connection..."
 	podman exec sqlterm-postgres psql -U testuser -d testdb -c "SELECT 'PostgreSQL connection successful' as status;"
 
+test-sqlite:
+	@echo "Testing SQLite database..."
+	podman exec sqlterm-sqlite sqlite3 /data/testdb.sqlite "SELECT 'SQLite connection successful' as status;"
+
 test-ssh:
 	@echo "Testing SSH connection to bastion..."
 	ssh -o StrictHostKeyChecking=no -p 2222 sqlterm@localhost "echo 'SSH connection successful'"
+
+test-ssh-sqlite:
+	@echo "Testing SQLite via SSH..."
+	ssh -o StrictHostKeyChecking=no -p 2222 sqlterm@localhost "sqlite3 /data/testdb.sqlite 'SELECT COUNT(*) as user_count FROM users;'"
 
 # Clean targets
 clean:

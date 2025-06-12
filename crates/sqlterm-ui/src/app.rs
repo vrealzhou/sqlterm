@@ -1,4 +1,4 @@
-use sqlterm_core::{ConnectionConfig, DatabaseConnection};
+use sqlterm_core::{ConnectionConfig, DatabaseConnection, TableDetails};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppState {
@@ -26,6 +26,7 @@ pub struct App {
     pub selected_table: usize,
     pub query_input: String,
     pub query_results: Option<sqlterm_core::QueryResult>,
+    pub table_details: Option<TableDetails>,
     pub error_message: Option<String>,
     pub cursor_position: usize,
 }
@@ -44,6 +45,7 @@ impl App {
             selected_table: 0,
             query_input: String::new(),
             query_results: None,
+            table_details: None,
             error_message: None,
             cursor_position: 0,
         }
@@ -131,5 +133,29 @@ impl App {
 
     pub fn get_selected_table(&self) -> Option<&String> {
         self.tables.get(self.selected_table)
+    }
+
+    pub fn set_table_details(&mut self, details: TableDetails) {
+        self.table_details = Some(details);
+    }
+
+    pub fn clear_table_details(&mut self) {
+        self.table_details = None;
+    }
+
+    pub fn get_table_details(&self) -> Option<&TableDetails> {
+        self.table_details.as_ref()
+    }
+
+    pub fn set_query_results(&mut self, results: sqlterm_core::QueryResult) {
+        self.query_results = Some(results);
+    }
+
+    pub fn clear_query_results(&mut self) {
+        self.query_results = None;
+    }
+
+    pub fn get_query_results(&self) -> Option<&sqlterm_core::QueryResult> {
+        self.query_results.as_ref()
     }
 }

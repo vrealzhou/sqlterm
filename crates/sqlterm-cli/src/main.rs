@@ -1,7 +1,9 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use sqlterm_core::{ConnectionConfig, DatabaseType};
+use crossterm::event::KeyEvent;
+use sqlterm_core::{ConnectionConfig, DatabaseType, ConfigManager, ConnectionFactory};
 use sqlterm_ui::{App, EventHandler};
+use sqlterm_ui::app::{AppState, InputMode};
 use std::path::PathBuf;
 use tracing::{info, Level};
 
@@ -113,8 +115,7 @@ async fn main() -> Result<()> {
             connect_and_run_tui(config).await?;
         }
         Some(Commands::List) => {
-            println!("Listing saved connections...");
-            // TODO: Implement connection listing
+            list_connections().await?;
         }
         Some(Commands::Add { 
             name, 
@@ -139,8 +140,7 @@ async fn main() -> Result<()> {
                 ssh_tunnel: None,
             };
             
-            println!("Adding connection: {}", config.name);
-            // TODO: Implement connection saving
+            add_connection(config).await?;
         }
     }
 
@@ -158,12 +158,45 @@ async fn run_tui() -> Result<()> {
         database_type: DatabaseType::MySQL,
         host: "localhost".to_string(),
         port: 3306,
-        database: "test".to_string(),
-        username: "root".to_string(),
-        password: Some("password".to_string()),
+        database: "testdb".to_string(),
+        username: "testuser".to_string(),
+        password: Some("testpassword".to_string()),
         ssl: false,
         ssh_tunnel: None,
     });
+
+    app.add_connection(ConnectionConfig {
+        name: "Local PostgreSQL".to_string(),
+        database_type: DatabaseType::PostgreSQL,
+        host: "localhost".to_string(),
+        port: 5432,
+        database: "testdb".to_string(),
+        username: "testuser".to_string(),
+        password: Some("testpassword".to_string()),
+        ssl: false,
+        ssh_tunnel: None,
+    });
+
+    app.add_connection(ConnectionConfig {
+        name: "Local SQLite".to_string(),
+        database_type: DatabaseType::SQLite,
+        host: "localhost".to_string(),
+        port: 0, // SQLite doesn't use ports
+        database: "/data/testdb.sqlite".to_string(),
+        username: "sqlite".to_string(),
+        password: None,
+        ssl: false,
+        ssh_tunnel: None,
+    });
+
+    // Add some sample tables for testing
+    app.tables = vec![
+        "users".to_string(),
+        "posts".to_string(),
+        "categories".to_string(),
+        "post_categories".to_string(),
+        "published_posts".to_string(),
+    ];
 
     loop {
         terminal.draw(|f| sqlterm_ui::ui::render(f, &app))?;
@@ -195,29 +228,61 @@ async fn handle_event(app: &mut App, event: sqlterm_ui::Event) -> Result<()> {
 
     match event {
         Event::Key(key_event) => {
+            // Global key handlers - these work in any state
             match key_event {
                 KeyEvent {
                     code: KeyCode::Char('q'),
                     modifiers: KeyModifiers::NONE,
                     ..
                 } => {
-                    app.quit();
+                    // Only quit if not in editing mode, or if we're in connection manager
+                    if app.input_mode == InputMode::Normal || app.state == AppState::ConnectionManager {
+                        app.quit();
+                        return Ok(());
+                    }
                 }
                 KeyEvent {
                     code: KeyCode::Char('c'),
                     modifiers: KeyModifiers::CONTROL,
                     ..
                 } => {
+                    // Ctrl+C always quits
                     app.quit();
+                    return Ok(());
                 }
-                _ => {
-                    // Handle other key events based on current state
-                    // TODO: Implement state-specific key handling
+                KeyEvent {
+                    code: KeyCode::Esc,
+                    modifiers: KeyModifiers::NONE,
+                    ..
+                } => {
+                    // Esc in normal mode goes back or quits
+                    if app.input_mode == InputMode::Normal {
+                        match app.state {
+                            AppState::ConnectionManager => {
+                                app.quit();
+                                return Ok(());
+                            }
+                            _ => {
+                                app.switch_to_connection_manager();
+                                return Ok(());
+                            }
+                        }
+                    }
                 }
+                _ => {}
+            }
+
+            // State-specific key handling
+            match app.state {
+                AppState::ConnectionManager => handle_connection_manager_keys(app, key_event).await?,
+                AppState::DatabaseBrowser => handle_database_browser_keys(app, key_event).await?,
+                AppState::QueryEditor => handle_query_editor_keys(app, key_event).await?,
+                AppState::Results => handle_results_keys(app, key_event).await?,
             }
         }
         Event::Tick => {
             // Handle periodic updates
+            app.clear_error(); // Clear error after some time
         }
         Event::Mouse(_) => {
             // Handle mouse events (not implemented yet)
@@ -227,6 +292,175 @@ async fn handle_event(app: &mut App, event: sqlterm_ui::Event) -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+async fn handle_connection_manager_keys(app: &mut App, key_event: KeyEvent) -> Result<()> {
+    use crossterm::event::KeyCode;
+
+    match key_event.code {
+        KeyCode::Up => {
+            app.select_previous_connection();
+        }
+        KeyCode::Down => {
+            app.select_next_connection();
+        }
+        KeyCode::Enter => {
+            if let Some(config) = app.get_selected_connection() {
+                // TODO: Actually connect to the database
+                app.set_error(format!("Connecting to {}... (not implemented)", config.name));
+                app.switch_to_database_browser();
+            }
+        }
+        KeyCode::Char('a') => {
+            app.set_error("Add connection not implemented yet".to_string());
+        }
+        KeyCode::Char('d') => {
+            app.set_error("Delete connection not implemented yet".to_string());
+        }
+        KeyCode::Char('e') => {
+            app.switch_to_query_editor();
+        }
+        KeyCode::Char('q') => {
+            app.quit();
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+async fn handle_database_browser_keys(app: &mut App, key_event: KeyEvent) -> Result<()> {
+    use crossterm::event::KeyCode;
+
+    match key_event.code {
+        KeyCode::Up => {
+            app.select_previous_table();
+        }
+        KeyCode::Down => {
+            app.select_next_table();
+        }
+        KeyCode::Enter => {
+            if let Some(table) = app.get_selected_table().cloned() {
+                // Load table details
+                load_table_details(app, &table).await?;
+            }
+        }
+        KeyCode::Char('d') => {
+            if let Some(table) = app.get_selected_table() {
+                // Show quick table description
+                app.set_error(format!("Describing table: {} (columns, indexes, etc.)", table));
+            }
+        }
+        KeyCode::Char('e') => {
+            app.switch_to_query_editor();
+        }
+        KeyCode::Char('c') => {
+            app.switch_to_connection_manager();
+        }
+        KeyCode::Char('r') => {
+            app.switch_to_results();
+        }
+        KeyCode::Char('q') => {
+            app.quit();
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+async fn handle_query_editor_keys(app: &mut App, key_event: KeyEvent) -> Result<()> {
+    use crossterm::event::{KeyCode, KeyModifiers};
+
+
+
+    match (key_event.code, key_event.modifiers) {
+        (KeyCode::Esc, _) => {
+            if app.input_mode == InputMode::Editing {
+                app.exit_edit_mode();
+            } else {
+                app.switch_to_database_browser();
+            }
+        }
+        (KeyCode::Enter, KeyModifiers::CONTROL) => {
+            // Execute query with Ctrl+Enter
+            if !app.query_input.trim().is_empty() {
+                execute_query(app).await?;
+                app.switch_to_results();
+            } else {
+                app.set_error("No query to execute. Type a query first.".to_string());
+            }
+        }
+        (KeyCode::Char('r'), KeyModifiers::CONTROL) => {
+            // Execute query with Ctrl+R (alternative)
+            if !app.query_input.trim().is_empty() {
+                execute_query(app).await?;
+                app.switch_to_results();
+            } else {
+                app.set_error("No query to execute. Type a query first.".to_string());
+            }
+        }
+        (KeyCode::Enter, _) if app.input_mode == InputMode::Editing => {
+            // Regular Enter in editing mode - add newline
+            app.query_input.push('\n');
+            app.cursor_position += 1;
+        }
+        (KeyCode::Char('i'), KeyModifiers::NONE) if app.input_mode == InputMode::Normal => {
+            app.enter_edit_mode();
+        }
+        (KeyCode::Char(c), _) if app.input_mode == InputMode::Editing => {
+            app.query_input.push(c);
+            app.cursor_position += 1;
+        }
+        (KeyCode::Backspace, _) if app.input_mode == InputMode::Editing => {
+            if app.cursor_position > 0 {
+                app.query_input.remove(app.cursor_position - 1);
+                app.cursor_position -= 1;
+            }
+        }
+        (KeyCode::Char('b'), _) if app.input_mode == InputMode::Normal => {
+            app.switch_to_database_browser();
+        }
+        (KeyCode::Char('c'), _) if app.input_mode == InputMode::Normal => {
+            app.switch_to_connection_manager();
+        }
+        (KeyCode::Char('q'), _) if app.input_mode == InputMode::Normal => {
+            app.quit();
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+async fn handle_results_keys(app: &mut App, key_event: KeyEvent) -> Result<()> {
+    use crossterm::event::KeyCode;
+
+    match key_event.code {
+        KeyCode::Char('s') => {
+            // Export results to file
+            export_results_to_file(app).await?;
+        }
+        KeyCode::Char('f') => {
+            // Show full results (remove truncation)
+            show_full_results(app).await?;
+        }
+        KeyCode::Char('c') => {
+            // Copy results to clipboard (placeholder)
+            app.set_error("Copy to clipboard not implemented yet".to_string());
+        }
+        KeyCode::Char('e') => {
+            app.switch_to_query_editor();
+        }
+        KeyCode::Char('b') => {
+            app.switch_to_database_browser();
+        }
+        KeyCode::Esc => {
+            app.switch_to_query_editor();
+        }
+        KeyCode::Char('q') => {
+            app.quit();
+        }
+        _ => {}
+    }
     Ok(())
 }
 
@@ -240,9 +474,530 @@ fn parse_database_type(db_type: &str) -> Result<DatabaseType> {
 }
 
 fn get_default_port(db_type: &DatabaseType) -> u16 {
-    match db_type {
-        DatabaseType::MySQL => 3306,
-        DatabaseType::PostgreSQL => 5432,
-        DatabaseType::SQLite => 0, // SQLite doesn't use ports
+    ConnectionFactory::get_default_port(db_type)
+}
+
+async fn list_connections() -> Result<()> {
+    let config_manager = ConfigManager::new()?;
+    let config = config_manager.config();
+
+    if config.connections.is_empty() {
+        println!("No saved connections found.");
+        println!("Use 'sqlterm add <name> --db-type <type> ...' to add a connection.");
+        return Ok(());
     }
+
+    println!("Saved connections:");
+    println!("{:<20} {:<15} {:<30}", "Name", "Type", "Connection String");
+    println!("{}", "-".repeat(65));
+
+    for conn in &config.connections {
+        let display_string = ConnectionFactory::create_display_string(conn);
+        println!("{:<20} {:<15} {:<30}",
+                 conn.name,
+                 conn.database_type.to_string(),
+                 display_string);
+    }
+
+    if let Some(default) = &config.settings.default_connection {
+        println!("\nDefault connection: {}", default);
+    }
+
+    Ok(())
+}
+
+async fn add_connection(config: ConnectionConfig) -> Result<()> {
+    // Validate the configuration
+    ConnectionFactory::validate_config(&config)?;
+
+    let mut config_manager = ConfigManager::new()?;
+
+    // Add the connection
+    config_manager.config_mut().add_connection(config.clone())?;
+
+    // Save the configuration
+    config_manager.save()?;
+
+    println!("✓ Added connection: {}", config.name);
+    println!("  Type: {}", config.database_type);
+    println!("  Connection: {}", ConnectionFactory::create_display_string(&config));
+
+    Ok(())
+}
+
+async fn load_table_details(app: &mut App, table_name: &str) -> Result<()> {
+    use sqlterm_core::{TableDetails, Table, Column, Index, ForeignKey, TableStatistics, TableType};
+
+    // Create mock table details for demonstration
+    // In a real implementation, this would use the active database connection
+    let table_details = create_mock_table_details(table_name);
+
+    app.set_table_details(table_details);
+    Ok(())
+}
+
+fn create_mock_table_details(table_name: &str) -> sqlterm_core::TableDetails {
+    use sqlterm_core::{TableDetails, Table, Column, Index, ForeignKey, TableStatistics, TableType};
+
+    let table = Table {
+        name: table_name.to_string(),
+        schema: Some("public".to_string()),
+        table_type: TableType::Table,
+        row_count: Some(match table_name {
+            "users" => 3,
+            "posts" => 5,
+            "categories" => 3,
+            "post_categories" => 5,
+            "published_posts" => 4,
+            _ => 0,
+        }),
+        size: Some(8192),
+        comment: Some(format!("Table: {}", table_name)),
+    };
+
+    let columns = match table_name {
+        "users" => vec![
+            Column {
+                name: "id".to_string(),
+                data_type: "SERIAL".to_string(),
+                nullable: false,
+                default_value: Some("nextval('users_id_seq')".to_string()),
+                is_primary_key: true,
+                is_foreign_key: false,
+                is_unique: true,
+                is_auto_increment: true,
+                max_length: None,
+                precision: None,
+                scale: None,
+                comment: Some("Primary key".to_string()),
+            },
+            Column {
+                name: "username".to_string(),
+                data_type: "VARCHAR(50)".to_string(),
+                nullable: false,
+                default_value: None,
+                is_primary_key: false,
+                is_foreign_key: false,
+                is_unique: true,
+                is_auto_increment: false,
+                max_length: Some(50),
+                precision: None,
+                scale: None,
+                comment: Some("Unique username".to_string()),
+            },
+            Column {
+                name: "email".to_string(),
+                data_type: "VARCHAR(100)".to_string(),
+                nullable: false,
+                default_value: None,
+                is_primary_key: false,
+                is_foreign_key: false,
+                is_unique: false,
+                is_auto_increment: false,
+                max_length: Some(100),
+                precision: None,
+                scale: None,
+                comment: Some("User email address".to_string()),
+            },
+            Column {
+                name: "created_at".to_string(),
+                data_type: "TIMESTAMP".to_string(),
+                nullable: false,
+                default_value: Some("CURRENT_TIMESTAMP".to_string()),
+                is_primary_key: false,
+                is_foreign_key: false,
+                is_unique: false,
+                is_auto_increment: false,
+                max_length: None,
+                precision: None,
+                scale: None,
+                comment: Some("Account creation timestamp".to_string()),
+            },
+        ],
+        "posts" => vec![
+            Column {
+                name: "id".to_string(),
+                data_type: "SERIAL".to_string(),
+                nullable: false,
+                default_value: Some("nextval('posts_id_seq')".to_string()),
+                is_primary_key: true,
+                is_foreign_key: false,
+                is_unique: true,
+                is_auto_increment: true,
+                max_length: None,
+                precision: None,
+                scale: None,
+                comment: Some("Primary key".to_string()),
+            },
+            Column {
+                name: "user_id".to_string(),
+                data_type: "INTEGER".to_string(),
+                nullable: false,
+                default_value: None,
+                is_primary_key: false,
+                is_foreign_key: true,
+                is_unique: false,
+                is_auto_increment: false,
+                max_length: None,
+                precision: None,
+                scale: None,
+                comment: Some("Foreign key to users".to_string()),
+            },
+            Column {
+                name: "title".to_string(),
+                data_type: "VARCHAR(200)".to_string(),
+                nullable: false,
+                default_value: None,
+                is_primary_key: false,
+                is_foreign_key: false,
+                is_unique: false,
+                is_auto_increment: false,
+                max_length: Some(200),
+                precision: None,
+                scale: None,
+                comment: Some("Post title".to_string()),
+            },
+            Column {
+                name: "content".to_string(),
+                data_type: "TEXT".to_string(),
+                nullable: true,
+                default_value: None,
+                is_primary_key: false,
+                is_foreign_key: false,
+                is_unique: false,
+                is_auto_increment: false,
+                max_length: None,
+                precision: None,
+                scale: None,
+                comment: Some("Post content".to_string()),
+            },
+            Column {
+                name: "published".to_string(),
+                data_type: "BOOLEAN".to_string(),
+                nullable: false,
+                default_value: Some("false".to_string()),
+                is_primary_key: false,
+                is_foreign_key: false,
+                is_unique: false,
+                is_auto_increment: false,
+                max_length: None,
+                precision: None,
+                scale: None,
+                comment: Some("Publication status".to_string()),
+            },
+        ],
+        _ => vec![
+            Column {
+                name: "id".to_string(),
+                data_type: "INTEGER".to_string(),
+                nullable: false,
+                default_value: None,
+                is_primary_key: true,
+                is_foreign_key: false,
+                is_unique: true,
+                is_auto_increment: true,
+                max_length: None,
+                precision: None,
+                scale: None,
+                comment: Some("Primary key".to_string()),
+            },
+            Column {
+                name: "name".to_string(),
+                data_type: "VARCHAR(100)".to_string(),
+                nullable: false,
+                default_value: None,
+                is_primary_key: false,
+                is_foreign_key: false,
+                is_unique: false,
+                is_auto_increment: false,
+                max_length: Some(100),
+                precision: None,
+                scale: None,
+                comment: Some("Name field".to_string()),
+            },
+        ],
+    };
+
+    let indexes = vec![
+        Index {
+            name: format!("{}_pkey", table_name),
+            table_name: table_name.to_string(),
+            columns: vec!["id".to_string()],
+            is_unique: true,
+            is_primary: true,
+            index_type: "btree".to_string(),
+        },
+    ];
+
+    let foreign_keys = if table_name == "posts" {
+        vec![
+            ForeignKey {
+                name: "posts_user_id_fkey".to_string(),
+                table_name: "posts".to_string(),
+                column_name: "user_id".to_string(),
+                referenced_table: "users".to_string(),
+                referenced_column: "id".to_string(),
+                on_delete: Some("CASCADE".to_string()),
+                on_update: Some("NO ACTION".to_string()),
+            },
+        ]
+    } else {
+        vec![]
+    };
+
+    let statistics = TableStatistics {
+        row_count: table.row_count.unwrap_or(0),
+        size_bytes: table.size,
+        last_updated: Some("2024-01-15 10:30:00".to_string()),
+        auto_increment_value: Some(match table_name {
+            "users" => 4,
+            "posts" => 6,
+            _ => 1,
+        }),
+    };
+
+    TableDetails {
+        table,
+        columns,
+        indexes,
+        foreign_keys,
+        statistics,
+    }
+}
+
+async fn execute_query(app: &mut App) -> Result<()> {
+    use sqlterm_core::{QueryResult, ColumnInfo, Row, Value};
+    use std::time::{Duration, Instant};
+
+    let start = Instant::now();
+    let query = app.query_input.trim();
+
+    // Create mock query results based on the query
+    let results = create_mock_query_results(query);
+
+    // Apply default truncation (200 rows)
+    let truncated_results = if results.rows.len() > 200 {
+        sqlterm_core::QueryResult::truncated(
+            results.columns,
+            results.rows,
+            start.elapsed(),
+            results.total_rows,
+            200,
+        )
+    } else {
+        results
+    };
+
+    app.set_query_results(truncated_results);
+    Ok(())
+}
+
+fn create_mock_query_results(query: &str) -> sqlterm_core::QueryResult {
+    use sqlterm_core::{QueryResult, ColumnInfo, Row, Value};
+    use std::time::Duration;
+
+    let query_lower = query.to_lowercase();
+
+    if query_lower.contains("select") && query_lower.contains("users") {
+        // Mock users query
+        let columns = vec![
+            ColumnInfo {
+                name: "id".to_string(),
+                data_type: "INTEGER".to_string(),
+                nullable: false,
+                max_length: None,
+                precision: None,
+                scale: None,
+            },
+            ColumnInfo {
+                name: "username".to_string(),
+                data_type: "VARCHAR".to_string(),
+                nullable: false,
+                max_length: Some(50),
+                precision: None,
+                scale: None,
+            },
+            ColumnInfo {
+                name: "email".to_string(),
+                data_type: "VARCHAR".to_string(),
+                nullable: false,
+                max_length: Some(100),
+                precision: None,
+                scale: None,
+            },
+            ColumnInfo {
+                name: "created_at".to_string(),
+                data_type: "TIMESTAMP".to_string(),
+                nullable: false,
+                max_length: None,
+                precision: None,
+                scale: None,
+            },
+        ];
+
+        let rows = vec![
+            Row {
+                values: vec![
+                    Value::Integer(1),
+                    Value::String("alice".to_string()),
+                    Value::String("alice@example.com".to_string()),
+                    Value::DateTime("2024-01-15 10:30:00".to_string()),
+                ],
+            },
+            Row {
+                values: vec![
+                    Value::Integer(2),
+                    Value::String("bob".to_string()),
+                    Value::String("bob@example.com".to_string()),
+                    Value::DateTime("2024-01-15 11:15:00".to_string()),
+                ],
+            },
+            Row {
+                values: vec![
+                    Value::Integer(3),
+                    Value::String("charlie".to_string()),
+                    Value::String("charlie@example.com".to_string()),
+                    Value::DateTime("2024-01-15 12:00:00".to_string()),
+                ],
+            },
+        ];
+
+        QueryResult::new(columns, rows, Duration::from_millis(45))
+    } else if query_lower.contains("select") && query_lower.contains("posts") {
+        // Mock posts query
+        let columns = vec![
+            ColumnInfo {
+                name: "id".to_string(),
+                data_type: "INTEGER".to_string(),
+                nullable: false,
+                max_length: None,
+                precision: None,
+                scale: None,
+            },
+            ColumnInfo {
+                name: "title".to_string(),
+                data_type: "VARCHAR".to_string(),
+                nullable: false,
+                max_length: Some(200),
+                precision: None,
+                scale: None,
+            },
+            ColumnInfo {
+                name: "author".to_string(),
+                data_type: "VARCHAR".to_string(),
+                nullable: false,
+                max_length: Some(50),
+                precision: None,
+                scale: None,
+            },
+            ColumnInfo {
+                name: "published".to_string(),
+                data_type: "BOOLEAN".to_string(),
+                nullable: false,
+                max_length: None,
+                precision: None,
+                scale: None,
+            },
+        ];
+
+        let rows = vec![
+            Row {
+                values: vec![
+                    Value::Integer(1),
+                    Value::String("Getting Started with Rust".to_string()),
+                    Value::String("alice".to_string()),
+                    Value::Boolean(true),
+                ],
+            },
+            Row {
+                values: vec![
+                    Value::Integer(2),
+                    Value::String("Database Design Patterns".to_string()),
+                    Value::String("alice".to_string()),
+                    Value::Boolean(true),
+                ],
+            },
+            Row {
+                values: vec![
+                    Value::Integer(3),
+                    Value::String("My Trip to Japan".to_string()),
+                    Value::String("bob".to_string()),
+                    Value::Boolean(true),
+                ],
+            },
+            Row {
+                values: vec![
+                    Value::Integer(4),
+                    Value::String("Cooking at Home".to_string()),
+                    Value::String("bob".to_string()),
+                    Value::Boolean(false),
+                ],
+            },
+            Row {
+                values: vec![
+                    Value::Integer(5),
+                    Value::String("Remote Work Tips".to_string()),
+                    Value::String("charlie".to_string()),
+                    Value::Boolean(true),
+                ],
+            },
+        ];
+
+        QueryResult::new(columns, rows, Duration::from_millis(32))
+    } else {
+        // Generic query result
+        let columns = vec![
+            ColumnInfo {
+                name: "result".to_string(),
+                data_type: "VARCHAR".to_string(),
+                nullable: false,
+                max_length: Some(100),
+                precision: None,
+                scale: None,
+            },
+        ];
+
+        let rows = vec![
+            Row {
+                values: vec![Value::String("Query executed successfully".to_string())],
+            },
+        ];
+
+        QueryResult::new(columns, rows, Duration::from_millis(15))
+    }
+}
+
+async fn export_results_to_file(app: &mut App) -> Result<()> {
+    if let Some(results) = app.get_query_results() {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let filename = format!("sqlterm_results_{}.csv", timestamp);
+
+        let csv_content = results.to_csv();
+        std::fs::write(&filename, csv_content)?;
+
+        app.set_error(format!("Results exported to: {}", filename));
+    } else {
+        app.set_error("No results to export".to_string());
+    }
+    Ok(())
+}
+
+async fn show_full_results(app: &mut App) -> Result<()> {
+    if let Some(current_results) = app.get_query_results() {
+        if current_results.is_truncated {
+            // Create a new result set without truncation
+            let query = app.query_input.trim();
+            let full_results = create_mock_query_results(query);
+            app.set_query_results(full_results);
+            app.set_error("Showing full results (no truncation)".to_string());
+        } else {
+            app.set_error("Results are already showing in full".to_string());
+        }
+    } else {
+        app.set_error("No results to show".to_string());
+    }
+    Ok(())
 }

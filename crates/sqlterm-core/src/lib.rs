@@ -1,11 +1,15 @@
+pub mod config;
 pub mod connection;
 pub mod error;
+pub mod factory;
 pub mod query;
 pub mod schema;
 pub mod result;
 
+pub use config::*;
 pub use connection::*;
 pub use error::*;
+pub use factory::*;
 pub use query::*;
 pub use schema::*;
 pub use result::*;

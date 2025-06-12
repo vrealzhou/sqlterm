@@ -7,6 +7,9 @@ RUN apk add --no-cache \
     bash \
     curl \
     ca-certificates \
+    sqlite \
+    mysql-client \
+    postgresql-client \
     && ssh-keygen -A
 
 # Create sqlterm user

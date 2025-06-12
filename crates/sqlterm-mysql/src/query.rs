@@ -29,12 +29,11 @@ impl QueryExecutor for MySqlQueryExecutor {
         let execution_time = start.elapsed();
         
         if rows.is_empty() {
-            return Ok(QueryResult {
-                columns: vec![],
-                rows: vec![],
+            return Ok(QueryResult::new(
+                vec![],
+                vec![],
                 execution_time,
-                total_rows: 0,
-            });
+            ));
         }
 
         // Extract column information from the first row
@@ -77,12 +76,11 @@ impl QueryExecutor for MySqlQueryExecutor {
             })
             .collect();
 
-        Ok(QueryResult {
+        Ok(QueryResult::new(
             columns,
-            rows: result_rows,
+            result_rows,
             execution_time,
-            total_rows: rows.len(),
-        })
+        ))
     }
 
     async fn execute_non_query(&self, query: &Query) -> Result<QueryExecution> {

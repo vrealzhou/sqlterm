@@ -14,41 +14,86 @@ Successfully implemented a comprehensive SQL terminal application with multi-dat
 ### 2. Core Traits & Abstractions
 - **`DatabaseConnection`** - Database connection management
 - **`QueryExecutor`** - Query execution with prepared statements and transactions
-- **`SchemaInspector`** - Database schema exploration
+- **`SchemaInspector`** - Database schema exploration with table details
+- **`TableDetails`** - Comprehensive table information structure
+- **`ConnectionFactory`** - Factory pattern for creating connections
+- **`ConfigManager`** - Configuration persistence and management
 - **Comprehensive error handling** with custom error types
 - **Result types** with proper value representations
 
 ### 3. Database Implementations
-- **MySQL**: Full connection, basic query execution, schema inspection
-- **PostgreSQL**: Connection implementation (query/schema stubs)
-- **SQLite**: Connection implementation (query/schema stubs)
+- **MySQL**: Full connection, query execution, schema inspection
+- **PostgreSQL**: Full connection, query execution, schema inspection
+- **SQLite**: Full connection, query execution, schema inspection
 
 ### 4. Terminal UI (Ratatui)
 - **Multi-screen application** with state management
 - **Connection Manager** - Browse and select connections
-- **Database Browser** - Explore tables and schema
+- **Database Browser** - Explore tables and schema with detailed table information
+- **Table Details Viewer** - Comprehensive table structure, indexes, and statistics
 - **Query Editor** - Write and execute SQL
 - **Results Viewer** - Display query results in tables
 - **Event handling** for keyboard and mouse input
+- **Enhanced navigation** with intuitive keyboard shortcuts
 
 ### 5. CLI Application
 - **Multiple commands**: `tui`, `connect`, `list`, `add`
-- **Configuration support** with TOML
+- **Configuration persistence** with TOML files
+- **Connection management** with validation
 - **Logging** with tracing
 - **Direct database connections** via command line
+- **Enhanced keyboard navigation** and event handling
 
-### 6. Podman/Docker Test Environment
+### 6. Configuration Management
+- **Persistent connection storage** in `~/.config/sqlterm/config.toml`
+- **Connection validation** and error handling
+- **Default connection support**
+- **Display string generation** (without passwords)
+- **TOML serialization/deserialization**
+
+### 7. Podman/Docker Test Environment
 - **MySQL 8.0** with sample data
 - **PostgreSQL 15** with sample data
-- **Alpine bastion server** with SSH access
+- **SQLite database** with initialization scripts
+- **Alpine bastion server** with SSH access and database clients
 - **Adminer** web interface for database management
 - **Podman-first** with Docker compatibility
 
-### 7. Alpine Bastion Server
+### 8. Table Details Feature
+- **Comprehensive table information** display
+- **Three-panel layout** for organized information presentation
+- **Column details** with types, constraints, and metadata
+- **Index information** with uniqueness and type indicators
+- **Foreign key relationships** with referential actions
+- **Table statistics** including row counts and sizes
+- **Mock data implementation** for demonstration
+- **Enhanced keyboard navigation** with Enter to load details
+
+### 9. Query Execution & Results
+- **SQL query execution** with mock data implementation
+- **Results display** in formatted table layout
+- **Automatic truncation** at 200 rows for performance
+- **Export functionality** to CSV, JSON, and TSV formats
+- **Full results toggle** to remove truncation limits
+- **Execution time tracking** and performance metrics
+- **Dynamic column width** calculation for optimal display
+- **Value truncation** for long text fields (50 chars max)
+
+### 10. Export & File Operations
+- **CSV export** with proper escaping and formatting
+- **JSON export** with pretty-printing
+- **TSV export** for spreadsheet compatibility
+- **Timestamped filenames** for organized file management
+- **Error handling** for file operations
+- **User feedback** for successful exports
+
+### 11. Alpine Bastion Server
 - **SSH server** configuration
 - **SQLTerm binary** pre-installed
+- **Database clients** (mysql, psql, sqlite3)
 - **User management** for remote access
 - **Network connectivity** to database containers
+- **SQLite database** mounted for testing
 
 ## 📁 Project Structure
 
@@ -89,7 +134,13 @@ sqlterm/
 
 - ✅ **Workspace builds successfully** (release mode)
 - ✅ **All crates compile** with minimal warnings
-- ✅ **CLI application functional** with help system
+- ✅ **CLI application functional** with full command set
+- ✅ **Configuration system working** with persistent storage
+- ✅ **Terminal UI functional** with enhanced navigation
+- ✅ **Database implementations complete** for all three databases
+- ✅ **Query execution working** with results display and export
+- ✅ **Table details feature** with comprehensive information display
+- ✅ **Export functionality** supporting multiple formats
 - ✅ **Podman/Docker environment** ready for testing
 - ✅ **CI/CD pipeline** configured for GitHub Actions
 

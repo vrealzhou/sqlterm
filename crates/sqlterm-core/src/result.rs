@@ -7,6 +7,8 @@ pub struct QueryResult {
     pub rows: Vec<Row>,
     pub execution_time: std::time::Duration,
     pub total_rows: usize,
+    pub is_truncated: bool,
+    pub truncated_at: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,11 +59,127 @@ impl Value {
     }
 }
 
+impl QueryResult {
+    /// Create a new QueryResult
+    pub fn new(
+        columns: Vec<ColumnInfo>,
+        rows: Vec<Row>,
+        execution_time: std::time::Duration,
+    ) -> Self {
+        let total_rows = rows.len();
+        Self {
+            columns,
+            rows,
+            execution_time,
+            total_rows,
+            is_truncated: false,
+            truncated_at: None,
+        }
+    }
+
+    /// Create a truncated QueryResult
+    pub fn truncated(
+        columns: Vec<ColumnInfo>,
+        mut rows: Vec<Row>,
+        execution_time: std::time::Duration,
+        total_rows: usize,
+        limit: usize,
+    ) -> Self {
+        let is_truncated = rows.len() > limit;
+        let truncated_at = if is_truncated {
+            rows.truncate(limit);
+            Some(limit)
+        } else {
+            None
+        };
+
+        Self {
+            columns,
+            rows,
+            execution_time,
+            total_rows,
+            is_truncated,
+            truncated_at,
+        }
+    }
+
+    /// Export results to CSV format
+    pub fn to_csv(&self) -> String {
+        let mut csv = String::new();
+
+        // Header
+        let headers: Vec<String> = self.columns.iter().map(|c| c.name.clone()).collect();
+        csv.push_str(&headers.join(","));
+        csv.push('\n');
+
+        // Rows
+        for row in &self.rows {
+            let values: Vec<String> = row.values.iter().map(|v| {
+                let s = v.to_string();
+                if s.contains(',') || s.contains('"') || s.contains('\n') {
+                    format!("\"{}\"", s.replace('"', "\"\""))
+                } else {
+                    s
+                }
+            }).collect();
+            csv.push_str(&values.join(","));
+            csv.push('\n');
+        }
+
+        csv
+    }
+
+    /// Export results to JSON format
+    pub fn to_json(&self) -> serde_json::Result<String> {
+        serde_json::to_string_pretty(self)
+    }
+
+    /// Export results to TSV format
+    pub fn to_tsv(&self) -> String {
+        let mut tsv = String::new();
+
+        // Header
+        let headers: Vec<String> = self.columns.iter().map(|c| c.name.clone()).collect();
+        tsv.push_str(&headers.join("\t"));
+        tsv.push('\n');
+
+        // Rows
+        for row in &self.rows {
+            let values: Vec<String> = row.values.iter().map(|v| {
+                v.to_string().replace('\t', " ").replace('\n', " ")
+            }).collect();
+            tsv.push_str(&values.join("\t"));
+            tsv.push('\n');
+        }
+
+        tsv
+    }
+
+    /// Get summary information
+    pub fn get_summary(&self) -> String {
+        let mut summary = format!(
+            "Rows: {} | Execution time: {:.2}ms",
+            self.total_rows,
+            self.execution_time.as_millis()
+        );
+
+        if self.is_truncated {
+            summary.push_str(&format!(
+                " | Showing {} of {} rows (truncated)",
+                self.truncated_at.unwrap_or(0),
+                self.total_rows
+            ));
+        }
+
+        summary
+    }
+}
+
 impl Row {
     pub fn get_value(&self, index: usize) -> Option<&Value> {
         self.values.get(index)
     }
-    
+
     pub fn to_map(&self, columns: &[ColumnInfo]) -> HashMap<String, &Value> {
         let mut map = HashMap::new();
         for (i, column) in columns.iter().enumerate() {

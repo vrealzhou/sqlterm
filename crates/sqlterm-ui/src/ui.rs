@@ -2,9 +2,10 @@ use crate::app::{App, AppState, InputMode};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{
         Block, Borders, Clear, List, ListItem, Paragraph, Table, Row, Cell,
-        Wrap,
+        Wrap, Tabs,
     },
     Frame,
 };
@@ -58,16 +59,19 @@ fn render_header(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
 fn render_footer(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
     let help_text = match app.state {
         AppState::ConnectionManager => {
-            "↑/↓: Navigate | Enter: Connect | a: Add | d: Delete | q: Quit"
+            "↑/↓: Navigate | Enter: Connect | a: Add | d: Delete | e: Query Editor | q/Esc/Ctrl+C: Quit"
         }
         AppState::DatabaseBrowser => {
-            "↑/↓: Navigate | Enter: Select | e: Query Editor | c: Connections | q: Quit"
+            "↑/↓: Navigate | Enter: Show Details | d: Describe | e: Query Editor | c: Connections | q/Esc: Quit"
         }
         AppState::QueryEditor => {
-            "Ctrl+Enter: Execute | Ctrl+S: Save | Esc: Browser | q: Quit"
+            match app.input_mode {
+                InputMode::Normal => "i: Insert | Ctrl+Enter/Ctrl+R: Execute | b: Browser | c: Connections | q/Esc: Quit",
+                InputMode::Editing => "Esc: Normal mode | Ctrl+Enter/Ctrl+R: Execute | Enter: New line | Ctrl+C: Quit",
+            }
         }
         AppState::Results => {
-            "↑/↓: Navigate | e: Query Editor | b: Browser | q: Quit"
+            "s: Export to file | f: Show full results | c: Copy | e: Query Editor | b: Browser | q: Quit"
         }
     };
 
@@ -134,12 +138,37 @@ fn render_database_browser(f: &mut Frame, area: ratatui::layout::Rect, app: &App
 
     f.render_widget(tables_list, chunks[0]);
 
-    // Table details (placeholder)
-    let details = Paragraph::new("Select a table to view details")
-        .block(Block::default().title("Table Details").borders(Borders::ALL))
-        .wrap(Wrap { trim: true });
+    // Table details
+    render_table_details(f, chunks[1], app);
+}
 
-    f.render_widget(details, chunks[1]);
+fn render_table_details(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
+    if let Some(table_details) = app.get_table_details() {
+        // Split the details area into sections
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(6),  // Table info
+                Constraint::Min(10),    // Columns
+                Constraint::Length(6),  // Statistics
+            ])
+            .split(area);
+
+        // Table information
+        render_table_info(f, chunks[0], table_details);
+
+        // Columns details
+        render_table_columns(f, chunks[1], table_details);
+
+        // Statistics
+        render_table_statistics(f, chunks[2], table_details);
+    } else {
+        let placeholder = Paragraph::new("Select a table and press Enter to view details\n\nAvailable actions:\n• Enter: Load table details\n• ↑/↓: Navigate tables\n• e: Query Editor\n• c: Connections")
+            .block(Block::default().title("Table Details").borders(Borders::ALL))
+            .wrap(Wrap { trim: true });
+
+        f.render_widget(placeholder, area);
+    }
 }
 
 fn render_query_editor(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
@@ -154,9 +183,14 @@ fn render_query_editor(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         InputMode::Normal => Style::default(),
     };
 
+    let title = match app.input_mode {
+        InputMode::Normal => "SQL Query (Press 'i' to edit)",
+        InputMode::Editing => "SQL Query (Editing - Press Esc to exit)",
+    };
+
     let query_input = Paragraph::new(app.query_input.as_str())
         .style(input_style)
-        .block(Block::default().title("SQL Query").borders(Borders::ALL))
+        .block(Block::default().title(title).borders(Borders::ALL))
         .wrap(Wrap { trim: true });
 
     f.render_widget(query_input, chunks[0]);
@@ -170,41 +204,101 @@ fn render_query_editor(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
 
 fn render_results(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
     if let Some(results) = &app.query_results {
-        let header_cells = results
-            .columns
-            .iter()
-            .map(|col| Cell::from(col.name.clone()))
-            .collect::<Vec<_>>();
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(5),     // Results table
+                Constraint::Length(3),  // Summary and export options
+            ])
+            .split(area);
 
-        let header = Row::new(header_cells)
-            .style(Style::default().bg(Color::Blue).fg(Color::White))
-            .height(1);
+        // Render results table
+        render_results_table(f, chunks[0], results);
 
-        let rows = results.rows.iter().map(|row| {
-            let cells = row
-                .values
-                .iter()
-                .map(|value| Cell::from(value.to_string()))
-                .collect::<Vec<_>>();
-            Row::new(cells).height(1)
-        });
-
-        let num_columns = results.columns.len().min(5);
-        let widths = vec![Constraint::Percentage(20); num_columns];
-
-        let table = Table::new(rows)
-            .header(header)
-            .block(Block::default().title("Query Results").borders(Borders::ALL))
-            .widths(&widths);
-
-        f.render_widget(table, area);
+        // Render summary and export options
+        render_results_summary(f, chunks[1], results);
     } else {
-        let placeholder = Paragraph::new("No results to display")
-            .block(Block::default().title("Query Results").borders(Borders::ALL))
-            .alignment(Alignment::Center);
+        let placeholder = Paragraph::new("No query results to display\n\nExecute a query from the Query Editor to see results here.\n\nKeyboard shortcuts:\n• e: Go to Query Editor\n• Ctrl+Enter: Execute query\n• s: Export results to file")
+            .block(Block::default().title("Results").borders(Borders::ALL))
+            .wrap(Wrap { trim: true });
 
         f.render_widget(placeholder, area);
     }
+}
+
+fn render_results_table(f: &mut Frame, area: ratatui::layout::Rect, query_results: &sqlterm_core::QueryResult) {
+    if query_results.columns.is_empty() {
+        let no_data = Paragraph::new("No data returned from query")
+            .block(Block::default().title("Query Results").borders(Borders::ALL))
+            .wrap(Wrap { trim: true });
+        f.render_widget(no_data, area);
+        return;
+    }
+
+    // Create header row
+    let header_cells: Vec<Cell> = query_results.columns
+        .iter()
+        .map(|col| Cell::from(col.name.clone()))
+        .collect();
+
+    let header = Row::new(header_cells)
+        .style(Style::default().bg(Color::Blue).fg(Color::White))
+        .height(1);
+
+    // Create data rows with value truncation for display
+    let rows = query_results.rows.iter().map(|row| {
+        let cells: Vec<Cell> = row.values.iter().map(|value| {
+            let text = value.to_string();
+            // Truncate long values for display
+            let display_text = if text.len() > 50 {
+                format!("{}...", &text[..47])
+            } else {
+                text
+            };
+            Cell::from(display_text)
+        }).collect();
+        Row::new(cells).height(1)
+    });
+
+    // Calculate column widths dynamically
+    let num_columns = query_results.columns.len();
+    let column_width = if num_columns > 0 {
+        100 / num_columns as u16
+    } else {
+        100
+    };
+
+    let widths: Vec<Constraint> = (0..num_columns)
+        .map(|_| Constraint::Percentage(column_width))
+        .collect();
+
+    let title = if query_results.is_truncated {
+        format!("Query Results (showing {} of {} rows)",
+                query_results.truncated_at.unwrap_or(0),
+                query_results.total_rows)
+    } else {
+        format!("Query Results ({} rows)", query_results.total_rows)
+    };
+
+    let table = Table::new(rows)
+        .header(header)
+        .block(Block::default().title(title).borders(Borders::ALL))
+        .widths(&widths);
+
+    f.render_widget(table, area);
+}
+
+fn render_results_summary(f: &mut Frame, area: ratatui::layout::Rect, query_results: &sqlterm_core::QueryResult) {
+    let summary_text = format!(
+        "{} | Press 's' to export to file | 'f' for full results | 'c' to copy",
+        query_results.get_summary()
+    );
+
+    let summary = Paragraph::new(summary_text)
+        .block(Block::default().title("Summary & Export").borders(Borders::ALL))
+        .wrap(Wrap { trim: true });
+
+    f.render_widget(summary, area);
 }
 
 fn render_error_popup(f: &mut Frame, app: &App) {
@@ -245,4 +339,89 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: ratatui::layout::Rect) -> ra
             Constraint::Percentage((100 - percent_x) / 2),
         ])
         .split(popup_layout[1])[1]
+}
+
+fn render_table_info(f: &mut Frame, area: ratatui::layout::Rect, table_details: &sqlterm_core::TableDetails) {
+    let info_text = format!(
+        "Table: {}\nType: {:?}\nSchema: {}\nRows: {}\nSize: {}",
+        table_details.table.name,
+        table_details.table.table_type,
+        table_details.table.schema.as_deref().unwrap_or("default"),
+        table_details.statistics.row_count,
+        table_details.statistics.size_bytes
+            .map(|s| format!("{} bytes", s))
+            .unwrap_or_else(|| "Unknown".to_string())
+    );
+
+    let info_widget = Paragraph::new(info_text)
+        .block(Block::default().title("Table Information").borders(Borders::ALL))
+        .wrap(Wrap { trim: true });
+
+    f.render_widget(info_widget, area);
+}
+
+fn render_table_columns(f: &mut Frame, area: ratatui::layout::Rect, table_details: &sqlterm_core::TableDetails) {
+    let header = Row::new(vec![
+        Cell::from("Column"),
+        Cell::from("Type"),
+        Cell::from("Null"),
+        Cell::from("Key"),
+        Cell::from("Default"),
+    ])
+    .style(Style::default().bg(Color::Blue).fg(Color::White))
+    .height(1);
+
+    let rows = table_details.columns.iter().map(|col| {
+        let key_info = if col.is_primary_key {
+            "PRI"
+        } else if col.is_foreign_key {
+            "FOR"
+        } else if col.is_unique {
+            "UNI"
+        } else {
+            ""
+        };
+
+        Row::new(vec![
+            Cell::from(col.name.clone()),
+            Cell::from(col.data_type.clone()),
+            Cell::from(if col.nullable { "YES" } else { "NO" }),
+            Cell::from(key_info),
+            Cell::from(col.default_value.as_deref().unwrap_or("")),
+        ])
+        .height(1)
+    });
+
+    let widths = [
+        Constraint::Percentage(25),
+        Constraint::Percentage(25),
+        Constraint::Percentage(10),
+        Constraint::Percentage(10),
+        Constraint::Percentage(30),
+    ];
+
+    let table = Table::new(rows)
+        .header(header)
+        .block(Block::default().title("Columns").borders(Borders::ALL))
+        .widths(&widths);
+
+    f.render_widget(table, area);
+}
+
+fn render_table_statistics(f: &mut Frame, area: ratatui::layout::Rect, table_details: &sqlterm_core::TableDetails) {
+    let stats_text = format!(
+        "Statistics:\n• Rows: {}\n• Indexes: {}\n• Foreign Keys: {}\n• Auto Increment: {}",
+        table_details.statistics.row_count,
+        table_details.indexes.len(),
+        table_details.foreign_keys.len(),
+        table_details.statistics.auto_increment_value
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "None".to_string())
+    );
+
+    let stats_widget = Paragraph::new(stats_text)
+        .block(Block::default().title("Statistics").borders(Borders::ALL))
+        .wrap(Wrap { trim: true });
+
+    f.render_widget(stats_widget, area);
 }

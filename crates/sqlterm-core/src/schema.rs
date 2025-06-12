@@ -65,6 +65,23 @@ pub struct ForeignKey {
     pub on_update: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TableDetails {
+    pub table: Table,
+    pub columns: Vec<Column>,
+    pub indexes: Vec<Index>,
+    pub foreign_keys: Vec<ForeignKey>,
+    pub statistics: TableStatistics,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TableStatistics {
+    pub row_count: u64,
+    pub size_bytes: Option<u64>,
+    pub last_updated: Option<String>,
+    pub auto_increment_value: Option<u64>,
+}
+
 #[async_trait]
 pub trait SchemaInspector: Send + Sync {
     /// List all databases
@@ -87,4 +104,36 @@ pub trait SchemaInspector: Send + Sync {
     
     /// Check if table exists
     async fn table_exists(&self, table_name: &str, schema: Option<&str>) -> Result<bool>;
+
+    /// Get comprehensive table details including columns, indexes, foreign keys, and statistics
+    async fn get_table_details(&self, table_name: &str, schema: Option<&str>) -> Result<TableDetails> {
+        let table_info = Table {
+            name: table_name.to_string(),
+            schema: schema.map(|s| s.to_string()),
+            table_type: TableType::Table, // Default, could be enhanced
+            row_count: None,
+            size: None,
+            comment: None,
+        };
+
+        let columns = self.describe_table(table_name, schema).await?;
+        let indexes = self.list_indexes(table_name, schema).await?;
+        let foreign_keys = self.list_foreign_keys(table_name, schema).await?;
+        let row_count = self.get_table_row_count(table_name, schema).await?;
+
+        let statistics = TableStatistics {
+            row_count,
+            size_bytes: None, // Could be implemented per database
+            last_updated: None, // Could be implemented per database
+            auto_increment_value: None, // Could be implemented per database
+        };
+
+        Ok(TableDetails {
+            table: table_info,
+            columns,
+            indexes,
+            foreign_keys,
+            statistics,
+        })
+    }
 }
