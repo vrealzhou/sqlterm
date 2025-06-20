@@ -2,10 +2,9 @@ use crate::app::{App, AppState, InputMode};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::{Line, Span},
     widgets::{
         Block, Borders, Clear, List, ListItem, Paragraph, Table, Row, Cell,
-        Wrap, Tabs,
+        Wrap,
     },
     Frame,
 };

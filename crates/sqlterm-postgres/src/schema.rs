@@ -123,7 +123,7 @@ impl SchemaInspector for PostgresSchemaInspector {
                 let precision: Option<i32> = row.get("numeric_precision");
                 let scale: Option<i32> = row.get("numeric_scale");
 
-                let is_auto_increment = default_value.as_ref().map_or(false, |d| d.contains("nextval"));
+                let is_auto_increment = default_value.as_ref().is_some_and(|d| d.contains("nextval"));
 
                 Column {
                     name,

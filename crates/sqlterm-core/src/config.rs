@@ -2,9 +2,11 @@ use crate::{ConnectionConfig, Result, SqlTermError};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SqlTermConfig {
+    #[serde(default)]
     pub connections: Vec<ConnectionConfig>,
+    #[serde(default)]
     pub settings: Settings,
 }
 
@@ -14,15 +16,6 @@ pub struct Settings {
     pub query_history_size: usize,
     pub auto_save_queries: bool,
     pub theme: String,
-}
-
-impl Default for SqlTermConfig {
-    fn default() -> Self {
-        Self {
-            connections: Vec::new(),
-            settings: Settings::default(),
-        }
-    }
 }
 
 impl Default for Settings {

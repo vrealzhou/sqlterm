@@ -1573,26 +1573,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sqlterm-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "crossterm",
- "serde",
- "serde_json",
- "sqlterm-core",
- "sqlterm-mysql",
- "sqlterm-postgres",
- "sqlterm-sqlite",
- "sqlterm-ui",
- "tokio",
- "toml",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "sqlterm-core"
 version = "0.1.0"
 dependencies = [
@@ -1636,19 +1616,6 @@ dependencies = [
  "async-trait",
  "sqlterm-core",
  "sqlx",
- "tokio",
-]
-
-[[package]]
-name = "sqlterm-ui"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "crossterm",
- "ratatui",
- "serde",
- "serde_json",
- "sqlterm-core",
  "tokio",
 ]
 
@@ -2153,6 +2120,26 @@ name = "typenum"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
+
+[[package]]
+name = "ui"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "crossterm",
+ "ratatui",
+ "serde",
+ "serde_json",
+ "sqlterm-core",
+ "sqlterm-mysql",
+ "sqlterm-postgres",
+ "sqlterm-sqlite",
+ "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "unicode-bidi"

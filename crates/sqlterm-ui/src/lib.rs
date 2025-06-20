@@ -22,8 +22,11 @@ pub type Tui = Terminal<CrosstermBackend<io::Stdout>>;
 
 /// Initialize the terminal
 pub fn init() -> Result<Tui> {
-    execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture)?;
-    enable_raw_mode()?;
+    // Enable raw mode first to check if we have a valid terminal
+    enable_raw_mode().map_err(|e| anyhow::anyhow!("Failed to enable raw mode: {}. This application requires a TTY.", e))?;
+    
+    execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture)
+        .map_err(|e| anyhow::anyhow!("Failed to initialize terminal: {}", e))?;
     
     let backend = CrosstermBackend::new(io::stdout());
     let terminal = Terminal::new(backend)?;

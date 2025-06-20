@@ -28,25 +28,30 @@ impl EventHandler {
                     .checked_sub(last_tick.elapsed())
                     .unwrap_or_else(|| Duration::from_secs(0));
 
-                if event::poll(timeout).unwrap() {
-                    match event::read().unwrap() {
-                        CrosstermEvent::Key(e) => {
-                            if tx.send(Event::Key(e)).is_err() {
-                                break;
+                match event::poll(timeout) {
+                    Ok(true) => {
+                        match event::read() {
+                            Ok(CrosstermEvent::Key(e)) => {
+                                if tx.send(Event::Key(e)).is_err() {
+                                    break;
+                                }
                             }
-                        }
-                        CrosstermEvent::Mouse(e) => {
-                            if tx.send(Event::Mouse(e)).is_err() {
-                                break;
+                            Ok(CrosstermEvent::Mouse(e)) => {
+                                if tx.send(Event::Mouse(e)).is_err() {
+                                    break;
+                                }
                             }
-                        }
-                        CrosstermEvent::Resize(w, h) => {
-                            if tx.send(Event::Resize(w, h)).is_err() {
-                                break;
+                            Ok(CrosstermEvent::Resize(w, h)) => {
+                                if tx.send(Event::Resize(w, h)).is_err() {
+                                    break;
+                                }
                             }
+                            Ok(_) => {}
+                            Err(_) => break, // Exit on read error
                         }
-                        _ => {}
                     }
+                    Ok(false) => {} // No event available
+                    Err(_) => break, // Exit on poll error
                 }
 
                 if last_tick.elapsed() >= tick_rate {

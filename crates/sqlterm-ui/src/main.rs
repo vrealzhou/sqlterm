@@ -2,10 +2,49 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use crossterm::event::KeyEvent;
 use sqlterm_core::{ConnectionConfig, DatabaseType, ConfigManager, ConnectionFactory};
-use sqlterm_ui::{App, EventHandler};
-use sqlterm_ui::app::{AppState, InputMode};
 use std::path::PathBuf;
 use tracing::{info, Level};
+
+mod app;
+mod components;
+mod events;
+mod ui;
+
+use app::{App, AppState, InputMode};
+use events::{Event, EventHandler};
+use crossterm::{
+    event::{DisableMouseCapture, EnableMouseCapture},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use ratatui::{
+    backend::CrosstermBackend,
+    Terminal,
+};
+use std::io;
+
+type Tui = Terminal<CrosstermBackend<io::Stdout>>;
+
+/// Initialize the terminal
+fn init() -> Result<Tui> {
+    // Enable raw mode first to check if we have a valid terminal
+    enable_raw_mode().map_err(|e| anyhow::anyhow!("Failed to enable raw mode: {}. This application requires a TTY.", e))?;
+    
+    execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture)
+        .map_err(|e| anyhow::anyhow!("Failed to initialize terminal: {}", e))?;
+    
+    let backend = CrosstermBackend::new(io::stdout());
+    let terminal = Terminal::new(backend)?;
+    
+    Ok(terminal)
+}
+
+/// Restore the terminal to its original state
+fn restore() -> Result<()> {
+    disable_raw_mode()?;
+    execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
+    Ok(())
+}
 
 #[derive(Parser)]
 #[command(name = "sqlterm")]
@@ -148,7 +187,11 @@ async fn main() -> Result<()> {
 }
 
 async fn run_tui() -> Result<()> {
-    let mut terminal = sqlterm_ui::init()?;
+    let mut terminal = init().map_err(|e| {
+        eprintln!("Failed to initialize terminal: {}", e);
+        e
+    })?;
+    
     let mut app = App::new();
     let mut event_handler = EventHandler::new(250);
 
@@ -198,21 +241,45 @@ async fn run_tui() -> Result<()> {
         "published_posts".to_string(),
     ];
 
-    loop {
-        terminal.draw(|f| sqlterm_ui::ui::render(f, &app))?;
+    let result = run_app_loop(&mut terminal, &mut app, &mut event_handler).await;
+    
+    // Always attempt to restore terminal, even if the app loop failed
+    if let Err(restore_error) = restore() {
+        eprintln!("Failed to restore terminal: {}", restore_error);
+    }
+    
+    result
+}
 
-        if let Ok(event) = event_handler.next().await {
-            if let Err(e) = handle_event(&mut app, event).await {
-                app.set_error(e.to_string());
+async fn run_app_loop(
+    terminal: &mut Tui,
+    app: &mut App,
+    event_handler: &mut EventHandler,
+) -> Result<()> {
+    loop {
+        // Draw the UI
+        if let Err(e) = terminal.draw(|f| ui::render(f, app)) {
+            app.set_error(format!("Failed to render UI: {}", e));
+        }
+
+        // Handle events
+        match event_handler.next().await {
+            Ok(event) => {
+                if let Err(e) = handle_event(app, event).await {
+                    app.set_error(e.to_string());
+                }
+            }
+            Err(e) => {
+                app.set_error(format!("Event handling error: {}", e));
             }
         }
 
+        // Check for quit condition
         if app.should_quit {
             break;
         }
     }
-
-    sqlterm_ui::restore()?;
+    
     Ok(())
 }
 
@@ -222,12 +289,17 @@ async fn connect_and_run_tui(config: ConnectionConfig) -> Result<()> {
     run_tui().await
 }
 
-async fn handle_event(app: &mut App, event: sqlterm_ui::Event) -> Result<()> {
+async fn handle_event(app: &mut App, event: Event) -> Result<()> {
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-    use sqlterm_ui::Event;
 
     match event {
         Event::Key(key_event) => {
+            // Clear any existing error when user presses a key
+            if app.error_message.is_some() {
+                app.clear_error();
+                return Ok(()); // Just clear the error, don't process the key
+            }
+            
             // Global key handlers - these work in any state
             match key_event {
                 KeyEvent {
@@ -281,8 +353,8 @@ async fn handle_event(app: &mut App, event: sqlterm_ui::Event) -> Result<()> {
             }
         }
         Event::Tick => {
-            // Handle periodic updates
-            app.clear_error(); // Clear error after some time
+            // Handle periodic updates - don't clear error immediately
+            // Errors will be cleared when user presses a key or after some time
         }
         Event::Mouse(_) => {
             // Handle mouse events (not implemented yet)
@@ -340,7 +412,7 @@ async fn handle_database_browser_keys(app: &mut App, key_event: KeyEvent) -> Res
             app.select_next_table();
         }
         KeyCode::Enter => {
-            if let Some(table) = app.get_selected_table().cloned() {
+            if let Some(table) = app.get_selected_table().map(|s| s.clone()) {
                 // Load table details
                 load_table_details(app, &table).await?;
             }
@@ -526,7 +598,6 @@ async fn add_connection(config: ConnectionConfig) -> Result<()> {
 }
 
 async fn load_table_details(app: &mut App, table_name: &str) -> Result<()> {
-    use sqlterm_core::{TableDetails, Table, Column, Index, ForeignKey, TableStatistics, TableType};
 
     // Create mock table details for demonstration
     // In a real implementation, this would use the active database connection
@@ -766,8 +837,7 @@ fn create_mock_table_details(table_name: &str) -> sqlterm_core::TableDetails {
 }
 
 async fn execute_query(app: &mut App) -> Result<()> {
-    use sqlterm_core::{QueryResult, ColumnInfo, Row, Value};
-    use std::time::{Duration, Instant};
+    use std::time::Instant;
 
     let start = Instant::now();
     let query = app.query_input.trim();

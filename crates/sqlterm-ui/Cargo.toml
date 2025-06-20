@@ -1,13 +1,24 @@
 [package]
-name = "sqlterm-ui"
+name = "ui"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "sqlterm"
+path = "src/main.rs"
+
 [dependencies]
 sqlterm-core = { path = "../sqlterm-core" }
+sqlterm-mysql = { path = "../sqlterm-mysql" }
+sqlterm-postgres = { path = "../sqlterm-postgres" }
+sqlterm-sqlite = { path = "../sqlterm-sqlite" }
 ratatui = { workspace = true }
 crossterm = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
+clap = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

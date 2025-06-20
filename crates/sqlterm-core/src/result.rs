@@ -39,20 +39,23 @@ pub enum Value {
     Null,
 }
 
-impl Value {
-    pub fn to_string(&self) -> String {
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Value::String(s) => s.clone(),
-            Value::Integer(i) => i.to_string(),
-            Value::Float(f) => f.to_string(),
-            Value::Boolean(b) => b.to_string(),
-            Value::Bytes(b) => format!("<{} bytes>", b.len()),
-            Value::Date(d) => d.clone(),
-            Value::DateTime(dt) => dt.clone(),
-            Value::Time(t) => t.clone(),
-            Value::Null => "NULL".to_string(),
+            Value::String(s) => write!(f, "{}", s),
+            Value::Integer(i) => write!(f, "{}", i),
+            Value::Float(fl) => write!(f, "{}", fl),
+            Value::Boolean(b) => write!(f, "{}", b),
+            Value::Bytes(b) => write!(f, "<{} bytes>", b.len()),
+            Value::Date(d) => write!(f, "{}", d),
+            Value::DateTime(dt) => write!(f, "{}", dt),
+            Value::Time(t) => write!(f, "{}", t),
+            Value::Null => write!(f, "NULL"),
         }
     }
+}
+
+impl Value {
     
     pub fn is_null(&self) -> bool {
         matches!(self, Value::Null)
@@ -146,7 +149,7 @@ impl QueryResult {
         // Rows
         for row in &self.rows {
             let values: Vec<String> = row.values.iter().map(|v| {
-                v.to_string().replace('\t', " ").replace('\n', " ")
+                v.to_string().replace(['\t', '\n'], " ")
             }).collect();
             tsv.push_str(&values.join("\t"));
             tsv.push('\n');
