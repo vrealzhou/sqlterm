@@ -8,6 +8,12 @@ pub enum SqlTermError {
     #[error("Query execution error: {0}")]
     QueryExecution(String),
     
+    #[error("Query error: {0}")]
+    Query(String),
+    
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
+    
     #[error("Schema inspection error: {0}")]
     SchemaInspection(String),
     

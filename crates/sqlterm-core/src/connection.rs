@@ -70,4 +70,13 @@ pub trait DatabaseConnection: Send + Sync {
     
     /// Check if connection is active
     fn is_connected(&self) -> bool;
+    
+    /// Execute a query and return results (simple string-based interface)
+    async fn execute_query(&self, sql: &str) -> Result<crate::QueryResult>;
+    
+    /// List tables in the current database
+    async fn list_tables(&self) -> Result<Vec<String>>;
+    
+    /// Get table details
+    async fn get_table_details(&self, table_name: &str) -> Result<crate::TableDetails>;
 }
