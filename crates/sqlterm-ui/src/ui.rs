@@ -204,29 +204,107 @@ fn render_query_editor(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
         .split(area);
 
-    // Query input
+    // Enhanced query input with cursor and selection support
     let input_style = match app.input_mode {
         InputMode::Editing => Style::default().fg(Color::Yellow),
+        InputMode::Visual => Style::default().fg(Color::Cyan),
         InputMode::Normal => Style::default(),
     };
 
     let title = match app.input_mode {
-        InputMode::Normal => "SQL Query (Press 'i' to edit)",
+        InputMode::Normal => "SQL Query (Press 'i' to edit, 'v' for visual mode)",
         InputMode::Editing => "SQL Query (Editing - Press Esc to exit)",
+        InputMode::Visual => "SQL Query (Visual mode - Press Esc to exit)",
     };
 
-    let query_input = Paragraph::new(app.query_input.as_str())
+    // Prepare content with cursor and selection highlighting
+    let query_content = render_editor_content(app);
+    
+    let query_input = Paragraph::new(query_content)
         .style(input_style)
         .block(Block::default().title(title).borders(Borders::ALL))
-        .wrap(Wrap { trim: true });
+        .wrap(Wrap { trim: false })
+        .scroll((app.query_editor.scroll_offset as u16, 0));
 
     f.render_widget(query_input, chunks[0]);
 
-    // Query history or help (placeholder)
-    let help = Paragraph::new("Query history will appear here")
-        .block(Block::default().title("History").borders(Borders::ALL));
+    // Show cursor position if in query editor
+    if app.state == AppState::QueryEditor {
+        let cursor_info = format!(
+            "Line: {}, Col: {} | Mode: {:?} | Ctrl+Enter: Execute | L: Toggle Logs", 
+            app.query_editor.cursor_line + 1, 
+            app.query_editor.cursor_col + 1,
+            app.input_mode
+        );
+        let help = Paragraph::new(cursor_info)
+            .block(Block::default().title("Status").borders(Borders::ALL));
+        f.render_widget(help, chunks[1]);
+    } else {
+        let help = Paragraph::new("Query history will appear here")
+            .block(Block::default().title("History").borders(Borders::ALL));
+        f.render_widget(help, chunks[1]);
+    }
+}
 
-    f.render_widget(help, chunks[1]);
+fn render_editor_content(app: &App) -> String {
+    use crate::app::InputMode;
+    
+    let mut content = String::new();
+    
+    for (line_idx, line) in app.query_editor.content.iter().enumerate() {
+        if line_idx > 0 {
+            content.push('\n');
+        }
+        
+        if app.input_mode == InputMode::Visual {
+            // Render with selection highlighting
+            if let (Some(start), Some(end)) = (app.query_editor.visual_start, app.query_editor.visual_end) {
+                let selection_start_line = start.0.min(end.0);
+                let selection_end_line = start.0.max(end.0);
+                let selection_start_col = if start.0 <= end.0 { start.1 } else { end.1 };
+                let selection_end_col = if start.0 <= end.0 { end.1 } else { start.1 };
+                
+                if line_idx >= selection_start_line && line_idx <= selection_end_line {
+                    let start_col = if line_idx == selection_start_line { selection_start_col } else { 0 };
+                    let end_col = if line_idx == selection_end_line { selection_end_col.min(line.len()) } else { line.len() };
+                    
+                    // Add unselected part before selection
+                    content.push_str(&line[..start_col]);
+                    
+                    // Add selected part (we'll use different approach for highlighting in terminal)
+                    if start_col < end_col {
+                        content.push_str("▶");
+                        content.push_str(&line[start_col..end_col]);
+                        content.push_str("◀");
+                    }
+                    
+                    // Add unselected part after selection
+                    content.push_str(&line[end_col..]);
+                } else {
+                    content.push_str(line);
+                }
+            } else {
+                content.push_str(line);
+            }
+        } else {
+            content.push_str(line);
+        }
+        
+        // Show cursor position
+        if line_idx == app.query_editor.cursor_line && (app.input_mode == InputMode::Editing || app.input_mode == InputMode::Normal) {
+            if app.query_editor.cursor_col <= line.len() {
+                // Insert cursor marker at cursor position
+                let cursor_pos = app.query_editor.cursor_col;
+                if cursor_pos == line.len() {
+                    content.push('█'); // Block cursor at end of line
+                } else {
+                    // We'll handle this in a more sophisticated way if needed
+                }
+            }
+        }
+    }
+    
+    content
 }
 
 fn render_results(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
@@ -562,4 +640,30 @@ fn render_add_connection_popup(f: &mut Frame, app: &App) {
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(instructions, form_chunks[8]);
+}
+
+fn render_logs_panel(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
+    let logs_text = if app.logs.is_empty() {
+        "No logs yet. Press 'L' to toggle this panel.".to_string()
+    } else {
+        app.logs
+            .iter()
+            .rev() // Show newest logs first
+            .take(5) // Show last 5 logs
+            .map(|log| format!("[{}] [{}] {}", log.timestamp, log.level, log.message))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+
+    let logs_widget = Paragraph::new(logs_text)
+        .style(Style::default().fg(Color::Gray))
+        .block(
+            Block::default()
+                .title("Logs (Press 'L' to toggle)")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::DarkGray))
+        )
+        .wrap(Wrap { trim: true });
+
+    f.render_widget(logs_widget, area);
 }
