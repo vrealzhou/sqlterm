@@ -1,12 +1,13 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use crossterm::event::KeyEvent;
-use sqlterm_core::{ConnectionConfig, DatabaseType, ConfigManager, ConnectionFactory};
+use sqlterm_core::{ConnectionConfig, DatabaseType};
 use std::path::PathBuf;
 use tracing::{info, Level};
 
 mod app;
 mod components;
+mod config;
 mod events;
 mod ui;
 
@@ -197,20 +198,38 @@ async fn run_tui() -> Result<()> {
     let mut app = App::new();
     let mut event_handler = EventHandler::new(250);
 
-    // Add sample connections for testing
-    app.add_connection(ConnectionConfig {
-        name: "In-Memory SQLite (Demo)".to_string(),
-        database_type: DatabaseType::SQLite,
-        host: "".to_string(),
-        port: 0,
-        database: ":memory:".to_string(),
-        username: "".to_string(),
-        password: None,
-        ssl: false,
-        ssh_tunnel: None,
-    });
+    // Load saved connections
+    match load_saved_connections().await {
+        Ok(connections) => {
+            for connection in connections {
+                app.add_connection(connection);
+            }
+            if !app.connections.is_empty() {
+                app.add_log("INFO", &format!("Loaded {} saved connections", app.connections.len()));
+            }
+        }
+        Err(e) => {
+            app.add_log("WARN", &format!("Failed to load saved connections: {}", e));
+        }
+    }
 
-    // Add sample tables
+    // Add demo connection if no saved connections exist
+    if app.connections.is_empty() {
+        app.add_connection(ConnectionConfig {
+            name: "In-Memory SQLite (Demo)".to_string(),
+            database_type: DatabaseType::SQLite,
+            host: "".to_string(),
+            port: 0,
+            database: ":memory:".to_string(),
+            username: "".to_string(),
+            password: None,
+            ssl: false,
+            ssh_tunnel: None,
+        });
+        app.add_log("INFO", "Added demo SQLite connection");
+    }
+
+    // Add sample tables for demo
     app.tables = vec![
         "users".to_string(),
         "posts".to_string(),
@@ -865,13 +884,16 @@ async fn add_connection(config: ConnectionConfig) -> Result<()> {
 }
 
 async fn load_saved_connections() -> Result<Vec<ConnectionConfig>> {
-    // For now, return empty list - in the future this would load from config file
-    Ok(vec![])
+    let config_manager = crate::config::ConfigManager::new()?;
+    config_manager.list_connections()
 }
 
 async fn save_connection(config: ConnectionConfig) -> Result<()> {
-    // For now, just succeed - in the future this would save to config file
-    println!("Connection saved to configuration (mock implementation)");
+    let config_manager = crate::config::ConfigManager::new()?;
+    config_manager.save_connection(&config)?;
+    println!("✓ Connection '{}' saved to {}", 
+             config.name, 
+             config_manager.get_config_directory_path().display());
     Ok(())
 }
 
