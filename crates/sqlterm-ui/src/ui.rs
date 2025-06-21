@@ -90,8 +90,9 @@ fn render_footer(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         }
         AppState::QueryEditor => {
             match app.input_mode {
-                InputMode::Normal => "i: Insert | Ctrl+Enter/Ctrl+R: Execute | b: Browser | c: Connections | q/Esc: Quit",
-                InputMode::Editing => "Esc: Normal mode | Ctrl+Enter/Ctrl+R: Execute | Enter: New line | Ctrl+C: Quit",
+                InputMode::Normal => "i: Insert | v: Visual | hjkl: Move | Ctrl+Enter: Execute | L: Logs | y: Copy | p: Paste",
+                InputMode::Editing => "Esc: Normal mode | Ctrl+Enter: Execute | Arrow keys: Move | Enter: New line",
+                InputMode::Visual => "hjkl: Move | y: Copy selection | Ctrl+Enter: Execute selection | Esc: Normal",
             }
         }
         AppState::Results => {

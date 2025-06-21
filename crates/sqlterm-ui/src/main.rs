@@ -389,7 +389,15 @@ async fn handle_database_browser_keys(app: &mut App, key_event: KeyEvent) -> Res
         KeyCode::Enter => {
             if let Some(table) = app.get_selected_table().map(|s| s.clone()) {
                 // Load table details
-                app.set_error(format!("Loading details for table '{}' (mock data)", table));
+                match load_table_details(app, &table).await {
+                    Ok(()) => {
+                        app.add_log("INFO", &format!("Loaded details for table '{}'", table));
+                    }
+                    Err(e) => {
+                        app.set_error(format!("Failed to load table details: {}", e));
+                        app.add_log("ERROR", &format!("Failed to load table details for '{}': {}", table, e));
+                    }
+                }
             }
         }
         KeyCode::Char('c') => {
@@ -407,43 +415,145 @@ async fn handle_database_browser_keys(app: &mut App, key_event: KeyEvent) -> Res
 async fn handle_query_editor_keys(app: &mut App, key_event: KeyEvent) -> Result<()> {
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    match (key_event.code, key_event.modifiers) {
-        (KeyCode::Esc, _) if app.input_mode == InputMode::Editing => {
-            app.exit_edit_mode();
-        }
-        (KeyCode::Enter, KeyModifiers::CONTROL) | (KeyCode::Char('r'), KeyModifiers::CONTROL) => {
-            if !app.query_input.trim().is_empty() {
-                app.set_error("Query execution not implemented - showing mock results".to_string());
-                app.switch_to_results();
-            } else {
-                app.set_error("No query to execute. Type a query first.".to_string());
+    match app.input_mode {
+        InputMode::Normal => {
+            match (key_event.code, key_event.modifiers) {
+                // Vim-like movement
+                (KeyCode::Char('h'), KeyModifiers::NONE) | (KeyCode::Left, _) => {
+                    app.move_cursor_left();
+                }
+                (KeyCode::Char('l'), KeyModifiers::NONE) | (KeyCode::Right, _) => {
+                    app.move_cursor_right();
+                }
+                (KeyCode::Char('k'), KeyModifiers::NONE) | (KeyCode::Up, _) => {
+                    app.move_cursor_up();
+                }
+                (KeyCode::Char('j'), KeyModifiers::NONE) | (KeyCode::Down, _) => {
+                    app.move_cursor_down();
+                }
+                (KeyCode::Char('0'), KeyModifiers::NONE) | (KeyCode::Home, _) => {
+                    app.move_to_line_start();
+                }
+                (KeyCode::Char('$'), KeyModifiers::NONE) | (KeyCode::End, _) => {
+                    app.move_to_line_end();
+                }
+                
+                // Mode changes
+                (KeyCode::Char('i'), KeyModifiers::NONE) => {
+                    app.enter_edit_mode();
+                }
+                (KeyCode::Char('v'), KeyModifiers::NONE) => {
+                    app.enter_visual_mode();
+                }
+                
+                // Navigation
+                (KeyCode::Char('b'), KeyModifiers::NONE) => {
+                    app.switch_to_database_browser();
+                }
+                (KeyCode::Char('c'), KeyModifiers::NONE) => {
+                    app.switch_to_connection_manager();
+                }
+                
+                // Actions
+                (KeyCode::Enter, KeyModifiers::CONTROL) | (KeyCode::Char('r'), KeyModifiers::CONTROL) => {
+                    execute_current_query(app).await?;
+                }
+                (KeyCode::Char('L'), KeyModifiers::NONE) => {
+                    app.toggle_logs();
+                    app.add_log("INFO", "Toggled logs panel");
+                }
+                (KeyCode::Char('y'), KeyModifiers::NONE) => {
+                    if let Err(e) = app.copy_to_clipboard() {
+                        app.set_error(format!("Failed to copy to clipboard: {}", e));
+                    } else {
+                        app.add_log("INFO", "Copied query to clipboard");
+                    }
+                }
+                (KeyCode::Char('p'), KeyModifiers::NONE) => {
+                    if let Err(e) = app.paste_from_clipboard() {
+                        app.set_error(format!("Failed to paste from clipboard: {}", e));
+                    } else {
+                        app.add_log("INFO", "Pasted from clipboard");
+                    }
+                }
+                _ => {}
             }
         }
-        (KeyCode::Enter, _) if app.input_mode == InputMode::Editing => {
-            // Regular Enter in editing mode - add newline
-            app.query_input.push('\n');
-            app.cursor_position += 1;
-        }
-        (KeyCode::Char('i'), KeyModifiers::NONE) if app.input_mode == InputMode::Normal => {
-            app.enter_edit_mode();
-        }
-        (KeyCode::Char(c), _) if app.input_mode == InputMode::Editing => {
-            app.query_input.push(c);
-            app.cursor_position += 1;
-        }
-        (KeyCode::Backspace, _) if app.input_mode == InputMode::Editing => {
-            if app.cursor_position > 0 {
-                app.query_input.remove(app.cursor_position - 1);
-                app.cursor_position -= 1;
+        InputMode::Editing => {
+            match (key_event.code, key_event.modifiers) {
+                (KeyCode::Esc, _) => {
+                    app.exit_edit_mode();
+                }
+                (KeyCode::Enter, KeyModifiers::CONTROL) => {
+                    execute_current_query(app).await?;
+                }
+                (KeyCode::Enter, _) => {
+                    app.insert_newline();
+                }
+                (KeyCode::Backspace, _) => {
+                    app.delete_char();
+                }
+                (KeyCode::Char(c), _) => {
+                    app.insert_char(c);
+                }
+                (KeyCode::Left, _) => {
+                    app.move_cursor_left();
+                }
+                (KeyCode::Right, _) => {
+                    app.move_cursor_right();
+                }
+                (KeyCode::Up, _) => {
+                    app.move_cursor_up();
+                }
+                (KeyCode::Down, _) => {
+                    app.move_cursor_down();
+                }
+                (KeyCode::Home, _) => {
+                    app.move_to_line_start();
+                }
+                (KeyCode::End, _) => {
+                    app.move_to_line_end();
+                }
+                _ => {}
             }
         }
-        (KeyCode::Char('b'), _) if app.input_mode == InputMode::Normal => {
-            app.switch_to_database_browser();
+        InputMode::Visual => {
+            match (key_event.code, key_event.modifiers) {
+                (KeyCode::Esc, _) => {
+                    app.exit_visual_mode();
+                }
+                (KeyCode::Enter, KeyModifiers::CONTROL) => {
+                    execute_selected_query(app).await?;
+                }
+                (KeyCode::Char('h'), KeyModifiers::NONE) | (KeyCode::Left, _) => {
+                    app.move_cursor_left();
+                }
+                (KeyCode::Char('l'), KeyModifiers::NONE) | (KeyCode::Right, _) => {
+                    app.move_cursor_right();
+                }
+                (KeyCode::Char('k'), KeyModifiers::NONE) | (KeyCode::Up, _) => {
+                    app.move_cursor_up();
+                }
+                (KeyCode::Char('j'), KeyModifiers::NONE) | (KeyCode::Down, _) => {
+                    app.move_cursor_down();
+                }
+                (KeyCode::Char('0'), KeyModifiers::NONE) | (KeyCode::Home, _) => {
+                    app.move_to_line_start();
+                }
+                (KeyCode::Char('$'), KeyModifiers::NONE) | (KeyCode::End, _) => {
+                    app.move_to_line_end();
+                }
+                (KeyCode::Char('y'), KeyModifiers::NONE) => {
+                    if let Err(e) = app.copy_to_clipboard() {
+                        app.set_error(format!("Failed to copy selection to clipboard: {}", e));
+                    } else {
+                        app.add_log("INFO", "Copied selection to clipboard");
+                        app.exit_visual_mode();
+                    }
+                }
+                _ => {}
+            }
         }
-        (KeyCode::Char('c'), _) if app.input_mode == InputMode::Normal => {
-            app.switch_to_connection_manager();
-        }
-        _ => {}
     }
 
     Ok(())
@@ -611,18 +721,27 @@ async fn connect_to_database(app: &mut App, config: ConnectionConfig) -> Result<
     // Get connection info for display
     let conn_info = connection.get_connection_info().await?;
     
+    // Load real table list before storing connection
+    let tables_result = connection.list_tables().await;
+    
     // Store the connection in the app state
     app.active_connection = Some(connection);
     app.current_database = Some(conn_info.database_name.clone());
     
-    // For now, use mock table data - real table loading will be implemented later
-    app.tables = vec![
-        "users".to_string(),
-        "posts".to_string(),
-        "categories".to_string(),
-        "orders".to_string(),
-    ];
-    app.selected_table = 0;
+    // Process table loading results
+    match tables_result {
+        Ok(tables) => {
+            app.tables = tables;
+            app.selected_table = 0;
+            app.add_log("INFO", &format!("Loaded {} tables from database", app.tables.len()));
+        }
+        Err(e) => {
+            app.add_log("ERROR", &format!("Failed to load tables: {}", e));
+            // Fallback to empty list
+            app.tables = vec![];
+            app.selected_table = 0;
+        }
+    }
     
     Ok(())
 }
@@ -753,5 +872,73 @@ async fn load_saved_connections() -> Result<Vec<ConnectionConfig>> {
 async fn save_connection(config: ConnectionConfig) -> Result<()> {
     // For now, just succeed - in the future this would save to config file
     println!("Connection saved to configuration (mock implementation)");
+    Ok(())
+}
+
+async fn execute_current_query(app: &mut App) -> Result<()> {
+    let query = app.get_current_query().trim().to_string();
+    if query.is_empty() {
+        app.set_error("No query to execute. Type a query first.".to_string());
+        return Ok(());
+    }
+    
+    execute_query(app, &query).await
+}
+
+async fn execute_selected_query(app: &mut App) -> Result<()> {
+    let query = if let Some(selected) = app.get_selected_query() {
+        selected.trim().to_string()
+    } else {
+        app.get_current_query().trim().to_string()
+    };
+    
+    if query.is_empty() {
+        app.set_error("No query to execute.".to_string());
+        return Ok(());
+    }
+    
+    execute_query(app, &query).await
+}
+
+async fn execute_query(app: &mut App, query: &str) -> Result<()> {
+    app.add_log("INFO", &format!("Executing query: {}", query.lines().next().unwrap_or("").chars().take(50).collect::<String>()));
+    
+    if let Some(connection) = &app.active_connection {
+        match connection.execute_query(query).await {
+            Ok(result) => {
+                app.add_log("INFO", &format!("Query executed successfully, {} rows returned", result.total_rows));
+                app.set_query_results(result);
+                app.switch_to_results();
+            }
+            Err(e) => {
+                app.add_log("ERROR", &format!("Query execution failed: {}", e));
+                app.set_error(format!("Query execution failed: {}", e));
+            }
+        }
+    } else {
+        app.set_error("No active database connection. Connect to a database first.".to_string());
+        app.add_log("ERROR", "Attempted to execute query without active connection");
+    }
+    
+    Ok(())
+}
+
+async fn load_table_details(app: &mut App, table_name: &str) -> Result<()> {
+    if let Some(connection) = &app.active_connection {
+        match connection.get_table_details(table_name).await {
+            Ok(details) => {
+                app.set_table_details(details);
+                app.add_log("INFO", &format!("Successfully loaded details for table '{}'", table_name));
+            }
+            Err(e) => {
+                app.add_log("ERROR", &format!("Failed to load table details for '{}': {}", table_name, e));
+                return Err(anyhow::anyhow!("Failed to load table details: {}", e));
+            }
+        }
+    } else {
+        app.add_log("ERROR", "No active database connection");
+        return Err(anyhow::anyhow!("No active database connection"));
+    }
+    
     Ok(())
 }
