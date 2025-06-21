@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mysql:
     image: mysql:8.0
@@ -42,7 +40,7 @@ services:
       retries: 5
 
   sqlite:
-    image: alpine:3.18
+    image: alpine:latest
     container_name: sqlterm-sqlite
     volumes:
       - sqlite_data:/data
@@ -80,17 +78,6 @@ services:
     environment:
       - SSH_ENABLE_PASSWORD_AUTH=true
       - SSH_USERS=sqlterm:1000:1000
-
-  adminer:
-    image: adminer
-    container_name: sqlterm-adminer
-    ports:
-      - "8080:8080"
-    networks:
-      - sqlterm-network
-    depends_on:
-      - mysql
-      - postgres
 
 volumes:
   mysql_data:

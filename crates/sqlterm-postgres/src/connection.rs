@@ -12,17 +12,29 @@ pub struct PostgresConnection {
 
 impl PostgresConnection {
     fn build_connection_string(config: &ConnectionConfig) -> String {
-        let mut url = format!(
-            "postgresql://{}:{}@{}:{}/{}",
-            config.username,
-            config.password.as_deref().unwrap_or(""),
-            config.host,
-            config.port,
-            config.database
-        );
+        let mut url = if let Some(password) = &config.password {
+            format!(
+                "postgresql://{}:{}@{}:{}/{}",
+                config.username,
+                password,
+                config.host,
+                config.port,
+                config.database
+            )
+        } else {
+            format!(
+                "postgresql://{}@{}:{}/{}",
+                config.username,
+                config.host,
+                config.port,
+                config.database
+            )
+        };
         
         if config.ssl {
             url.push_str("?sslmode=require");
+        } else {
+            url.push_str("?sslmode=disable");
         }
         
         url

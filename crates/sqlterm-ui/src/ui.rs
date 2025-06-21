@@ -10,28 +10,52 @@ use ratatui::{
 };
 
 pub fn render(f: &mut Frame, app: &App) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3), // Header
-            Constraint::Min(0),    // Main content
-            Constraint::Length(3), // Footer
-        ])
-        .split(f.size());
+    let main_chunks = if app.show_logs {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3),  // Header
+                Constraint::Min(0),     // Main content
+                Constraint::Length(6),  // Log panel
+                Constraint::Length(3),  // Footer
+            ])
+            .split(f.size())
+    } else {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3), // Header
+                Constraint::Min(0),    // Main content
+                Constraint::Length(3), // Footer
+            ])
+            .split(f.size())
+    };
 
     // Render header
-    render_header(f, chunks[0], app);
+    render_header(f, main_chunks[0], app);
 
     // Render main content based on current state
+    let content_area = main_chunks[1];
     match app.state {
-        AppState::ConnectionManager => render_connection_manager(f, chunks[1], app),
-        AppState::DatabaseBrowser => render_database_browser(f, chunks[1], app),
-        AppState::QueryEditor => render_query_editor(f, chunks[1], app),
-        AppState::Results => render_results(f, chunks[1], app),
+        AppState::ConnectionManager => render_connection_manager(f, content_area, app),
+        AppState::DatabaseBrowser => render_database_browser(f, content_area, app),
+        AppState::QueryEditor => render_query_editor(f, content_area, app),
+        AppState::Results => render_results(f, content_area, app),
+        AppState::AddConnection => render_connection_manager(f, content_area, app), // Render base, then popup
     }
 
-    // Render footer
-    render_footer(f, chunks[2], app);
+    // Render logs panel if enabled
+    if app.show_logs {
+        render_logs_panel(f, main_chunks[2], app);
+        render_footer(f, main_chunks[3], app);
+    } else {
+        render_footer(f, main_chunks[2], app);
+    }
+
+    // Render add connection popup if in add connection state
+    if app.state == AppState::AddConnection {
+        render_add_connection_popup(f, app);
+    }
 
     // Render error popup if there's an error
     if app.error_message.is_some() {
@@ -45,6 +69,7 @@ fn render_header(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         AppState::DatabaseBrowser => "Database Browser",
         AppState::QueryEditor => "Query Editor",
         AppState::Results => "Query Results",
+        AppState::AddConnection => "Connection Manager",
     };
 
     let header = Paragraph::new(format!("SQLTerm - {}", title))
@@ -71,6 +96,9 @@ fn render_footer(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         }
         AppState::Results => {
             "s: Export to file | f: Show full results | c: Copy | e: Query Editor | b: Browser | q: Quit"
+        }
+        AppState::AddConnection => {
+            "Tab/↓: Next field | Shift+Tab/↑: Previous field | Enter: Connect | Esc: Cancel"
         }
     };
 
@@ -423,4 +451,115 @@ fn render_table_statistics(f: &mut Frame, area: ratatui::layout::Rect, table_det
         .wrap(Wrap { trim: true });
 
     f.render_widget(stats_widget, area);
+}
+
+fn render_add_connection_popup(f: &mut Frame, app: &App) {
+    use sqlterm_core::DatabaseType;
+
+    // Create a centered popup area
+    let area = centered_rect(70, 60, f.size());
+    f.render_widget(Clear, area);
+
+    // Create form layout
+    let form_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),  // Title
+            Constraint::Length(3),  // Name
+            Constraint::Length(3),  // Database Type
+            Constraint::Length(3),  // Host
+            Constraint::Length(3),  // Port
+            Constraint::Length(3),  // Database
+            Constraint::Length(3),  // Username
+            Constraint::Length(3),  // Password
+            Constraint::Length(3),  // Instructions
+        ])
+        .split(area);
+
+    let form = &app.connection_form;
+
+    // Title
+    let title = Paragraph::new("Add New Connection")
+        .style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD))
+        .alignment(Alignment::Center)
+        .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Blue)));
+    f.render_widget(title, form_chunks[0]);
+
+    // Helper function to create field widget
+    let create_field = |label: String, value: String, is_selected: bool| {
+        let style = if is_selected {
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        let border_style = if is_selected {
+            Style::default().fg(Color::Yellow)
+        } else {
+            Style::default().fg(Color::Gray)
+        };
+        
+        Paragraph::new(value)
+            .style(style)
+            .block(
+                Block::default()
+                    .title(label)
+                    .borders(Borders::ALL)
+                    .border_style(border_style)
+            )
+    };
+
+    // Name field
+    f.render_widget(
+        create_field("Name".to_string(), form.name.clone(), form.selected_field == 0),
+        form_chunks[1]
+    );
+
+    // Database Type field
+    let db_type_display = match form.database_type {
+        DatabaseType::SQLite => "SQLite (s)",
+        DatabaseType::MySQL => "MySQL (m)", 
+        DatabaseType::PostgreSQL => "PostgreSQL (p)",
+    };
+    f.render_widget(
+        create_field("Database Type (s/m/p)".to_string(), db_type_display.to_string(), form.selected_field == 1),
+        form_chunks[2]
+    );
+
+    // Host field
+    f.render_widget(
+        create_field("Host".to_string(), form.host.clone(), form.selected_field == 2),
+        form_chunks[3]
+    );
+
+    // Port field
+    f.render_widget(
+        create_field("Port".to_string(), form.port.clone(), form.selected_field == 3),
+        form_chunks[4]
+    );
+
+    // Database field
+    f.render_widget(
+        create_field("Database".to_string(), form.database.clone(), form.selected_field == 4),
+        form_chunks[5]
+    );
+
+    // Username field
+    f.render_widget(
+        create_field("Username".to_string(), form.username.clone(), form.selected_field == 5),
+        form_chunks[6]
+    );
+
+    // Password field (masked)
+    let masked_password = "*".repeat(form.password.len());
+    f.render_widget(
+        create_field("Password".to_string(), masked_password, form.selected_field == 6),
+        form_chunks[7]
+    );
+
+    // Instructions
+    let instructions = Paragraph::new("Tab/↓: Next field | Shift+Tab/↑: Previous field | Enter: Connect | Esc: Cancel")
+        .style(Style::default().fg(Color::Gray))
+        .alignment(Alignment::Center)
+        .block(Block::default().borders(Borders::ALL));
+    f.render_widget(instructions, form_chunks[8]);
 }
