@@ -257,55 +257,109 @@ fn render_editor_content(app: &App) -> String {
             content.push('\n');
         }
         
+        let is_cursor_line = line_idx == app.query_editor.cursor_line;
+        let cursor_col = app.query_editor.cursor_col;
+        
         if app.input_mode == InputMode::Visual {
             // Render with selection highlighting
             if let (Some(start), Some(end)) = (app.query_editor.visual_start, app.query_editor.visual_end) {
-                let selection_start_line = start.0.min(end.0);
-                let selection_end_line = start.0.max(end.0);
-                let selection_start_col = if start.0 <= end.0 { start.1 } else { end.1 };
-                let selection_end_col = if start.0 <= end.0 { end.1 } else { start.1 };
+                // Calculate selection bounds properly
+                let (selection_start_line, selection_start_col, selection_end_line, selection_end_col) = 
+                    if start.0 < end.0 || (start.0 == end.0 && start.1 <= end.1) {
+                        (start.0, start.1, end.0, end.1)
+                    } else {
+                        (end.0, end.1, start.0, start.1)
+                    };
                 
                 if line_idx >= selection_start_line && line_idx <= selection_end_line {
-                    let start_col = if line_idx == selection_start_line { selection_start_col } else { 0 };
-                    let end_col = if line_idx == selection_end_line { selection_end_col.min(line.len()) } else { line.len() };
+                    let start_col = if line_idx == selection_start_line { 
+                        selection_start_col.min(line.len()) 
+                    } else { 
+                        0 
+                    };
+                    let end_col = if line_idx == selection_end_line { 
+                        selection_end_col.min(line.len()) 
+                    } else { 
+                        line.len() 
+                    };
                     
-                    // Add unselected part before selection
-                    content.push_str(&line[..start_col]);
-                    
-                    // Add selected part (we'll use different approach for highlighting in terminal)
-                    if start_col < end_col {
-                        content.push_str("▶");
-                        content.push_str(&line[start_col..end_col]);
-                        content.push_str("◀");
-                    }
-                    
-                    // Add unselected part after selection
-                    content.push_str(&line[end_col..]);
+                    render_line_with_cursor(&mut content, line, is_cursor_line, cursor_col, Some((start_col, end_col)));
                 } else {
-                    content.push_str(line);
+                    render_line_with_cursor(&mut content, line, is_cursor_line, cursor_col, None);
                 }
             } else {
-                content.push_str(line);
+                render_line_with_cursor(&mut content, line, is_cursor_line, cursor_col, None);
             }
         } else {
-            content.push_str(line);
-        }
-        
-        // Show cursor position
-        if line_idx == app.query_editor.cursor_line && (app.input_mode == InputMode::Editing || app.input_mode == InputMode::Normal) {
-            if app.query_editor.cursor_col <= line.len() {
-                // Insert cursor marker at cursor position
-                let cursor_pos = app.query_editor.cursor_col;
-                if cursor_pos == line.len() {
-                    content.push('█'); // Block cursor at end of line
-                } else {
-                    // We'll handle this in a more sophisticated way if needed
-                }
-            }
+            render_line_with_cursor(&mut content, line, is_cursor_line, cursor_col, None);
         }
     }
     
     content
+}
+
+fn render_line_with_cursor(content: &mut String, line: &str, is_cursor_line: bool, cursor_col: usize, selection: Option<(usize, usize)>) {
+    if let Some((start_col, end_col)) = selection {
+        // Render line with selection
+        if start_col > 0 {
+            let pre_selection = &line[..start_col];
+            if is_cursor_line && cursor_col <= start_col {
+                insert_cursor_in_text(content, pre_selection, cursor_col);
+            } else {
+                content.push_str(pre_selection);
+            }
+        }
+        
+        // Add selected part with visual markers
+        if start_col < end_col {
+            content.push_str("▶");
+            let selected_text = &line[start_col..end_col];
+            if is_cursor_line && cursor_col >= start_col && cursor_col <= end_col {
+                insert_cursor_in_text(content, selected_text, cursor_col - start_col);
+            } else {
+                content.push_str(selected_text);
+            }
+            content.push_str("◀");
+        }
+        
+        // Add unselected part after selection
+        if end_col < line.len() {
+            let post_selection = &line[end_col..];
+            if is_cursor_line && cursor_col >= end_col {
+                insert_cursor_in_text(content, post_selection, cursor_col - end_col);
+            } else {
+                content.push_str(post_selection);
+            }
+        }
+        
+        // Add cursor at end if needed
+        if is_cursor_line && cursor_col >= line.len() {
+            content.push('│');
+        }
+    } else {
+        // Render line without selection
+        if is_cursor_line {
+            insert_cursor_in_text(content, line, cursor_col);
+            if cursor_col >= line.len() {
+                content.push('│');
+            }
+        } else {
+            content.push_str(line);
+        }
+    }
+}
+
+fn insert_cursor_in_text(content: &mut String, text: &str, cursor_pos: usize) {
+    if cursor_pos == 0 {
+        content.push('│');
+        content.push_str(text);
+    } else if cursor_pos >= text.len() {
+        content.push_str(text);
+    } else {
+        content.push_str(&text[..cursor_pos]);
+        content.push('│');
+        content.push_str(&text[cursor_pos..]);
+    }
 }
 
 fn render_results(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {

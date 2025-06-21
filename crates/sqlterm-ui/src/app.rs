@@ -319,6 +319,7 @@ impl App {
         self.input_mode = InputMode::Visual;
         self.query_editor.visual_start = Some((self.query_editor.cursor_line, self.query_editor.cursor_col));
         self.query_editor.visual_end = Some((self.query_editor.cursor_line, self.query_editor.cursor_col));
+        self.add_log("DEBUG", &format!("Entered visual mode at line:{}, col:{}", self.query_editor.cursor_line, self.query_editor.cursor_col));
     }
 
     pub fn exit_visual_mode(&mut self) {
@@ -332,6 +333,10 @@ impl App {
     pub fn update_visual_selection(&mut self) {
         if self.input_mode == InputMode::Visual {
             self.query_editor.visual_end = Some((self.query_editor.cursor_line, self.query_editor.cursor_col));
+            if let Some(start) = self.query_editor.visual_start {
+                self.add_log("DEBUG", &format!("Visual selection: ({},{}) to ({},{})", 
+                    start.0, start.1, self.query_editor.cursor_line, self.query_editor.cursor_col));
+            }
         }
     }
 

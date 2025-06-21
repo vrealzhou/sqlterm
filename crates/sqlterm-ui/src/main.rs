@@ -199,7 +199,7 @@ async fn run_tui() -> Result<()> {
     let mut event_handler = EventHandler::new(250);
 
     // Load saved connections
-    match load_saved_connections().await {
+    match load_saved_connections(&mut app).await {
         Ok(connections) => {
             for connection in connections {
                 app.add_connection(connection);
@@ -474,12 +474,16 @@ async fn handle_query_editor_keys(app: &mut App, key_event: KeyEvent) -> Result<
                 }
                 
                 // Actions
-                (KeyCode::Enter, KeyModifiers::CONTROL) | (KeyCode::Char('r'), KeyModifiers::CONTROL) => {
+                (KeyCode::Enter, KeyModifiers::CONTROL) => {
+                    app.add_log("DEBUG", "Ctrl+Enter detected in Normal mode");
+                    execute_current_query(app).await?;
+                }
+                (KeyCode::Char('r'), KeyModifiers::CONTROL) => {
                     execute_current_query(app).await?;
                 }
                 (KeyCode::Char('L'), KeyModifiers::NONE) => {
                     app.toggle_logs();
-                    app.add_log("INFO", "Toggled logs panel");
+                    app.add_log("INFO", &format!("Toggled logs panel (now: {})", app.show_logs));
                 }
                 (KeyCode::Char('y'), KeyModifiers::NONE) => {
                     if let Err(e) = app.copy_to_clipboard() {
@@ -504,7 +508,12 @@ async fn handle_query_editor_keys(app: &mut App, key_event: KeyEvent) -> Result<
                     app.exit_edit_mode();
                 }
                 (KeyCode::Enter, KeyModifiers::CONTROL) => {
+                    app.add_log("DEBUG", "Ctrl+Enter detected in Editing mode");
                     execute_current_query(app).await?;
+                }
+                (KeyCode::Char('L'), KeyModifiers::CONTROL) => {
+                    app.toggle_logs();
+                    app.add_log("INFO", &format!("Toggled logs panel (now: {})", app.show_logs));
                 }
                 (KeyCode::Enter, _) => {
                     app.insert_newline();
@@ -542,6 +551,7 @@ async fn handle_query_editor_keys(app: &mut App, key_event: KeyEvent) -> Result<
                     app.exit_visual_mode();
                 }
                 (KeyCode::Enter, KeyModifiers::CONTROL) => {
+                    app.add_log("DEBUG", "Ctrl+Enter detected in Visual mode");
                     execute_selected_query(app).await?;
                 }
                 (KeyCode::Char('h'), KeyModifiers::NONE) | (KeyCode::Left, _) => {
@@ -561,6 +571,10 @@ async fn handle_query_editor_keys(app: &mut App, key_event: KeyEvent) -> Result<
                 }
                 (KeyCode::Char('$'), KeyModifiers::NONE) | (KeyCode::End, _) => {
                     app.move_to_line_end();
+                }
+                (KeyCode::Char('L'), KeyModifiers::CONTROL) => {
+                    app.toggle_logs();
+                    app.add_log("INFO", &format!("Toggled logs panel (now: {})", app.show_logs));
                 }
                 (KeyCode::Char('y'), KeyModifiers::NONE) => {
                     if let Err(e) = app.copy_to_clipboard() {
@@ -821,8 +835,14 @@ async fn connect_and_run_tui(config: ConnectionConfig) -> Result<()> {
 }
 
 async fn list_connections() -> Result<()> {
-    match load_saved_connections().await {
-        Ok(connections) => {
+    let config_manager = crate::config::ConfigManager::new()?;
+    match config_manager.list_connections_with_errors() {
+        Ok((connections, errors)) => {
+            // Print any errors that occurred during loading
+            for error in &errors {
+                eprintln!("Warning: {}", error);
+            }
+            
             if connections.is_empty() {
                 println!("No saved connections found.");
                 println!("Add a connection with: sqlterm add <name> --db-type <type> --host <host> --database <db> --username <user>");
@@ -883,9 +903,16 @@ async fn add_connection(config: ConnectionConfig) -> Result<()> {
     Ok(())
 }
 
-async fn load_saved_connections() -> Result<Vec<ConnectionConfig>> {
+async fn load_saved_connections(app: &mut App) -> Result<Vec<ConnectionConfig>> {
     let config_manager = crate::config::ConfigManager::new()?;
-    config_manager.list_connections()
+    let (connections, errors) = config_manager.list_connections_with_errors()?;
+    
+    // Log any errors that occurred during loading
+    for error in errors {
+        app.add_log("ERROR", &error);
+    }
+    
+    Ok(connections)
 }
 
 async fn save_connection(config: ConnectionConfig) -> Result<()> {

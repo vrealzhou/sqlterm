@@ -76,11 +76,12 @@ impl ConfigManager {
         Ok(stored_config.connection)
     }
 
-    pub fn list_connections(&self) -> Result<Vec<ConnectionConfig>> {
+    pub fn list_connections_with_errors(&self) -> Result<(Vec<ConnectionConfig>, Vec<String>)> {
         let mut connections = Vec::new();
+        let mut errors = Vec::new();
         
         if !self.config_dir.exists() {
-            return Ok(connections);
+            return Ok((connections, errors));
         }
 
         for entry in fs::read_dir(&self.config_dir)? {
@@ -91,7 +92,8 @@ impl ConfigManager {
                 match self.load_connection_from_path(&path) {
                     Ok(config) => connections.push(config),
                     Err(e) => {
-                        eprintln!("Warning: Failed to load connection from {:?}: {}", path, e);
+                        // Collect errors to be logged by the app
+                        errors.push(format!("Failed to load connection from {:?}: {}", path, e));
                     }
                 }
             }
@@ -100,6 +102,11 @@ impl ConfigManager {
         // Sort by name for consistent ordering
         connections.sort_by(|a, b| a.name.cmp(&b.name));
         
+        Ok((connections, errors))
+    }
+
+    pub fn list_connections(&self) -> Result<Vec<ConnectionConfig>> {
+        let (connections, _) = self.list_connections_with_errors()?;
         Ok(connections)
     }
 
