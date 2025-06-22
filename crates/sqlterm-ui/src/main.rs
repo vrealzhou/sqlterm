@@ -640,7 +640,7 @@ async fn handle_add_connection_keys(app: &mut App, key_event: KeyEvent) -> Resul
             if let Ok(config) = create_connection_from_form(&app.connection_form) {
                 match connect_to_database(app, config.clone()).await {
                     Ok(()) => {
-                        app.add_connection(config);
+                        // Connection is auto-saved and added to app by connect_to_database
                         app.connection_form = ConnectionForm::default();
                         app.switch_to_database_browser();
                     }
@@ -776,6 +776,40 @@ async fn connect_to_database(app: &mut App, config: ConnectionConfig) -> Result<
         }
     }
     
+    // Auto-save connection to config if it's not already saved
+    if let Err(e) = auto_save_connection_config(app, &config).await {
+        app.add_log("WARN", &format!("Failed to auto-save connection config: {}", e));
+    }
+    
+    Ok(())
+}
+
+async fn auto_save_connection_config(app: &mut App, config: &ConnectionConfig) -> Result<()> {
+    let config_manager = crate::config::ConfigManager::new()?;
+    
+    // Check if this connection already exists in the config
+    if config_manager.connection_exists(&config.name) {
+        app.add_log("DEBUG", &format!("Connection '{}' already exists in config, skipping auto-save", config.name));
+        return Ok(());
+    }
+    
+    // Save the connection config
+    match config_manager.save_connection(config) {
+        Ok(()) => {
+            app.add_log("INFO", &format!("Auto-saved connection '{}' to config", config.name));
+            
+            // Add the connection to the app's connection list if it's not already there
+            let connection_exists_in_app = app.connections.iter().any(|c| c.name == config.name);
+            if !connection_exists_in_app {
+                app.add_connection(config.clone());
+                app.add_log("DEBUG", &format!("Added connection '{}' to app connection list", config.name));
+            }
+        }
+        Err(e) => {
+            return Err(anyhow::anyhow!("Failed to save connection config: {}", e));
+        }
+    }
+    
     Ok(())
 }
 
@@ -807,9 +841,8 @@ async fn connect_and_run_tui(config: ConnectionConfig) -> Result<()> {
             println!("✓ Connected successfully to {}", config.name);
             println!("Starting TUI...");
             
-            // Add the connection to the app and start TUI
-            app.connections.clear(); // Remove demo connections
-            app.add_connection(config);
+            // Remove demo connections but keep the newly added connection
+            app.connections.retain(|c| c.name == config.name);
             app.switch_to_database_browser();
             
             // Start the TUI with this connection
@@ -879,19 +912,9 @@ async fn add_connection(config: ConnectionConfig) -> Result<()> {
     match connect_to_database(&mut app, config.clone()).await {
         Ok(()) => {
             println!("✓ Connection test successful");
-            
-            // Save the connection
-            match save_connection(config.clone()).await {
-                Ok(()) => {
-                    println!("✓ Connection '{}' saved successfully", config.name);
-                    println!("Use 'sqlterm list' to see all connections");
-                    println!("Use 'sqlterm tui' to start the interactive interface");
-                }
-                Err(e) => {
-                    eprintln!("✗ Failed to save connection: {}", e);
-                    return Err(e);
-                }
-            }
+            println!("✓ Connection '{}' saved automatically", config.name);
+            println!("Use 'sqlterm list' to see all connections");
+            println!("Use 'sqlterm tui' to start the interactive interface");
         }
         Err(e) => {
             eprintln!("✗ Connection test failed: {}", e);
@@ -915,14 +938,6 @@ async fn load_saved_connections(app: &mut App) -> Result<Vec<ConnectionConfig>> 
     Ok(connections)
 }
 
-async fn save_connection(config: ConnectionConfig) -> Result<()> {
-    let config_manager = crate::config::ConfigManager::new()?;
-    config_manager.save_connection(&config)?;
-    println!("✓ Connection '{}' saved to {}", 
-             config.name, 
-             config_manager.get_config_directory_path().display());
-    Ok(())
-}
 
 async fn execute_current_query(app: &mut App) -> Result<()> {
     let query = app.get_current_query().trim().to_string();
