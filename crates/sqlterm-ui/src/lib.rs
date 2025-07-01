@@ -1,10 +1,13 @@
 pub mod app;
 pub mod components;
+pub mod config;
+pub mod conversation;
 pub mod events;
 pub mod ui;
 
 pub use app::App;
 pub use events::{Event, EventHandler};
+pub use conversation::ConversationApp;
 
 use anyhow::Result;
 use crossterm::{

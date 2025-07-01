@@ -90,9 +90,9 @@ fn render_footer(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         }
         AppState::QueryEditor => {
             match app.input_mode {
-                InputMode::Normal => "i: Insert | v: Visual | hjkl: Move | Ctrl+Enter: Execute | L: Logs | y: Copy | p: Paste",
-                InputMode::Editing => "Esc: Normal mode | Ctrl+Enter: Execute | Arrow keys: Move | Enter: New line",
-                InputMode::Visual => "hjkl: Move | y: Copy selection | Ctrl+Enter: Execute selection | Esc: Normal",
+                InputMode::Normal => "i: Insert | v: Visual | hjkl: Move | r: Execute | L: Logs | y: Copy | p: Paste",
+                InputMode::Editing => "Esc: Normal mode | Arrow keys: Move | Enter: New line",
+                InputMode::Visual => "hjkl: Move | y: Copy selection | Esc: Normal",
             }
         }
         AppState::Results => {
@@ -232,7 +232,7 @@ fn render_query_editor(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
     // Show cursor position if in query editor
     if app.state == AppState::QueryEditor {
         let cursor_info = format!(
-            "Line: {}, Col: {} | Mode: {:?} | Ctrl+Enter: Execute | L: Toggle Logs", 
+            "Line: {}, Col: {} | Mode: {:?} | r: Execute | L: Toggle Logs", 
             app.query_editor.cursor_line + 1, 
             app.query_editor.cursor_col + 1,
             app.input_mode

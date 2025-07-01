@@ -37,6 +37,7 @@ pub enum Value {
     DateTime(String),
     Time(String),
     Null,
+    Unknown(String), // For types we can't convert, store the raw string representation
 }
 
 impl std::fmt::Display for Value {
@@ -51,6 +52,7 @@ impl std::fmt::Display for Value {
             Value::DateTime(dt) => write!(f, "{}", dt),
             Value::Time(t) => write!(f, "{}", t),
             Value::Null => write!(f, "NULL"),
+            Value::Unknown(s) => write!(f, "{}", s),
         }
     }
 }

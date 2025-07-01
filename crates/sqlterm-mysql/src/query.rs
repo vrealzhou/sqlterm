@@ -56,18 +56,45 @@ impl QueryExecutor for MySqlQueryExecutor {
             .map(|row| {
                 let values = (0..row.len())
                     .map(|i| {
-                        // This is a simplified conversion - in a real implementation,
-                        // you'd handle all MySQL types properly
+                        // Try to get the column type info
+                        let column = &row.columns()[i];
+                        let type_name = column.type_info().name();
+                        
+                        // Check if it's null first
+                        if row.try_get::<Option<String>, _>(i).unwrap_or(None).is_none() {
+                            return Value::Null;
+                        }
+                        
+                        // MySQL type conversion with better handling
                         if let Ok(val) = row.try_get::<String, _>(i) {
                             Value::String(val)
                         } else if let Ok(val) = row.try_get::<i64, _>(i) {
                             Value::Integer(val)
+                        } else if let Ok(val) = row.try_get::<i32, _>(i) {
+                            Value::Integer(val as i64)
+                        } else if let Ok(val) = row.try_get::<i16, _>(i) {
+                            Value::Integer(val as i64)
+                        } else if let Ok(val) = row.try_get::<i8, _>(i) {
+                            Value::Integer(val as i64)
+                        } else if let Ok(val) = row.try_get::<u32, _>(i) {
+                            Value::Integer(val as i64)
+                        } else if let Ok(val) = row.try_get::<u16, _>(i) {
+                            Value::Integer(val as i64)
+                        } else if let Ok(val) = row.try_get::<u8, _>(i) {
+                            Value::Integer(val as i64)
                         } else if let Ok(val) = row.try_get::<f64, _>(i) {
                             Value::Float(val)
+                        } else if let Ok(val) = row.try_get::<f32, _>(i) {
+                            Value::Float(val as f64)
                         } else if let Ok(val) = row.try_get::<bool, _>(i) {
                             Value::Boolean(val)
                         } else {
-                            Value::Null
+                            // For unknown types, try to get as string or create unknown value
+                            if let Ok(val) = row.try_get::<String, _>(i) {
+                                Value::Unknown(val)
+                            } else {
+                                Value::Unknown(format!("<{} type>", type_name))
+                            }
                         }
                     })
                     .collect();

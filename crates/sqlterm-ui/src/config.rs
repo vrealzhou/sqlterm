@@ -12,20 +12,35 @@ pub struct StoredConnectionConfig {
     pub last_used: Option<String>,
 }
 
+#[derive(Clone)]
 pub struct ConfigManager {
     config_dir: PathBuf,
+    connections_dir: PathBuf,
+    sessions_dir: PathBuf,
 }
 
 impl ConfigManager {
     pub fn new() -> Result<Self> {
         let config_dir = Self::get_config_directory()?;
+        let connections_dir = config_dir.join("connections");
+        let sessions_dir = config_dir.join("sessions");
         
-        // Create config directory if it doesn't exist
+        // Create config directories if they don't exist
         if !config_dir.exists() {
             fs::create_dir_all(&config_dir)?;
         }
+        if !connections_dir.exists() {
+            fs::create_dir_all(&connections_dir)?;
+        }
+        if !sessions_dir.exists() {
+            fs::create_dir_all(&sessions_dir)?;
+        }
         
-        Ok(ConfigManager { config_dir })
+        Ok(ConfigManager { 
+            config_dir,
+            connections_dir, 
+            sessions_dir,
+        })
     }
 
     fn get_config_directory() -> Result<PathBuf> {
@@ -45,7 +60,7 @@ impl ConfigManager {
             })
             .collect::<String>();
         
-        self.config_dir.join(format!("{}.toml", safe_name))
+        self.connections_dir.join(format!("{}.toml", safe_name))
     }
 
     pub fn save_connection(&self, config: &ConnectionConfig) -> Result<()> {
@@ -80,11 +95,11 @@ impl ConfigManager {
         let mut connections = Vec::new();
         let mut errors = Vec::new();
         
-        if !self.config_dir.exists() {
+        if !self.connections_dir.exists() {
             return Ok((connections, errors));
         }
 
-        for entry in fs::read_dir(&self.config_dir)? {
+        for entry in fs::read_dir(&self.connections_dir)? {
             let entry = entry?;
             let path = entry.path();
             
@@ -152,6 +167,62 @@ impl ConfigManager {
 
     pub fn get_config_directory_path(&self) -> &PathBuf {
         &self.config_dir
+    }
+
+    pub fn get_connections_directory_path(&self) -> &PathBuf {
+        &self.connections_dir
+    }
+
+    pub fn get_sessions_directory_path(&self) -> &PathBuf {
+        &self.sessions_dir
+    }
+
+    // Session management methods (for future use)
+    pub fn save_session(&self, session_name: &str, content: &str) -> Result<()> {
+        let session_file = self.sessions_dir.join(format!("{}.txt", session_name));
+        fs::write(session_file, content)?;
+        Ok(())
+    }
+
+    pub fn load_session(&self, session_name: &str) -> Result<String> {
+        let session_file = self.sessions_dir.join(format!("{}.txt", session_name));
+        if !session_file.exists() {
+            return Err(anyhow::anyhow!("Session '{}' not found", session_name));
+        }
+        Ok(fs::read_to_string(session_file)?)
+    }
+
+    pub fn list_sessions(&self) -> Result<Vec<String>> {
+        let mut sessions = Vec::new();
+        
+        if !self.sessions_dir.exists() {
+            return Ok(sessions);
+        }
+
+        for entry in fs::read_dir(&self.sessions_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            
+            if path.extension().and_then(|s| s.to_str()) == Some("txt") {
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    sessions.push(stem.to_string());
+                }
+            }
+        }
+
+        sessions.sort();
+        Ok(sessions)
+    }
+
+    pub fn delete_session(&self, session_name: &str) -> Result<()> {
+        let session_file = self.sessions_dir.join(format!("{}.txt", session_name));
+        
+        if !session_file.exists() {
+            return Err(anyhow::anyhow!("Session '{}' not found", session_name));
+        }
+
+        fs::remove_file(&session_file)?;
+        Ok(())
     }
 }
 

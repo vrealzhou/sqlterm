@@ -56,12 +56,23 @@ impl QueryExecutor for PostgresQueryExecutor {
             .map(|row| {
                 let values = (0..row.len())
                     .map(|i| {
-                        // PostgreSQL type conversion - simplified for now
+                        // Try to get the column type info
+                        let column = &row.columns()[i];
+                        let type_name = column.type_info().name();
+                        
+                        // Check if it's null first
+                        if row.try_get::<Option<String>, _>(i).unwrap_or(None).is_none() {
+                            return Value::Null;
+                        }
+                        
+                        // PostgreSQL type conversion with better handling
                         if let Ok(val) = row.try_get::<String, _>(i) {
                             Value::String(val)
                         } else if let Ok(val) = row.try_get::<i64, _>(i) {
                             Value::Integer(val)
                         } else if let Ok(val) = row.try_get::<i32, _>(i) {
+                            Value::Integer(val as i64)
+                        } else if let Ok(val) = row.try_get::<i16, _>(i) {
                             Value::Integer(val as i64)
                         } else if let Ok(val) = row.try_get::<f64, _>(i) {
                             Value::Float(val)
@@ -70,7 +81,12 @@ impl QueryExecutor for PostgresQueryExecutor {
                         } else if let Ok(val) = row.try_get::<bool, _>(i) {
                             Value::Boolean(val)
                         } else {
-                            Value::Null
+                            // For unknown types, try to get as string or create unknown value
+                            if let Ok(val) = row.try_get::<String, _>(i) {
+                                Value::Unknown(val)
+                            } else {
+                                Value::Unknown(format!("<{} type>", type_name))
+                            }
                         }
                     })
                     .collect();

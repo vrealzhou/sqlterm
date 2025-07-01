@@ -8,6 +8,7 @@ use tracing::{info, Level};
 mod app;
 mod components;
 mod config;
+mod conversation;
 mod events;
 mod ui;
 
@@ -68,7 +69,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Start the interactive terminal UI
+    /// Start the interactive terminal UI (legacy mode)
     Tui,
     /// Connect to a database directly
     Connect {
@@ -128,8 +129,12 @@ async fn main() -> Result<()> {
     info!("Starting sqlterm");
 
     match cli.command {
-        Some(Commands::Tui) | None => {
+        Some(Commands::Tui) => {
             run_tui().await?;
+        }
+        None => {
+            // Default to conversation mode
+            run_conversation().await?;
         }
         Some(Commands::Connect { 
             db_type, 
@@ -187,6 +192,11 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+async fn run_conversation() -> Result<()> {
+    let mut app = conversation::ConversationApp::new()?;
+    app.run().await
 }
 
 async fn run_tui() -> Result<()> {
@@ -474,12 +484,9 @@ async fn handle_query_editor_keys(app: &mut App, key_event: KeyEvent) -> Result<
                 }
                 
                 // Actions
-                (KeyCode::Enter, KeyModifiers::CONTROL) => {
-                    app.add_log("DEBUG", "Ctrl+Enter detected in Normal mode");
-                    execute_current_query(app).await?;
-                }
-                (KeyCode::Char('r'), KeyModifiers::CONTROL) => {
-                    execute_current_query(app).await?;
+                (KeyCode::Char('r'), KeyModifiers::NONE) => {
+                    app.add_log("DEBUG", "r key detected in Normal mode - executing query");
+                    execute_query_smart(app).await?;
                 }
                 (KeyCode::Char('L'), KeyModifiers::NONE) => {
                     app.toggle_logs();
@@ -506,10 +513,6 @@ async fn handle_query_editor_keys(app: &mut App, key_event: KeyEvent) -> Result<
             match (key_event.code, key_event.modifiers) {
                 (KeyCode::Esc, _) => {
                     app.exit_edit_mode();
-                }
-                (KeyCode::Enter, KeyModifiers::CONTROL) => {
-                    app.add_log("DEBUG", "Ctrl+Enter detected in Editing mode");
-                    execute_current_query(app).await?;
                 }
                 (KeyCode::Char('L'), KeyModifiers::CONTROL) => {
                     app.toggle_logs();
@@ -549,10 +552,6 @@ async fn handle_query_editor_keys(app: &mut App, key_event: KeyEvent) -> Result<
             match (key_event.code, key_event.modifiers) {
                 (KeyCode::Esc, _) => {
                     app.exit_visual_mode();
-                }
-                (KeyCode::Enter, KeyModifiers::CONTROL) => {
-                    app.add_log("DEBUG", "Ctrl+Enter detected in Visual mode");
-                    execute_selected_query(app).await?;
                 }
                 (KeyCode::Char('h'), KeyModifiers::NONE) | (KeyCode::Left, _) => {
                     app.move_cursor_left();
@@ -947,6 +946,53 @@ async fn execute_current_query(app: &mut App) -> Result<()> {
     }
     
     execute_query(app, &query).await
+}
+
+async fn execute_query_smart(app: &mut App) -> Result<()> {
+    // First try to get selected query if in visual mode
+    if let Some(selected) = app.get_selected_query() {
+        let query = selected.trim().to_string();
+        if !query.is_empty() {
+            app.add_log("INFO", "Executing selected query");
+            return execute_query(app, &query).await;
+        }
+    }
+    
+    // If no selection, find the first complete query in the editor
+    let full_content = app.get_current_query();
+    if full_content.trim().is_empty() {
+        app.set_error("No query to execute. Type a query first.".to_string());
+        return Ok(());
+    }
+    
+    // Look for the first query that ends with semicolon or use the full content
+    let query = find_first_query(&full_content).unwrap_or(full_content.trim().to_string());
+    
+    if query.is_empty() {
+        app.set_error("No query to execute. Type a query first.".to_string());
+        return Ok(());
+    }
+    
+    app.add_log("INFO", "Executing first query found in editor");
+    execute_query(app, &query).await
+}
+
+fn find_first_query(content: &str) -> Option<String> {
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    
+    // Look for the first semicolon to identify a complete query
+    if let Some(semicolon_pos) = trimmed.find(';') {
+        let first_query = trimmed[..=semicolon_pos].trim();
+        if !first_query.is_empty() {
+            return Some(first_query.to_string());
+        }
+    }
+    
+    // If no semicolon found, return the entire content
+    Some(trimmed.to_string())
 }
 
 async fn execute_selected_query(app: &mut App) -> Result<()> {
