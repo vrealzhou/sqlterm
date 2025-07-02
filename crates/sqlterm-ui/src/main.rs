@@ -351,6 +351,7 @@ async fn handle_event(app: &mut App, event: Event) -> Result<()> {
                 AppState::QueryEditor => handle_query_editor_keys(app, key_event).await?,
                 AppState::Results => handle_results_keys(app, key_event).await?,
                 AppState::AddConnection => handle_add_connection_keys(app, key_event).await?,
+                AppState::Conversation => handle_conversation_keys(app, key_event).await?,
             }
         }
         Event::Tick => {
@@ -1048,6 +1049,284 @@ async fn load_table_details(app: &mut App, table_name: &str) -> Result<()> {
     } else {
         app.add_log("ERROR", "No active database connection");
         return Err(anyhow::anyhow!("No active database connection"));
+    }
+    
+    Ok(())
+}
+
+async fn handle_conversation_keys(app: &mut App, key_event: KeyEvent) -> Result<()> {
+    use crossterm::event::{KeyCode, KeyModifiers};
+
+    match (key_event.code, key_event.modifiers) {
+        // Handle completion navigation if dropdown is visible
+        (KeyCode::Up, _) if app.completion_state.is_visible => {
+            app.select_previous_completion();
+        }
+        (KeyCode::Down, _) if app.completion_state.is_visible => {
+            app.select_next_completion();
+        }
+        (KeyCode::Tab, _) if app.completion_state.is_visible => {
+            // Tab fills the completion but doesn't execute
+            app.apply_selected_completion();
+        }
+        (KeyCode::Esc, _) if app.completion_state.is_visible => {
+            // Escape cancels completion
+            app.hide_completions();
+        }
+        (KeyCode::Enter, _) if app.completion_state.is_visible => {
+            // Enter executes the selected completion
+            if app.apply_selected_completion() {
+                // Execute the completed input
+                execute_conversation_input(app).await?;
+            }
+        }
+        
+        // Normal input handling when no completion dropdown
+        (KeyCode::Enter, _) => {
+            execute_conversation_input(app).await?;
+        }
+        (KeyCode::Tab, _) => {
+            // Tab triggers completion
+            app.update_completions();
+        }
+        (KeyCode::Backspace, _) => {
+            app.conversation_delete_char();
+        }
+        (KeyCode::Left, _) => {
+            app.conversation_move_cursor_left();
+        }
+        (KeyCode::Right, _) => {
+            app.conversation_move_cursor_right();
+        }
+        (KeyCode::Home, _) => {
+            app.conversation_move_cursor_to_start();
+        }
+        (KeyCode::End, _) => {
+            app.conversation_move_cursor_to_end();
+        }
+        (KeyCode::Char(c), _) => {
+            app.conversation_insert_char(c);
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+async fn execute_conversation_input(app: &mut App) -> Result<()> {
+    let input = app.conversation_input.trim().to_string();
+    if input.is_empty() {
+        return Ok(());
+    }
+
+    // Add input to history
+    app.add_conversation_entry(input.clone(), None, false, None);
+    
+    // Clear input
+    app.conversation_clear_input();
+
+    // Process the input
+    if input.starts_with('/') {
+        // Handle command
+        execute_conversation_command(app, &input).await?;
+    } else if input.starts_with('@') {
+        // Handle file reference
+        execute_conversation_file_reference(app, &input).await?;
+    } else {
+        // Handle SQL query
+        execute_conversation_query(app, &input).await?;
+    }
+
+    Ok(())
+}
+
+async fn execute_conversation_command(app: &mut App, command: &str) -> Result<()> {
+    let parts: Vec<&str> = command.split_whitespace().collect();
+    if parts.is_empty() {
+        return Ok(());
+    }
+
+    let cmd = parts[0];
+    let args = &parts[1..];
+
+    match cmd {
+        "/help" => {
+            let help_text = "Available commands:\n\
+                /connect <name> - Connect to saved connection\n\
+                /list-connections - Show saved connections\n\
+                /tables - List tables in current database\n\
+                /describe <table> - Show table structure\n\
+                /status - Show connection status\n\
+                /clear - Clear conversation history\n\
+                /quit or /exit - Quit SQLTerm\n\
+                \n\
+                You can also:\n\
+                • Type SQL queries directly\n\
+                • Reference files with @filename.sql\n\
+                • Use @file.sql 2 for specific queries\n\
+                • Use @file.sql 2-5 for query ranges";
+            
+            app.add_conversation_entry(command.to_string(), Some(help_text.to_string()), false, None);
+        }
+        "/connect" => {
+            if args.is_empty() {
+                app.add_conversation_entry(command.to_string(), Some("Usage: /connect <connection_name>".to_string()), false, None);
+                return Ok(());
+            }
+
+            let conn_name = args[0];
+            let config_manager = crate::config::ConfigManager::new()?;
+            
+            if let Ok(connections) = config_manager.list_connections() {
+                if let Some(config) = connections.iter().find(|c| c.name == conn_name) {
+                    match connect_to_database(app, config.clone()).await {
+                        Ok(()) => {
+                            let output = format!("✅ Connected to {}", config.name);
+                            app.add_conversation_entry(command.to_string(), Some(output), false, None);
+                            
+                            // Update table list for completion
+                            if let Some(connection) = &app.active_connection {
+                                if let Ok(tables) = connection.list_tables().await {
+                                    app.tables = tables;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            let output = format!("❌ Failed to connect: {}", e);
+                            app.add_conversation_entry(command.to_string(), Some(output), false, None);
+                        }
+                    }
+                } else {
+                    let output = format!("❌ Connection '{}' not found. Use /list-connections to see available connections.", conn_name);
+                    app.add_conversation_entry(command.to_string(), Some(output), false, None);
+                }
+            }
+        }
+        "/list-connections" => {
+            let config_manager = crate::config::ConfigManager::new()?;
+            match config_manager.list_connections() {
+                Ok(connections) => {
+                    if connections.is_empty() {
+                        app.add_conversation_entry(command.to_string(), Some("No saved connections found.".to_string()), false, None);
+                    } else {
+                        let mut output = "Saved connections:\n".to_string();
+                        for (i, conn) in connections.iter().enumerate() {
+                            output.push_str(&format!("{}. {} - {}://{}:{}/{}\n", 
+                                i + 1, conn.name, conn.database_type.to_string().to_lowercase(),
+                                conn.host, conn.port, conn.database));
+                        }
+                        app.add_conversation_entry(command.to_string(), Some(output), false, None);
+                    }
+                }
+                Err(e) => {
+                    let output = format!("❌ Failed to list connections: {}", e);
+                    app.add_conversation_entry(command.to_string(), Some(output), false, None);
+                }
+            }
+        }
+        "/tables" => {
+            if let Some(connection) = &app.active_connection {
+                match connection.list_tables().await {
+                    Ok(tables) => {
+                        if tables.is_empty() {
+                            app.add_conversation_entry(command.to_string(), Some("No tables found.".to_string()), false, None);
+                        } else {
+                            let mut output = "Tables:\n".to_string();
+                            for (i, table) in tables.iter().enumerate() {
+                                output.push_str(&format!("{}. {}\n", i + 1, table));
+                            }
+                            app.tables = tables; // Update for completion
+                            app.add_conversation_entry(command.to_string(), Some(output), false, None);
+                        }
+                    }
+                    Err(e) => {
+                        let output = format!("❌ Failed to list tables: {}", e);
+                        app.add_conversation_entry(command.to_string(), Some(output), false, None);
+                    }
+                }
+            } else {
+                app.add_conversation_entry(command.to_string(), Some("❌ No active connection. Use /connect first.".to_string()), false, None);
+            }
+        }
+        "/describe" | "/desc" => {
+            if args.is_empty() {
+                app.add_conversation_entry(command.to_string(), Some("Usage: /describe <table_name>".to_string()), false, None);
+                return Ok(());
+            }
+
+            let table_name = args[0];
+            if let Some(connection) = &app.active_connection {
+                match connection.get_table_details(table_name).await {
+                    Ok(details) => {
+                        let mut output = format!("Table: {}\n", details.table.name);
+                        output.push_str(&format!("Columns:\n"));
+                        for col in &details.columns {
+                            output.push_str(&format!("  {} {} {}\n", 
+                                col.name, col.data_type, if col.nullable { "(NULL)" } else { "(NOT NULL)" }));
+                        }
+                        app.add_conversation_entry(command.to_string(), Some(output), false, None);
+                    }
+                    Err(e) => {
+                        let output = format!("❌ Failed to describe table: {}", e);
+                        app.add_conversation_entry(command.to_string(), Some(output), false, None);
+                    }
+                }
+            } else {
+                app.add_conversation_entry(command.to_string(), Some("❌ No active connection. Use /connect first.".to_string()), false, None);
+            }
+        }
+        "/status" => {
+            let output = if let Some(db) = &app.current_database {
+                format!("✅ Connected to: {}", db)
+            } else {
+                "❌ Not connected to any database".to_string()
+            };
+            app.add_conversation_entry(command.to_string(), Some(output), false, None);
+        }
+        "/clear" => {
+            app.conversation_history.clear();
+            app.add_conversation_entry(command.to_string(), Some("Conversation history cleared.".to_string()), false, None);
+        }
+        "/quit" | "/exit" => {
+            app.quit();
+        }
+        _ => {
+            let output = format!("❌ Unknown command: {}. Type /help for available commands.", cmd);
+            app.add_conversation_entry(command.to_string(), Some(output), false, None);
+        }
+    }
+
+    Ok(())
+}
+
+async fn execute_conversation_file_reference(app: &mut App, input: &str) -> Result<()> {
+    // This would implement the same file reference logic as conversation.rs
+    // For now, just show a placeholder
+    let output = format!("📁 File reference processing for: {} (not yet implemented in TUI mode)", input);
+    app.add_conversation_entry(input.to_string(), Some(output), false, None);
+    Ok(())
+}
+
+async fn execute_conversation_query(app: &mut App, query: &str) -> Result<()> {
+    if let Some(connection) = &app.active_connection {
+        match connection.execute_query(query).await {
+            Ok(results) => {
+                if results.columns.is_empty() {
+                    let output = format!("✅ Query executed successfully ({} rows affected)", results.total_rows);
+                    app.add_conversation_entry(query.to_string(), Some(output), true, Some(results));
+                } else {
+                    let output = format!("📊 Query returned {} rows", results.total_rows);
+                    app.add_conversation_entry(query.to_string(), Some(output), true, Some(results));
+                }
+            }
+            Err(e) => {
+                let output = format!("❌ Query failed: {}", e);
+                app.add_conversation_entry(query.to_string(), Some(output), true, None);
+            }
+        }
+    } else {
+        let output = "❌ No active connection. Use /connect first.".to_string();
+        app.add_conversation_entry(query.to_string(), Some(output), true, None);
     }
     
     Ok(())

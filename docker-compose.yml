@@ -39,22 +39,6 @@ services:
       timeout: 5s
       retries: 5
 
-  sqlite:
-    image: alpine:latest
-    container_name: sqlterm-sqlite
-    volumes:
-      - sqlite_data:/data
-      - ./docker/sqlite:/init
-    networks:
-      - sqlterm-network
-    command: >
-      sh -c "
-        apk add --no-cache sqlite &&
-        chmod +x /init/create_db.sh &&
-        /init/create_db.sh &&
-        tail -f /dev/null
-      "
-
   bastion:
     build:
       context: .

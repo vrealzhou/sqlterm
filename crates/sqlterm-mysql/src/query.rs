@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sqlx::{MySql, Pool, Row, Column, TypeInfo};
+use sqlx::{MySql, Pool, Row, Column, TypeInfo, ValueRef};
 use sqlterm_core::{
     Query, QueryExecutor, QueryResult, QueryExecution, PreparedStatement, Transaction,
     Result, SqlTermError, Value, ColumnInfo
@@ -60,40 +60,137 @@ impl QueryExecutor for MySqlQueryExecutor {
                         let column = &row.columns()[i];
                         let type_name = column.type_info().name();
                         
-                        // Check if it's null first
-                        if row.try_get::<Option<String>, _>(i).unwrap_or(None).is_none() {
-                            return Value::Null;
+                        // Check if the column is null using the raw value interface
+                        use sqlx::Row as _;
+                        if let Ok(raw_value) = row.try_get_raw(i) {
+                            if raw_value.is_null() {
+                                return Value::Null;
+                            }
                         }
                         
-                        // MySQL type conversion with better handling
-                        if let Ok(val) = row.try_get::<String, _>(i) {
-                            Value::String(val)
-                        } else if let Ok(val) = row.try_get::<i64, _>(i) {
-                            Value::Integer(val)
-                        } else if let Ok(val) = row.try_get::<i32, _>(i) {
-                            Value::Integer(val as i64)
-                        } else if let Ok(val) = row.try_get::<i16, _>(i) {
-                            Value::Integer(val as i64)
-                        } else if let Ok(val) = row.try_get::<i8, _>(i) {
-                            Value::Integer(val as i64)
-                        } else if let Ok(val) = row.try_get::<u32, _>(i) {
-                            Value::Integer(val as i64)
-                        } else if let Ok(val) = row.try_get::<u16, _>(i) {
-                            Value::Integer(val as i64)
-                        } else if let Ok(val) = row.try_get::<u8, _>(i) {
-                            Value::Integer(val as i64)
-                        } else if let Ok(val) = row.try_get::<f64, _>(i) {
-                            Value::Float(val)
-                        } else if let Ok(val) = row.try_get::<f32, _>(i) {
-                            Value::Float(val as f64)
-                        } else if let Ok(val) = row.try_get::<bool, _>(i) {
-                            Value::Boolean(val)
-                        } else {
-                            // For unknown types, try to get as string or create unknown value
-                            if let Ok(val) = row.try_get::<String, _>(i) {
-                                Value::Unknown(val)
-                            } else {
-                                Value::Unknown(format!("<{} type>", type_name))
+                        // MySQL type conversion - check by MySQL type name first
+                        match type_name {
+                            // MySQL integer types
+                            "TINYINT" => {
+                                if let Ok(val) = row.try_get::<i8, _>(i) {
+                                    Value::Integer(val as i64)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as i8", type_name))
+                                }
+                            }
+                            "SMALLINT" => {
+                                if let Ok(val) = row.try_get::<i16, _>(i) {
+                                    Value::Integer(val as i64)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as i16", type_name))
+                                }
+                            }
+                            "MEDIUMINT" | "INT" | "INTEGER" => {
+                                if let Ok(val) = row.try_get::<i32, _>(i) {
+                                    Value::Integer(val as i64)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as i32", type_name))
+                                }
+                            }
+                            "BIGINT" => {
+                                if let Ok(val) = row.try_get::<i64, _>(i) {
+                                    Value::Integer(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as i64", type_name))
+                                }
+                            }
+                            // MySQL float types
+                            "FLOAT" => {
+                                if let Ok(val) = row.try_get::<f32, _>(i) {
+                                    Value::Float(val as f64)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as f32", type_name))
+                                }
+                            }
+                            "DOUBLE" => {
+                                if let Ok(val) = row.try_get::<f64, _>(i) {
+                                    Value::Float(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as f64", type_name))
+                                }
+                            }
+                            // MySQL boolean type
+                            "BOOLEAN" | "BOOL" => {
+                                if let Ok(val) = row.try_get::<bool, _>(i) {
+                                    Value::Boolean(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as bool", type_name))
+                                }
+                            }
+                            // MySQL decimal/numeric types
+                            "DECIMAL" | "NUMERIC" => {
+                                // Try as f64 first, then as string for high precision
+                                if let Ok(val) = row.try_get::<f64, _>(i) {
+                                    Value::Float(val)
+                                } else if let Ok(val) = row.try_get::<String, _>(i) {
+                                    Value::String(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as f64 or String", type_name))
+                                }
+                            }
+                            // MySQL text types
+                            "VARCHAR" | "CHAR" | "TEXT" | "TINYTEXT" | "MEDIUMTEXT" | "LONGTEXT" | "JSON" => {
+                                if let Ok(val) = row.try_get::<String, _>(i) {
+                                    Value::String(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as String", type_name))
+                                }
+                            }
+                            // MySQL date/time types
+                            "DATETIME" | "TIMESTAMP" => {
+                                if let Ok(val) = row.try_get::<String, _>(i) {
+                                    Value::DateTime(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as String", type_name))
+                                }
+                            }
+                            "DATE" => {
+                                if let Ok(val) = row.try_get::<String, _>(i) {
+                                    Value::Date(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as String", type_name))
+                                }
+                            }
+                            "TIME" => {
+                                if let Ok(val) = row.try_get::<String, _>(i) {
+                                    Value::Time(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as String", type_name))
+                                }
+                            }
+                            // Default fallback - try different types
+                            _ => {
+                                // Try common types in order
+                                if let Ok(val) = row.try_get::<i32, _>(i) {
+                                    Value::Integer(val as i64)
+                                } else if let Ok(val) = row.try_get::<i64, _>(i) {
+                                    Value::Integer(val)
+                                } else if let Ok(val) = row.try_get::<i16, _>(i) {
+                                    Value::Integer(val as i64)
+                                } else if let Ok(val) = row.try_get::<i8, _>(i) {
+                                    Value::Integer(val as i64)
+                                } else if let Ok(val) = row.try_get::<u32, _>(i) {
+                                    Value::Integer(val as i64)
+                                } else if let Ok(val) = row.try_get::<u16, _>(i) {
+                                    Value::Integer(val as i64)
+                                } else if let Ok(val) = row.try_get::<u8, _>(i) {
+                                    Value::Integer(val as i64)
+                                } else if let Ok(val) = row.try_get::<f64, _>(i) {
+                                    Value::Float(val)
+                                } else if let Ok(val) = row.try_get::<f32, _>(i) {
+                                    Value::Float(val as f64)
+                                } else if let Ok(val) = row.try_get::<bool, _>(i) {
+                                    Value::Boolean(val)
+                                } else if let Ok(val) = row.try_get::<String, _>(i) {
+                                    Value::String(val)
+                                } else {
+                                    Value::Unknown(format!("Unknown MySQL type: {}", type_name))
+                                }
                             }
                         }
                     })

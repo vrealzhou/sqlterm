@@ -42,6 +42,7 @@ pub fn render(f: &mut Frame, app: &App) {
         AppState::QueryEditor => render_query_editor(f, content_area, app),
         AppState::Results => render_results(f, content_area, app),
         AppState::AddConnection => render_connection_manager(f, content_area, app), // Render base, then popup
+        AppState::Conversation => render_conversation(f, content_area, app),
     }
 
     // Render logs panel if enabled
@@ -70,6 +71,7 @@ fn render_header(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         AppState::QueryEditor => "Query Editor",
         AppState::Results => "Query Results",
         AppState::AddConnection => "Connection Manager",
+        AppState::Conversation => "Conversation Mode",
     };
 
     let header = Paragraph::new(format!("SQLTerm - {}", title))
@@ -100,6 +102,13 @@ fn render_footer(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         }
         AppState::AddConnection => {
             "Tab/↓: Next field | Shift+Tab/↑: Previous field | Enter: Connect | Esc: Cancel"
+        }
+        AppState::Conversation => {
+            if app.completion_state.is_visible {
+                "↑/↓: Navigate completions | Tab: Fill | Enter: Execute | Esc: Cancel completion | Ctrl+C: Quit"
+            } else {
+                "Type SQL queries or /commands | Enter: Execute | Tab: Auto-complete | Ctrl+C: Quit"
+            }
         }
     };
 
@@ -721,4 +730,187 @@ fn render_logs_panel(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         .wrap(Wrap { trim: true });
 
     f.render_widget(logs_widget, area);
+}
+
+fn render_conversation(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(5),     // Conversation history area
+            Constraint::Length(3),  // Input area
+        ])
+        .split(area);
+
+    // Render conversation history
+    render_conversation_history(f, chunks[0], app);
+    
+    // Render input area with completion dropdown if visible
+    render_conversation_input(f, chunks[1], app);
+}
+
+fn render_conversation_history(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
+    if app.conversation_history.is_empty() {
+        let welcome_text = if let Some(db) = &app.current_database {
+            format!("Welcome to SQLTerm!\n\nConnected to: {}\n\nType SQL queries or use commands:\n• /help - Show all commands\n• /tables - List tables\n• /describe <table> - Show table structure\n• /connect <name> - Connect to database\n\nYou can also reference SQL files with @filename.sql", db)
+        } else {
+            "Welcome to SQLTerm!\n\nNo active database connection.\n\nAvailable commands:\n• /help - Show all commands\n• /connect <name> - Connect to database\n• /list-connections - Show saved connections\n\nType /help for more information.".to_string()
+        };
+        
+        let welcome = Paragraph::new(welcome_text)
+            .block(Block::default().title("SQLTerm Conversation").borders(Borders::ALL))
+            .wrap(Wrap { trim: true })
+            .style(Style::default().fg(Color::Gray));
+        
+        f.render_widget(welcome, area);
+        return;
+    }
+
+    // Create conversation entries
+    let mut lines = Vec::new();
+    
+    for entry in app.conversation_history.iter() {
+        // Add timestamp and input
+        lines.push(format!("[{}] > {}", entry.timestamp, entry.input));
+        
+        // Add output if present
+        if let Some(output) = &entry.output {
+            for line in output.lines() {
+                lines.push(format!("  {}", line));
+            }
+        }
+        
+        // Add results summary if present
+        if let Some(results) = &entry.results {
+            if results.columns.is_empty() {
+                lines.push(format!("  ✅ Query executed ({} rows affected)", results.total_rows));
+            } else {
+                lines.push(format!("  📊 {} rows returned", results.total_rows));
+                // Could add a condensed table view here
+            }
+        }
+        
+        lines.push("".to_string()); // Empty line between entries
+    }
+    
+    // Handle scrolling
+    let total_lines = lines.len();
+    let visible_lines = area.height.saturating_sub(2) as usize; // Account for borders
+    let start_line = if total_lines > visible_lines {
+        total_lines.saturating_sub(visible_lines)
+    } else {
+        0
+    };
+    
+    let visible_content = if total_lines > start_line {
+        lines[start_line..].join("\n")
+    } else {
+        lines.join("\n")
+    };
+    
+    let history = Paragraph::new(visible_content)
+        .block(Block::default().title("Conversation History").borders(Borders::ALL))
+        .wrap(Wrap { trim: true })
+        .scroll((0, 0));
+    
+    f.render_widget(history, area);
+}
+
+fn render_conversation_input(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
+    // If completions are visible, we need to reserve space for the dropdown
+    let (input_area, completion_area) = if app.completion_state.is_visible && !app.completion_state.completions.is_empty() {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3),  // Input
+                Constraint::Min(1),     // Completion dropdown
+            ])
+            .split(area);
+        (chunks[0], Some(chunks[1]))
+    } else {
+        (area, None)
+    };
+    
+    // Render input box
+    let input_text = if app.conversation_cursor <= app.conversation_input.len() {
+        let before_cursor = &app.conversation_input[..app.conversation_cursor];
+        let after_cursor = &app.conversation_input[app.conversation_cursor..];
+        format!("{}│{}", before_cursor, after_cursor)
+    } else {
+        format!("{}│", app.conversation_input)
+    };
+    
+    let connection_info = if let Some(db) = &app.current_database {
+        format!(" [{}]", db)
+    } else {
+        " [not connected]".to_string()
+    };
+    
+    let input_widget = Paragraph::new(input_text)
+        .style(Style::default().fg(Color::White))
+        .block(
+            Block::default()
+                .title(format!("Input{}", connection_info))
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Blue))
+        );
+    
+    f.render_widget(input_widget, input_area);
+    
+    // Render completion dropdown if visible
+    if let Some(completion_area) = completion_area {
+        render_completion_dropdown(f, completion_area, app);
+    }
+}
+
+fn render_completion_dropdown(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
+    if !app.completion_state.is_visible || app.completion_state.completions.is_empty() {
+        return;
+    }
+    
+    // Limit the number of visible completions
+    let max_visible = (area.height.saturating_sub(2) as usize).min(10);
+    let total_completions = app.completion_state.completions.len();
+    
+    // Calculate which completions to show based on selected index
+    let selected_index = app.completion_state.selected_index;
+    let start_index = if selected_index >= max_visible {
+        selected_index - max_visible + 1
+    } else {
+        0
+    };
+    let end_index = (start_index + max_visible).min(total_completions);
+    
+    // Create list items
+    let items: Vec<ListItem> = app.completion_state.completions[start_index..end_index]
+        .iter()
+        .enumerate()
+        .map(|(i, completion)| {
+            let global_index = start_index + i;
+            let style = if global_index == selected_index {
+                Style::default().bg(Color::Blue).fg(Color::White)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            
+            ListItem::new(completion.display.clone()).style(style)
+        })
+        .collect();
+    
+    let title = if total_completions > max_visible {
+        format!("Completions ({}/{}) - Use ↑/↓ to navigate", 
+               selected_index + 1, total_completions)
+    } else {
+        format!("Completions ({}) - Use ↑/↓ to navigate", total_completions)
+    };
+    
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .title(title)
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow))
+        )
+        .highlight_style(Style::default().add_modifier(Modifier::BOLD));
+    
+    f.render_widget(list, area);
 }

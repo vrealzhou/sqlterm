@@ -1955,6 +1955,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "chrono",
  "sqlterm-core",
  "sqlx",
  "tokio",
@@ -1979,6 +1980,7 @@ dependencies = [
  "async-trait",
  "sqlterm-core",
  "sqlx",
+ "tempfile",
  "tokio",
 ]
 

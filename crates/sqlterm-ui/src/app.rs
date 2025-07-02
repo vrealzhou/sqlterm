@@ -1,5 +1,8 @@
 use sqlterm_core::{ConnectionConfig, DatabaseConnection, TableDetails, DatabaseType};
 use std::collections::VecDeque;
+use rustyline::completion::{Pair, Completer};
+use rustyline::history::MemHistory;
+use rustyline::Context;
 
 #[derive(Debug, Clone)]
 pub struct ConnectionForm {
@@ -37,6 +40,7 @@ pub enum AppState {
     QueryEditor,
     Results,
     AddConnection,
+    Conversation, // New Claude Code-style conversation mode
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -51,6 +55,23 @@ pub struct LogEntry {
     pub timestamp: String,
     pub level: String,
     pub message: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConversationEntry {
+    pub timestamp: String,
+    pub input: String,
+    pub output: Option<String>,
+    pub is_query: bool,
+    pub results: Option<sqlterm_core::QueryResult>,
+}
+
+#[derive(Clone)]
+pub struct CompletionState {
+    pub completions: Vec<Pair>,
+    pub selected_index: usize,
+    pub is_visible: bool,
+    pub trigger_pos: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -87,6 +108,12 @@ pub struct App {
     pub logs: VecDeque<LogEntry>,
     pub max_logs: usize,
     pub show_logs: bool,
+    // Conversation mode fields
+    pub conversation_input: String,
+    pub conversation_cursor: usize,
+    pub conversation_history: VecDeque<ConversationEntry>,
+    pub completion_state: CompletionState,
+    pub scroll_offset: usize,
 }
 
 impl Default for App {
@@ -112,7 +139,7 @@ impl Default for QueryEditor {
 impl App {
     pub fn new() -> Self {
         Self {
-            state: AppState::ConnectionManager,
+            state: AppState::Conversation, // Start in conversation mode
             input_mode: InputMode::Normal,
             should_quit: false,
             connections: Vec::new(),
@@ -131,6 +158,16 @@ impl App {
             logs: VecDeque::new(),
             max_logs: 1000,
             show_logs: false,
+            conversation_input: String::new(),
+            conversation_cursor: 0,
+            conversation_history: VecDeque::new(),
+            completion_state: CompletionState {
+                completions: Vec::new(),
+                selected_index: 0,
+                is_visible: false,
+                trigger_pos: 0,
+            },
+            scroll_offset: 0,
         }
     }
 
@@ -163,6 +200,11 @@ impl App {
         self.input_mode = InputMode::Editing;
         self.connection_form.is_active = true;
         self.connection_form.selected_field = 0;
+    }
+
+    pub fn switch_to_conversation(&mut self) {
+        self.state = AppState::Conversation;
+        self.input_mode = InputMode::Normal;
     }
 
     pub fn enter_edit_mode(&mut self) {
@@ -458,5 +500,139 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    // Conversation mode methods
+    pub fn conversation_insert_char(&mut self, c: char) {
+        self.conversation_input.insert(self.conversation_cursor, c);
+        self.conversation_cursor += 1;
+        self.update_completions();
+    }
+
+    pub fn conversation_delete_char(&mut self) {
+        if self.conversation_cursor > 0 {
+            self.conversation_input.remove(self.conversation_cursor - 1);
+            self.conversation_cursor -= 1;
+            self.update_completions();
+        }
+    }
+
+    pub fn conversation_move_cursor_left(&mut self) {
+        if self.conversation_cursor > 0 {
+            self.conversation_cursor -= 1;
+            self.update_completions();
+        }
+    }
+
+    pub fn conversation_move_cursor_right(&mut self) {
+        if self.conversation_cursor < self.conversation_input.len() {
+            self.conversation_cursor += 1;
+            self.update_completions();
+        }
+    }
+
+    pub fn conversation_move_cursor_to_start(&mut self) {
+        self.conversation_cursor = 0;
+        self.update_completions();
+    }
+
+    pub fn conversation_move_cursor_to_end(&mut self) {
+        self.conversation_cursor = self.conversation_input.len();
+        self.update_completions();
+    }
+
+    pub fn conversation_clear_input(&mut self) {
+        self.conversation_input.clear();
+        self.conversation_cursor = 0;
+        self.hide_completions();
+    }
+
+    pub fn add_conversation_entry(&mut self, input: String, output: Option<String>, is_query: bool, results: Option<sqlterm_core::QueryResult>) {
+        use chrono::Utc;
+        let timestamp = Utc::now().format("%H:%M:%S").to_string();
+        
+        let entry = ConversationEntry {
+            timestamp,
+            input,
+            output,
+            is_query,
+            results,
+        };
+        
+        self.conversation_history.push_back(entry);
+        if self.conversation_history.len() > 100 {
+            self.conversation_history.pop_front();
+        }
+    }
+
+    // Completion methods
+    pub fn update_completions(&mut self) {
+        // Import the completion logic from conversation.rs
+        if let Ok(completer) = crate::conversation::create_completer(&self.tables) {
+            let history = MemHistory::new();
+            let ctx = Context::new(&history);
+            if let Ok((trigger_pos, completions)) = completer.complete(&self.conversation_input, self.conversation_cursor, &ctx) {
+                self.completion_state.completions = completions;
+                self.completion_state.trigger_pos = trigger_pos;
+                self.completion_state.selected_index = 0;
+                self.completion_state.is_visible = !self.completion_state.completions.is_empty();
+            } else {
+                self.hide_completions();
+            }
+        } else {
+            // If completer creation fails, hide completions
+            self.hide_completions();
+        }
+    }
+
+    pub fn hide_completions(&mut self) {
+        self.completion_state.is_visible = false;
+        self.completion_state.completions.clear();
+        self.completion_state.selected_index = 0;
+    }
+
+    pub fn select_next_completion(&mut self) {
+        if self.completion_state.is_visible && !self.completion_state.completions.is_empty() {
+            self.completion_state.selected_index = 
+                (self.completion_state.selected_index + 1) % self.completion_state.completions.len();
+        }
+    }
+
+    pub fn select_previous_completion(&mut self) {
+        if self.completion_state.is_visible && !self.completion_state.completions.is_empty() {
+            self.completion_state.selected_index = if self.completion_state.selected_index == 0 {
+                self.completion_state.completions.len() - 1
+            } else {
+                self.completion_state.selected_index - 1
+            };
+        }
+    }
+
+    pub fn apply_selected_completion(&mut self) -> bool {
+        if self.completion_state.is_visible && 
+           self.completion_state.selected_index < self.completion_state.completions.len() {
+            
+            let completion = &self.completion_state.completions[self.completion_state.selected_index];
+            
+            // Replace from trigger position to cursor
+            let before = &self.conversation_input[..self.completion_state.trigger_pos];
+            let after = &self.conversation_input[self.conversation_cursor..];
+            
+            self.conversation_input = format!("{}{}{}", before, completion.replacement, after);
+            self.conversation_cursor = self.completion_state.trigger_pos + completion.replacement.len();
+            
+            self.hide_completions();
+            return true;
+        }
+        false
+    }
+
+    pub fn get_selected_completion(&self) -> Option<&Pair> {
+        if self.completion_state.is_visible && 
+           self.completion_state.selected_index < self.completion_state.completions.len() {
+            Some(&self.completion_state.completions[self.completion_state.selected_index])
+        } else {
+            None
+        }
     }
 }

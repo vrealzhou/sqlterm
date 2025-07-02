@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sqlx::{Postgres, Pool, Row, Column, TypeInfo};
+use sqlx::{Postgres, Pool, Row, Column, TypeInfo, ValueRef};
 use sqlterm_core::{
     Query, QueryExecutor, QueryResult, QueryExecution, PreparedStatement, Transaction,
     Result, SqlTermError, Value, ColumnInfo
@@ -60,32 +60,121 @@ impl QueryExecutor for PostgresQueryExecutor {
                         let column = &row.columns()[i];
                         let type_name = column.type_info().name();
                         
-                        // Check if it's null first
-                        if row.try_get::<Option<String>, _>(i).unwrap_or(None).is_none() {
-                            return Value::Null;
+                        // Check if the column is null using the raw value interface
+                        use sqlx::Row as _;
+                        if let Ok(raw_value) = row.try_get_raw(i) {
+                            if raw_value.is_null() {
+                                return Value::Null;
+                            }
                         }
                         
-                        // PostgreSQL type conversion with better handling
-                        if let Ok(val) = row.try_get::<String, _>(i) {
-                            Value::String(val)
-                        } else if let Ok(val) = row.try_get::<i64, _>(i) {
-                            Value::Integer(val)
-                        } else if let Ok(val) = row.try_get::<i32, _>(i) {
-                            Value::Integer(val as i64)
-                        } else if let Ok(val) = row.try_get::<i16, _>(i) {
-                            Value::Integer(val as i64)
-                        } else if let Ok(val) = row.try_get::<f64, _>(i) {
-                            Value::Float(val)
-                        } else if let Ok(val) = row.try_get::<f32, _>(i) {
-                            Value::Float(val as f64)
-                        } else if let Ok(val) = row.try_get::<bool, _>(i) {
-                            Value::Boolean(val)
-                        } else {
-                            // For unknown types, try to get as string or create unknown value
-                            if let Ok(val) = row.try_get::<String, _>(i) {
-                                Value::Unknown(val)
-                            } else {
-                                Value::Unknown(format!("<{} type>", type_name))
+                        // PostgreSQL type conversion - check by PostgreSQL type name first
+                        match type_name {
+                            // PostgreSQL integer types
+                            "INT2" | "SMALLINT" | "SMALLSERIAL" => {
+                                if let Ok(val) = row.try_get::<i16, _>(i) {
+                                    Value::Integer(val as i64)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as i16", type_name))
+                                }
+                            }
+                            "INT4" | "INTEGER" | "INT" | "SERIAL" => {
+                                if let Ok(val) = row.try_get::<i32, _>(i) {
+                                    Value::Integer(val as i64)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as i32", type_name))
+                                }
+                            }
+                            "INT8" | "BIGINT" | "BIGSERIAL" => {
+                                if let Ok(val) = row.try_get::<i64, _>(i) {
+                                    Value::Integer(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as i64", type_name))
+                                }
+                            }
+                            // PostgreSQL float types
+                            "FLOAT4" | "REAL" => {
+                                if let Ok(val) = row.try_get::<f32, _>(i) {
+                                    Value::Float(val as f64)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as f32", type_name))
+                                }
+                            }
+                            "FLOAT8" | "DOUBLE PRECISION" => {
+                                if let Ok(val) = row.try_get::<f64, _>(i) {
+                                    Value::Float(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as f64", type_name))
+                                }
+                            }
+                            // PostgreSQL boolean type
+                            "BOOL" | "BOOLEAN" => {
+                                if let Ok(val) = row.try_get::<bool, _>(i) {
+                                    Value::Boolean(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as bool", type_name))
+                                }
+                            }
+                            // PostgreSQL decimal/numeric types
+                            "NUMERIC" | "DECIMAL" => {
+                                // Try as f64 first, then as string for high precision
+                                if let Ok(val) = row.try_get::<f64, _>(i) {
+                                    Value::Float(val)
+                                } else if let Ok(val) = row.try_get::<String, _>(i) {
+                                    Value::String(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as f64 or String", type_name))
+                                }
+                            }
+                            // PostgreSQL text types
+                            "TEXT" | "VARCHAR" | "CHAR" | "BPCHAR" | "NAME" | "CHARACTER VARYING" | "CHARACTER" => {
+                                if let Ok(val) = row.try_get::<String, _>(i) {
+                                    Value::String(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as String", type_name))
+                                }
+                            }
+                            // PostgreSQL date/time types
+                            "TIMESTAMP" | "TIMESTAMPTZ" | "TIMESTAMP WITH TIME ZONE" | "TIMESTAMP WITHOUT TIME ZONE" => {
+                                if let Ok(val) = row.try_get::<String, _>(i) {
+                                    Value::DateTime(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as String", type_name))
+                                }
+                            }
+                            "DATE" => {
+                                if let Ok(val) = row.try_get::<String, _>(i) {
+                                    Value::Date(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as String", type_name))
+                                }
+                            }
+                            "TIME" | "TIMETZ" | "TIME WITH TIME ZONE" | "TIME WITHOUT TIME ZONE" => {
+                                if let Ok(val) = row.try_get::<String, _>(i) {
+                                    Value::Time(val)
+                                } else {
+                                    Value::Unknown(format!("Failed to parse {} as String", type_name))
+                                }
+                            }
+                            // Default fallback - try common types
+                            _ => {
+                                if let Ok(val) = row.try_get::<i32, _>(i) {
+                                    Value::Integer(val as i64)
+                                } else if let Ok(val) = row.try_get::<i64, _>(i) {
+                                    Value::Integer(val)
+                                } else if let Ok(val) = row.try_get::<i16, _>(i) {
+                                    Value::Integer(val as i64)
+                                } else if let Ok(val) = row.try_get::<f64, _>(i) {
+                                    Value::Float(val)
+                                } else if let Ok(val) = row.try_get::<f32, _>(i) {
+                                    Value::Float(val as f64)
+                                } else if let Ok(val) = row.try_get::<bool, _>(i) {
+                                    Value::Boolean(val)
+                                } else if let Ok(val) = row.try_get::<String, _>(i) {
+                                    Value::String(val)
+                                } else {
+                                    Value::Unknown(format!("Unknown type: {}", type_name))
+                                }
                             }
                         }
                     })

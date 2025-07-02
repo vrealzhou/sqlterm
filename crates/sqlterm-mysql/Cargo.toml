@@ -9,3 +9,4 @@ sqlx = { workspace = true, features = ["mysql", "chrono", "uuid"] }
 async-trait = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
+chrono = { workspace = true }

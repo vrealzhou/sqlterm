@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use sqlx::{PgPool, Pool, Postgres, Row, Column, TypeInfo};
+use sqlx::types::chrono::{DateTime, NaiveDateTime, Utc};
 use sqlterm_core::{
     ConnectionConfig, ConnectionInfo, DatabaseConnection, DatabaseType, Result, SqlTermError,
 };
@@ -151,10 +152,20 @@ impl DatabaseConnection for PostgresConnection {
                             Ok(Some(val)) => sqlterm_core::Value::String(val),
                             Ok(None) => sqlterm_core::Value::Null,
                             Err(_) => {
-                                // Try different types
-                                if let Ok(val) = row.try_get::<Option<i64>, _>(col.name.as_str()) {
+                                // Try different types - check integers first to avoid string conversion
+                                if let Ok(val) = row.try_get::<Option<i32>, _>(col.name.as_str()) {
+                                    match val {
+                                        Some(v) => sqlterm_core::Value::Integer(v as i64),
+                                        None => sqlterm_core::Value::Null,
+                                    }
+                                } else if let Ok(val) = row.try_get::<Option<i64>, _>(col.name.as_str()) {
                                     match val {
                                         Some(v) => sqlterm_core::Value::Integer(v),
+                                        None => sqlterm_core::Value::Null,
+                                    }
+                                } else if let Ok(val) = row.try_get::<Option<i16>, _>(col.name.as_str()) {
+                                    match val {
+                                        Some(v) => sqlterm_core::Value::Integer(v as i64),
                                         None => sqlterm_core::Value::Null,
                                     }
                                 } else if let Ok(val) = row.try_get::<Option<f64>, _>(col.name.as_str()) {
@@ -162,13 +173,28 @@ impl DatabaseConnection for PostgresConnection {
                                         Some(v) => sqlterm_core::Value::Float(v),
                                         None => sqlterm_core::Value::Null,
                                     }
+                                } else if let Ok(val) = row.try_get::<Option<f32>, _>(col.name.as_str()) {
+                                    match val {
+                                        Some(v) => sqlterm_core::Value::Float(v as f64),
+                                        None => sqlterm_core::Value::Null,
+                                    }
                                 } else if let Ok(val) = row.try_get::<Option<bool>, _>(col.name.as_str()) {
                                     match val {
                                         Some(v) => sqlterm_core::Value::Boolean(v),
                                         None => sqlterm_core::Value::Null,
                                     }
+                                } else if let Ok(val) = row.try_get::<Option<NaiveDateTime>, _>(col.name.as_str()) {
+                                    match val {
+                                        Some(v) => sqlterm_core::Value::String(v.format("%Y-%m-%d %H:%M:%S").to_string()),
+                                        None => sqlterm_core::Value::Null,
+                                    }
+                                } else if let Ok(val) = row.try_get::<Option<DateTime<Utc>>, _>(col.name.as_str()) {
+                                    match val {
+                                        Some(v) => sqlterm_core::Value::String(v.format("%Y-%m-%d %H:%M:%S UTC").to_string()),
+                                        None => sqlterm_core::Value::Null,
+                                    }
                                 } else {
-                                    sqlterm_core::Value::String("Unknown type".to_string())
+                                    sqlterm_core::Value::String(format!("Unknown type: {}", col.data_type))
                                 }
                             }
                         }

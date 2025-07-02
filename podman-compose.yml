@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   mysql:
@@ -45,17 +45,18 @@ services:
     image: docker.io/alpine:3.18
     container_name: sqlterm-sqlite
     volumes:
-      - sqlite_data:/data
+      - ./data:/data
       - ./docker/sqlite:/init
     networks:
       - sqlterm-network
-    command: >
-      sh -c "
-        apk add --no-cache sqlite &&
-        chmod +x /init/create_db.sh &&
-        /init/create_db.sh &&
-        tail -f /dev/null
-      "
+    command: sh
+    # command: >
+    #   sh -c "
+    #     apk add --no-cache sqlite &&
+    #     chmod +x /init/create_db.sh &&
+    #     /init/create_db.sh &&
+    #     tail -f /dev/null
+    #   "
 
   bastion:
     build:

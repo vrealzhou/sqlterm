@@ -120,31 +120,34 @@ impl DatabaseConnection for SqliteConnection {
                 let values: Vec<sqlterm_core::Value> = columns
                     .iter()
                     .map(|col| {
-                        // Extract value based on column type
-                        match row.try_get::<Option<String>, _>(col.name.as_str()) {
-                            Ok(Some(val)) => sqlterm_core::Value::String(val),
-                            Ok(None) => sqlterm_core::Value::Null,
-                            Err(_) => {
-                                // Try different types
-                                if let Ok(val) = row.try_get::<Option<i64>, _>(col.name.as_str()) {
-                                    match val {
-                                        Some(v) => sqlterm_core::Value::Integer(v),
-                                        None => sqlterm_core::Value::Null,
-                                    }
-                                } else if let Ok(val) = row.try_get::<Option<f64>, _>(col.name.as_str()) {
-                                    match val {
-                                        Some(v) => sqlterm_core::Value::Float(v),
-                                        None => sqlterm_core::Value::Null,
-                                    }
-                                } else if let Ok(val) = row.try_get::<Option<bool>, _>(col.name.as_str()) {
-                                    match val {
-                                        Some(v) => sqlterm_core::Value::Boolean(v),
-                                        None => sqlterm_core::Value::Null,
-                                    }
-                                } else {
-                                    sqlterm_core::Value::String("Unknown type".to_string())
-                                }
+                        // SQLite is dynamically typed, so we need to try different types in order
+                        if let Ok(val) = row.try_get::<Option<i64>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => sqlterm_core::Value::Integer(v),
+                                None => sqlterm_core::Value::Null,
                             }
+                        } else if let Ok(val) = row.try_get::<Option<i32>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => sqlterm_core::Value::Integer(v as i64),
+                                None => sqlterm_core::Value::Null,
+                            }
+                        } else if let Ok(val) = row.try_get::<Option<f64>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => sqlterm_core::Value::Float(v),
+                                None => sqlterm_core::Value::Null,
+                            }
+                        } else if let Ok(val) = row.try_get::<Option<bool>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => sqlterm_core::Value::Boolean(v),
+                                None => sqlterm_core::Value::Null,
+                            }
+                        } else if let Ok(val) = row.try_get::<Option<String>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => sqlterm_core::Value::String(v),
+                                None => sqlterm_core::Value::Null,
+                            }
+                        } else {
+                            sqlterm_core::Value::String(format!("Unknown type: {}", col.data_type))
                         }
                     })
                     .collect();

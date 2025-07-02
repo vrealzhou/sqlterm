@@ -71,20 +71,20 @@ impl Highlighter for SQLTermHelper {
     }
 }
 
-struct SQLTermCompleter {
+pub struct SQLTermCompleter {
     config_manager: crate::config::ConfigManager,
     tables: Vec<String>,
 }
 
 impl SQLTermCompleter {
-    fn new(config_manager: crate::config::ConfigManager) -> Self {
+    pub fn new(config_manager: crate::config::ConfigManager) -> Self {
         Self {
             config_manager,
             tables: Vec::new(),
         }
     }
 
-    fn update_tables(&mut self, tables: Vec<String>) {
+    pub fn update_tables(&mut self, tables: Vec<String>) {
         self.tables = tables;
     }
 
@@ -261,7 +261,7 @@ impl SQLTermCompleter {
                         }
                     }
                     
-                    let start_pos = if parts.len() == 2 {
+                    let _start_pos = if parts.len() == 2 {
                         line.rfind(parts[1]).unwrap_or(0)
                     } else {
                         line.len()
@@ -1548,4 +1548,12 @@ impl ConversationApp {
             .map_err(|e| anyhow::anyhow!("Failed to get clipboard text: {}", e))?;
         Ok(text)
     }
+}
+
+// Helper function to create a completer for use in TUI mode
+pub fn create_completer(tables: &[String]) -> Result<SQLTermCompleter> {
+    let config_manager = crate::config::ConfigManager::new()?;
+    let mut completer = SQLTermCompleter::new(config_manager);
+    completer.update_tables(tables.to_vec());
+    Ok(completer)
 }

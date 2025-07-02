@@ -72,14 +72,14 @@ impl DatabaseConnection for MySqlConnection {
     }
 
     async fn get_connection_info(&self) -> Result<ConnectionInfo> {
-        let row = sqlx::query("SELECT VERSION() as version, DATABASE() as database, USER() as user")
+        let row = sqlx::query("SELECT VERSION() as version, DATABASE() as database_name, USER() as username")
             .fetch_one(&self.pool)
             .await
             .map_err(|e| SqlTermError::Connection(e.to_string()))?;
 
         let server_version: String = row.get("version");
-        let database_name: String = row.get("database");
-        let username: String = row.get("user");
+        let database_name: String = row.get("database_name");
+        let username: String = row.get("username");
 
         Ok(ConnectionInfo {
             server_version,
@@ -172,31 +172,69 @@ impl QueryExecutor for MySqlConnection {
                 let values: Vec<Value> = columns
                     .iter()
                     .map(|col| {
-                        // Extract value based on column type
-                        match row.try_get::<Option<String>, _>(col.name.as_str()) {
-                            Ok(Some(val)) => Value::String(val),
-                            Ok(None) => Value::Null,
-                            Err(_) => {
-                                // Try different types
-                                if let Ok(val) = row.try_get::<Option<i64>, _>(col.name.as_str()) {
-                                    match val {
-                                        Some(v) => Value::Integer(v),
-                                        None => Value::Null,
-                                    }
-                                } else if let Ok(val) = row.try_get::<Option<f64>, _>(col.name.as_str()) {
-                                    match val {
-                                        Some(v) => Value::Float(v),
-                                        None => Value::Null,
-                                    }
-                                } else if let Ok(val) = row.try_get::<Option<bool>, _>(col.name.as_str()) {
-                                    match val {
-                                        Some(v) => Value::Boolean(v),
-                                        None => Value::Null,
-                                    }
-                                } else {
-                                    Value::String(format!("Unknown type"))
-                                }
+                        // Extract value based on column type - check integers first to avoid string conversion
+                        if let Ok(val) = row.try_get::<Option<i32>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => Value::Integer(v as i64),
+                                None => Value::Null,
                             }
+                        } else if let Ok(val) = row.try_get::<Option<i64>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => Value::Integer(v),
+                                None => Value::Null,
+                            }
+                        } else if let Ok(val) = row.try_get::<Option<i16>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => Value::Integer(v as i64),
+                                None => Value::Null,
+                            }
+                        } else if let Ok(val) = row.try_get::<Option<i8>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => Value::Integer(v as i64),
+                                None => Value::Null,
+                            }
+                        } else if let Ok(val) = row.try_get::<Option<u32>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => Value::Integer(v as i64),
+                                None => Value::Null,
+                            }
+                        } else if let Ok(val) = row.try_get::<Option<u64>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => Value::Integer(v as i64),
+                                None => Value::Null,
+                            }
+                        } else if let Ok(val) = row.try_get::<Option<f64>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => Value::Float(v),
+                                None => Value::Null,
+                            }
+                        } else if let Ok(val) = row.try_get::<Option<f32>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => Value::Float(v as f64),
+                                None => Value::Null,
+                            }
+                        } else if let Ok(val) = row.try_get::<Option<bool>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => Value::Boolean(v),
+                                None => Value::Null,
+                            }
+                        } else if let Ok(val) = row.try_get::<Option<chrono::NaiveDateTime>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => Value::String(v.format("%Y-%m-%d %H:%M:%S").to_string()),
+                                None => Value::Null,
+                            }
+                        } else if let Ok(val) = row.try_get::<Option<chrono::DateTime<chrono::Utc>>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => Value::String(v.format("%Y-%m-%d %H:%M:%S UTC").to_string()),
+                                None => Value::Null,
+                            }
+                        } else if let Ok(val) = row.try_get::<Option<String>, _>(col.name.as_str()) {
+                            match val {
+                                Some(v) => Value::String(v),
+                                None => Value::Null,
+                            }
+                        } else {
+                            Value::String(format!("Unknown type: {}", col.data_type))
                         }
                     })
                     .collect();
@@ -382,15 +420,18 @@ impl SchemaInspector for MySqlConnection {
         
         let sql = r#"
             SELECT 
-                CONSTRAINT_NAME as name,
-                TABLE_NAME as table_name,
-                COLUMN_NAME as column_name,
-                REFERENCED_TABLE_NAME as referenced_table,
-                REFERENCED_COLUMN_NAME as referenced_column,
-                DELETE_RULE as on_delete,
-                UPDATE_RULE as on_update
-            FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-            WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL
+                kcu.CONSTRAINT_NAME as name,
+                kcu.TABLE_NAME as table_name,
+                kcu.COLUMN_NAME as column_name,
+                kcu.REFERENCED_TABLE_NAME as referenced_table,
+                kcu.REFERENCED_COLUMN_NAME as referenced_column,
+                rc.DELETE_RULE as on_delete,
+                rc.UPDATE_RULE as on_update
+            FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+            LEFT JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc 
+                ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME 
+                AND kcu.TABLE_SCHEMA = rc.CONSTRAINT_SCHEMA
+            WHERE kcu.TABLE_SCHEMA = ? AND kcu.TABLE_NAME = ? AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
         "#;
 
         let rows = sqlx::query(sql)
