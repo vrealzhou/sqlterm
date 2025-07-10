@@ -136,6 +136,11 @@ func (a *App) processCommand(line string) error {
 }
 
 func (a *App) processFileCommand(line string) error {
+	// Check if it's a CSV export with @
+	if strings.Contains(line, " > ") {
+		return a.processFileCommandWithCSVExport(line)
+	}
+
 	parts := strings.Fields(line)
 	if len(parts) == 0 {
 		return nil
@@ -257,6 +262,20 @@ func (a *App) executeFile(filename string, queryRange []int) error {
 		} else {
 			fmt.Printf("📊 Query Results (%d rows):\n", len(result.Rows))
 			a.printQueryResult(result)
+			
+			// Save as markdown and show with glow for each query with results
+			if a.config != nil {
+				if err := a.sessionMgr.EnsureSessionDir(a.config.Name); err != nil {
+					fmt.Printf("Warning: failed to create session directory: %v\n", err)
+				} else {
+					mdPath, err := core.SaveQueryResultAsMarkdown(result, query, a.config.Name, a.configMgr.GetConfigDir())
+					if err != nil {
+						fmt.Printf("Warning: failed to save markdown: %v\n", err)
+					} else {
+						fmt.Printf("📄 Results saved to: %s\n", mdPath)
+					}
+				}
+			}
 		}
 	}
 
@@ -674,4 +693,162 @@ func (a *App) processQueryWithCSVExport(line string) error {
 
 	fmt.Printf("✅ Exported %d rows to %s\n", len(result.Rows), filename)
 	return nil
+}
+
+func (a *App) processFileCommandWithCSVExport(line string) error {
+	if a.connection == nil {
+		fmt.Println("No database connection. Use /connect to connect to a database.")
+		return nil
+	}
+
+	parts := strings.SplitN(line, " > ", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid CSV export syntax. Use: @filename.sql > output.csv")
+	}
+
+	fileCmd := strings.TrimSpace(parts[0])
+	csvFilename := strings.TrimSpace(parts[1])
+
+	// Parse the file command
+	cmdParts := strings.Fields(fileCmd)
+	if len(cmdParts) == 0 {
+		return nil
+	}
+
+	filename := cmdParts[0][1:] // Remove @ prefix
+	var queryRange []int
+
+	if len(cmdParts) > 1 {
+		rangeStr := cmdParts[1]
+		if strings.Contains(rangeStr, "-") {
+			rangeParts := strings.Split(rangeStr, "-")
+			if len(rangeParts) == 2 {
+				start, err1 := strconv.Atoi(rangeParts[0])
+				end, err2 := strconv.Atoi(rangeParts[1])
+				if err1 == nil && err2 == nil {
+					queryRange = []int{start, end}
+				}
+			}
+		} else {
+			if num, err := strconv.Atoi(rangeStr); err == nil {
+				queryRange = []int{num, num}
+			}
+		}
+	}
+
+	return a.executeFileWithCSVExport(filename, queryRange, csvFilename)
+}
+
+func (a *App) executeFileWithCSVExport(filename string, queryRange []int, csvFilename string) error {
+	if a.connection == nil {
+		fmt.Println("No database connection. Use /connect to connect to a database.")
+		return nil
+	}
+
+	// Try to find the file in current directory or queries directory
+	var filepath string
+	if _, err := os.Stat(filename); err == nil {
+		filepath = filename
+	} else if _, err := os.Stat("queries/" + filename); err == nil {
+		filepath = "queries/" + filename
+	} else {
+		return fmt.Errorf("file not found: %s", filename)
+	}
+
+	file, err := os.Open(filepath)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	content, err := io.ReadAll(file)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	queries := a.parseQueries(string(content))
+	fmt.Printf("📁 Executing SQL file: %s\n", filename)
+	fmt.Printf("🔄 Found %d queries in file\n", len(queries))
+
+	start, end := 1, len(queries)
+	if len(queryRange) == 2 {
+		start, end = queryRange[0], queryRange[1]
+	}
+
+	// Collect all results for CSV export
+	var allResults []*core.QueryResult
+	var allQueries []string
+
+	for i := start - 1; i < end && i < len(queries); i++ {
+		query := strings.TrimSpace(queries[i])
+		if query == "" {
+			continue
+		}
+
+		fmt.Printf("\n📝 Query %d: %s\n", i+1, a.truncateQuery(query))
+		result, err := a.connection.Execute(query)
+		if err != nil {
+			fmt.Printf("❌ Query failed: %v\n", err)
+			continue
+		}
+
+		if len(result.Rows) == 0 {
+			fmt.Printf("✅ Query executed (0 rows affected)\n")
+		} else {
+			fmt.Printf("📊 Query Results (%d rows):\n", len(result.Rows))
+			a.printQueryResult(result)
+			
+			// Collect results for CSV export
+			allResults = append(allResults, result)
+			allQueries = append(allQueries, query)
+		}
+	}
+
+	// Export all results to CSV
+	if len(allResults) > 0 {
+		if len(allResults) == 1 {
+			// Single result - export directly
+			if err := core.SaveQueryResultAsCSV(allResults[0], csvFilename); err != nil {
+				return fmt.Errorf("failed to save CSV: %w", err)
+			}
+			fmt.Printf("✅ Exported %d rows to %s\n", len(allResults[0].Rows), csvFilename)
+		} else {
+			// Multiple results - combine them
+			combinedResult := a.combineQueryResults(allResults, allQueries)
+			if err := core.SaveQueryResultAsCSV(combinedResult, csvFilename); err != nil {
+				return fmt.Errorf("failed to save CSV: %w", err)
+			}
+			totalRows := 0
+			for _, result := range allResults {
+				totalRows += len(result.Rows)
+			}
+			fmt.Printf("✅ Exported %d total rows from %d queries to %s\n", totalRows, len(allResults), csvFilename)
+		}
+	} else {
+		fmt.Printf("⚠️  No results to export to CSV (all queries returned 0 rows)\n")
+	}
+
+	return nil
+}
+
+func (a *App) combineQueryResults(results []*core.QueryResult, queries []string) *core.QueryResult {
+	if len(results) == 0 {
+		return &core.QueryResult{}
+	}
+
+	// Create combined result with query source column
+	combined := &core.QueryResult{
+		Columns: append([]string{"query_source"}, results[0].Columns...),
+		Rows:    [][]core.Value{},
+	}
+
+	for i, result := range results {
+		querySource := fmt.Sprintf("Query %d", i+1)
+		for _, row := range result.Rows {
+			newRow := append([]core.Value{core.StringValue{Value: querySource}}, row...)
+			combined.Rows = append(combined.Rows, newRow)
+		}
+	}
+
+	return combined
 }
