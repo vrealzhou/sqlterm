@@ -2,7 +2,7 @@
 
 # Build the application
 build:
-	go build -o sqlterm ./cmd/sqlterm
+	go build -o ./bin/sqlterm ./cmd/sqlterm
 
 # Run the application
 run:
@@ -10,7 +10,7 @@ run:
 
 # Clean build artifacts
 clean:
-	rm -f sqlterm
+	rm -f ./bin/sqlterm
 
 # Run tests
 test:
@@ -33,7 +33,7 @@ check: fmt vet test
 
 # Development build and run
 dev: build
-	./sqlterm
+	./bin/sqlterm
 
 # Install dependencies
 deps:

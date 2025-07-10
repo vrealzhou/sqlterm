@@ -8,11 +8,13 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/chzyer/readline"
 	"sqlterm-go/internal/config"
 	"sqlterm-go/internal/core"
 	"sqlterm-go/internal/session"
+
+	"github.com/chzyer/readline"
 )
 
 type App struct {
@@ -94,12 +96,9 @@ func (a *App) processLine(line string) error {
 	if strings.HasPrefix(line, "/") {
 		return a.processCommand(line)
 	} else if strings.HasPrefix(line, "@") {
-		return a.processFileCommand(line)
-	} else if strings.Contains(line, " > ") {
-		return a.processQueryWithCSVExport(line)
-	} else {
-		return a.processQuery(line)
+		return a.processQueryFile(line)
 	}
+	return nil
 }
 
 func (a *App) processCommand(line string) error {
@@ -135,7 +134,7 @@ func (a *App) processCommand(line string) error {
 	return nil
 }
 
-func (a *App) processFileCommand(line string) error {
+func (a *App) processQueryFile(line string) error {
 	// Check if it's a CSV export with @
 	if strings.Contains(line, " > ") {
 		return a.processFileCommandWithCSVExport(line)
@@ -170,7 +169,7 @@ func (a *App) processFileCommand(line string) error {
 	return a.executeFile(filename, queryRange)
 }
 
-func (a *App) processQuery(query string) error {
+func (a *App) processQuery(query string, resultWriter io.Writer) error {
 	if a.connection == nil {
 		fmt.Println("No database connection. Use /connect to connect to a database.")
 		return nil
@@ -181,31 +180,51 @@ func (a *App) processQuery(query string) error {
 		return fmt.Errorf("query execution failed: %w", err)
 	}
 
-	a.printQueryResult(result)
-	
+	if len(result.Rows) == 0 {
+		fmt.Println("✅ Query executed (0 rows affected)")
+		return nil
+	}
+
+	fmt.Printf("📊 Query executed (%d rows)\n", len(result.Rows))
+
 	// Save as markdown and show with glow
 	if a.config != nil {
 		if err := a.sessionMgr.EnsureSessionDir(a.config.Name); err != nil {
 			fmt.Printf("Warning: failed to create session directory: %v\n", err)
 		} else {
-			mdPath, err := core.SaveQueryResultAsMarkdown(result, query, a.config.Name, a.configMgr.GetConfigDir())
+			err := core.SaveQueryResultAsMarkdown(result, query, a.config.Name, resultWriter)
 			if err != nil {
 				fmt.Printf("Warning: failed to save markdown: %v\n", err)
-			} else {
-				fmt.Printf("\n📄 Results saved to: %s\n", mdPath)
-				fmt.Println("Press Enter to view with glow (ESC to quit preview)...")
-				a.rl.Readline() // Wait for user input
-				
-				if err := a.sessionMgr.ViewMarkdownWithGlow(mdPath); err != nil {
-					fmt.Printf("Warning: %v\n", err)
-				}
-				
-				fmt.Printf("📍 File location: %s\n", mdPath)
 			}
 		}
 	}
-	
+
 	return nil
+}
+
+func (a *App) prepareQueryResultMarkdown() (string, *os.File, error) {
+	if err := a.sessionMgr.EnsureSessionDir(a.config.Name); err != nil {
+		return "", nil, fmt.Errorf("failed to create session directory: %v", err)
+	}
+	// Generate filename with timestamp
+	configDir := a.configMgr.GetConfigDir()
+	// Create sessions directory structure
+	resultsDir := filepath.Join(configDir, "sessions", a.config.Name, "results")
+	if err := os.MkdirAll(resultsDir, 0755); err != nil {
+		return "", nil, fmt.Errorf("failed to create results directory %s: %w", resultsDir, err)
+	}
+	timestamp := time.Now().Format("20060102_150405")
+	filename := fmt.Sprintf("query_results_%s.md", timestamp)
+	filename = filepath.Join(resultsDir, filename)
+	writer, err := os.Create(filename)
+	if err != nil {
+		return filename, nil, err
+	}
+	var content strings.Builder
+	content.WriteString(fmt.Sprintf("# Query Results - %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
+	content.WriteString(fmt.Sprintf("**Connection:** %s\n\n", a.config.Name))
+	writer.Write([]byte(content.String()))
+	return filename, writer, err
 }
 
 func (a *App) executeFile(filename string, queryRange []int) error {
@@ -244,40 +263,29 @@ func (a *App) executeFile(filename string, queryRange []int) error {
 		start, end = queryRange[0], queryRange[1]
 	}
 
+	mdPath, writer, err := a.prepareQueryResultMarkdown()
+	if err != nil {
+		fmt.Println("Warning:", err.Error())
+		return nil
+	}
+
 	for i := start - 1; i < end && i < len(queries); i++ {
 		query := strings.TrimSpace(queries[i])
 		if query == "" {
 			continue
 		}
 
-		fmt.Printf("\n📝 Query %d: %s\n", i+1, a.truncateQuery(query))
-		result, err := a.connection.Execute(query)
+		err = a.processQuery(query, writer)
 		if err != nil {
 			fmt.Printf("❌ Query failed: %v\n", err)
-			continue
-		}
-
-		if len(result.Rows) == 0 {
-			fmt.Printf("✅ Query executed (0 rows affected)\n")
-		} else {
-			fmt.Printf("📊 Query Results (%d rows):\n", len(result.Rows))
-			a.printQueryResult(result)
-			
-			// Save as markdown and show with glow for each query with results
-			if a.config != nil {
-				if err := a.sessionMgr.EnsureSessionDir(a.config.Name); err != nil {
-					fmt.Printf("Warning: failed to create session directory: %v\n", err)
-				} else {
-					mdPath, err := core.SaveQueryResultAsMarkdown(result, query, a.config.Name, a.configMgr.GetConfigDir())
-					if err != nil {
-						fmt.Printf("Warning: failed to save markdown: %v\n", err)
-					} else {
-						fmt.Printf("📄 Results saved to: %s\n", mdPath)
-					}
-				}
-			}
 		}
 	}
+	writer.Close()
+
+	if err := a.sessionMgr.ViewMarkdownWithGlow(mdPath); err != nil {
+		fmt.Printf("Warning: %v\n", err)
+	}
+	fmt.Printf("📍 File location: %s\n", mdPath)
 
 	return nil
 }
@@ -404,7 +412,7 @@ Results are automatically saved as markdown and can be viewed with glow.
 
 Auto-completion:
 - Tab after /connect to see connection names
-- Tab after /describe to see table names  
+- Tab after /describe to see table names
 - Tab after @ to see .sql files (searches all subdirectories)
 - Tab after > to see/create .csv files
 - Excludes hidden folders (starting with .) and common build directories
@@ -444,22 +452,22 @@ func (a *App) handleConnect(args []string) error {
 
 func (a *App) interactiveConnect() error {
 	fmt.Println("🔧 Interactive Connection Setup")
-	
+
 	reader := bufio.NewReader(os.Stdin)
-	
+
 	fmt.Print("📝 Enter connection name: ")
 	name, _ := reader.ReadString('\n')
 	name = strings.TrimSpace(name)
-	
+
 	fmt.Println("📊 Select database type:")
 	fmt.Println("  1. MySQL")
 	fmt.Println("  2. PostgreSQL")
 	fmt.Println("  3. SQLite")
 	fmt.Print("Enter choice (1-3): ")
-	
+
 	choice, _ := reader.ReadString('\n')
 	choice = strings.TrimSpace(choice)
-	
+
 	var dbType core.DatabaseType
 	switch choice {
 	case "1":
@@ -471,12 +479,12 @@ func (a *App) interactiveConnect() error {
 	default:
 		return fmt.Errorf("invalid choice: %s", choice)
 	}
-	
+
 	config := &core.ConnectionConfig{
 		Name:         name,
 		DatabaseType: dbType,
 	}
-	
+
 	if dbType != core.SQLite {
 		fmt.Print("📝 Enter host [localhost]: ")
 		host, _ := reader.ReadString('\n')
@@ -485,7 +493,7 @@ func (a *App) interactiveConnect() error {
 			host = "localhost"
 		}
 		config.Host = host
-		
+
 		fmt.Printf("📝 Enter port [%d]: ", core.GetDefaultPort(dbType))
 		portStr, _ := reader.ReadString('\n')
 		portStr = strings.TrimSpace(portStr)
@@ -498,45 +506,45 @@ func (a *App) interactiveConnect() error {
 			}
 			config.Port = port
 		}
-		
+
 		fmt.Print("📝 Enter username: ")
 		username, _ := reader.ReadString('\n')
 		config.Username = strings.TrimSpace(username)
-		
+
 		fmt.Print("🔐 Enter password: ")
 		password, _ := reader.ReadString('\n')
 		config.Password = strings.TrimSpace(password)
 	}
-	
+
 	fmt.Print("📝 Enter database name: ")
 	database, _ := reader.ReadString('\n')
 	config.Database = strings.TrimSpace(database)
-	
+
 	// Test connection
 	fmt.Printf("Testing connection to %s...\n", config.Name)
 	conn, err := core.NewConnection(config)
 	if err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
-	
+
 	if err := conn.Ping(); err != nil {
 		return fmt.Errorf("connection test failed: %w", err)
 	}
-	
+
 	if a.connection != nil {
 		a.connection.Close()
 	}
-	
+
 	a.SetConnection(conn, config)
 	fmt.Printf("✅ Connected to %s (%s)\n", config.Name, config.Database)
-	
+
 	// Save connection
 	if err := a.configMgr.SaveConnection(config); err != nil {
 		fmt.Printf("Warning: failed to save connection: %v\n", err)
 	} else {
 		fmt.Println("💾 Connection saved!")
 	}
-	
+
 	return nil
 }
 
@@ -657,13 +665,27 @@ func (a *App) handleExecQuery(args []string) error {
 	}
 
 	line := strings.Join(args, " ")
-	
+
 	// Check if it's a CSV export
 	if strings.Contains(line, " > ") {
 		return a.processQueryWithCSVExport(line)
 	}
-	
-	return a.processQuery(line)
+	mdPath, writer, err := a.prepareQueryResultMarkdown()
+	if err != nil {
+		fmt.Println("Warning:", err.Error())
+		return nil
+	}
+	err = a.processQuery(line, writer)
+	writer.Close()
+	if err != nil {
+		fmt.Println("Warning:", err.Error())
+		return nil
+	}
+	if err := a.sessionMgr.ViewMarkdownWithGlow(mdPath); err != nil {
+		fmt.Printf("Warning: %v\n", err)
+	}
+	fmt.Printf("📍 File location: %s\n", mdPath)
+	return nil
 }
 
 func (a *App) processQueryWithCSVExport(line string) error {
@@ -681,7 +703,7 @@ func (a *App) processQueryWithCSVExport(line string) error {
 	filename := strings.TrimSpace(parts[1])
 
 	fmt.Printf("Executing query and exporting to %s...\n", filename)
-	
+
 	result, err := a.connection.Execute(query)
 	if err != nil {
 		return fmt.Errorf("query execution failed: %w", err)
@@ -795,9 +817,8 @@ func (a *App) executeFileWithCSVExport(filename string, queryRange []int, csvFil
 		if len(result.Rows) == 0 {
 			fmt.Printf("✅ Query executed (0 rows affected)\n")
 		} else {
-			fmt.Printf("📊 Query Results (%d rows):\n", len(result.Rows))
-			a.printQueryResult(result)
-			
+			fmt.Printf("📊 Query executed (%d rows)\n", len(result.Rows))
+
 			// Collect results for CSV export
 			allResults = append(allResults, result)
 			allQueries = append(allQueries, query)

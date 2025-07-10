@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/csv"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,7 +16,7 @@ func (result *QueryResult) ToMarkdown(limit int) string {
 	}
 
 	var sb strings.Builder
-	
+
 	// Calculate column widths
 	widths := make([]int, len(result.Columns))
 	for i, col := range result.Columns {
@@ -106,34 +107,22 @@ func (result *QueryResult) ToCSV() (string, error) {
 	return sb.String(), nil
 }
 
-func SaveQueryResultAsMarkdown(result *QueryResult, query string, connection string, configDir string) (string, error) {
-	// Create sessions directory structure
-	sessionDir := filepath.Join(configDir, "sessions", connection)
-	if err := os.MkdirAll(sessionDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create session directory: %w", err)
-	}
-
-	// Generate filename with timestamp
-	timestamp := time.Now().Format("20060102_150405")
-	filename := fmt.Sprintf("query_results_%s.md", timestamp)
-	fullPath := filepath.Join(sessionDir, filename)
-
+func SaveQueryResultAsMarkdown(result *QueryResult, query string, connection string, resultWriter io.Writer) error {
 	// Create markdown content
 	var content strings.Builder
-	content.WriteString(fmt.Sprintf("# Query Results - %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
-	content.WriteString(fmt.Sprintf("**Connection:** %s\n\n", connection))
 	content.WriteString(fmt.Sprintf("**Query:**\n```sql\n%s\n```\n\n", query))
 	content.WriteString(fmt.Sprintf("**Results:** %d rows\n\n", len(result.Rows)))
-	
+
 	// Add the markdown table (limited to 20 rows)
 	content.WriteString(result.ToMarkdown(20))
+	content.WriteString("\n\n")
 
 	// Write to file
-	if err := os.WriteFile(fullPath, []byte(content.String()), 0644); err != nil {
-		return "", fmt.Errorf("failed to write markdown file: %w", err)
+	if _, err := resultWriter.Write([]byte(content.String())); err != nil {
+		return fmt.Errorf("failed to write markdown file: %w", err)
 	}
 
-	return fullPath, nil
+	return nil
 }
 
 func SaveQueryResultAsCSV(result *QueryResult, filePath string) error {
@@ -147,4 +136,47 @@ func SaveQueryResultAsCSV(result *QueryResult, filePath string) error {
 	}
 
 	return nil
+}
+
+func SaveFileQueryResultsAsMarkdown(filename string, queryResults []QueryResultWithQuery, connection string, configDir string) (string, error) {
+	// Create sessions directory structure
+	sessionDir := filepath.Join(configDir, "sessions", connection)
+	if err := os.MkdirAll(sessionDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create session directory: %w", err)
+	}
+
+	// Generate filename with timestamp
+	timestamp := time.Now().Format("20060102_150405")
+	mdFilename := fmt.Sprintf("file_results_%s_%s.md", strings.TrimSuffix(filepath.Base(filename), filepath.Ext(filename)), timestamp)
+	fullPath := filepath.Join(sessionDir, mdFilename)
+
+	// Create markdown content
+	var content strings.Builder
+	content.WriteString(fmt.Sprintf("# File Query Results - %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
+	content.WriteString(fmt.Sprintf("**Connection:** %s\n\n", connection))
+	content.WriteString(fmt.Sprintf("**Source File:** %s\n\n", filename))
+	content.WriteString(fmt.Sprintf("**Total Queries:** %d\n\n", len(queryResults)))
+
+	// Add each query result
+	for i, qr := range queryResults {
+		content.WriteString(fmt.Sprintf("## Query %d\n\n", i+1))
+		content.WriteString(fmt.Sprintf("**SQL:**\n```sql\n%s\n```\n\n", qr.Query))
+		content.WriteString(fmt.Sprintf("**Results:** %d rows\n\n", len(qr.Result.Rows)))
+
+		// Add the markdown table (limited to 20 rows)
+		content.WriteString(qr.Result.ToMarkdown(20))
+		content.WriteString("\n\n")
+	}
+
+	// Write to file
+	if err := os.WriteFile(fullPath, []byte(content.String()), 0644); err != nil {
+		return "", fmt.Errorf("failed to write markdown file: %w", err)
+	}
+
+	return fullPath, nil
+}
+
+type QueryResultWithQuery struct {
+	Result *QueryResult
+	Query  string
 }

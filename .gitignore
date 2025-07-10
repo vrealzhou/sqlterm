@@ -5,3 +5,4 @@ tmp/
 .hidden
 database/
 reports/
+bin
