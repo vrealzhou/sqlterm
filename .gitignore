@@ -1,0 +1,7 @@
+data
+queries
+tmp/
+.DS_Store
+.hidden
+database/
+reports/
