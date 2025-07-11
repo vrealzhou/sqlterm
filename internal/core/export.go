@@ -10,31 +10,37 @@ import (
 	"time"
 )
 
-func (result *QueryResult) ToMarkdown(limit int) string {
-	if len(result.Rows) == 0 {
-		return "No results returned.\n"
-	}
+func ToMarkdown(result *QueryResult, limit int) string {
+	count := 0
+	defer result.Close()
 
 	var sb strings.Builder
 
 	// Calculate column widths
 	widths := make([]int, len(result.Columns))
+	rowsToProcess := make([][]string, 0)
 	for i, col := range result.Columns {
 		widths[i] = len(col)
 	}
 
-	// Consider only the first 'limit' rows for width calculation
-	rowsToProcess := result.Rows
-	if limit > 0 && len(result.Rows) > limit {
-		rowsToProcess = result.Rows[:limit]
-	}
-
-	for _, row := range rowsToProcess {
+	for row := range result.Itor() {
+		line := make([]string, len(result.Columns))
+		rowsToProcess = append(rowsToProcess, line)
 		for i, val := range row {
 			if i < len(widths) && len(val.String()) > widths[i] {
 				widths[i] = len(val.String())
 			}
+			line[i] = val.String()
 		}
+		count++
+		if count >= limit {
+			break
+		}
+	}
+
+	if result.Error() != nil {
+		sb.WriteString(fmt.Sprint("Query error", result.Error()))
+		return sb.String()
 	}
 
 	// Write header
@@ -62,7 +68,7 @@ func (result *QueryResult) ToMarkdown(limit int) string {
 		sb.WriteString("| ")
 		for i, val := range row {
 			if i < len(widths) {
-				sb.WriteString(fmt.Sprintf("%-*s", widths[i], val.String()))
+				sb.WriteString(fmt.Sprintf("%-*s", widths[i], val))
 			}
 			if i < len(result.Columns)-1 {
 				sb.WriteString(" | ")
@@ -72,49 +78,20 @@ func (result *QueryResult) ToMarkdown(limit int) string {
 	}
 
 	// Add truncation note if limited
-	if limit > 0 && len(result.Rows) > limit {
-		sb.WriteString(fmt.Sprintf("\n*Note: Showing top %d of %d rows. Use CSV export for complete results.*\n", limit, len(result.Rows)))
+	if limit > 0 && count >= limit {
+		sb.WriteString(fmt.Sprintf("\n*Note: Showing top %d rows. Use CSV export for complete results.*\n", limit))
 	}
 
 	return sb.String()
-}
-
-func (result *QueryResult) ToCSV() (string, error) {
-	var sb strings.Builder
-	writer := csv.NewWriter(&sb)
-
-	// Write headers
-	if err := writer.Write(result.Columns); err != nil {
-		return "", fmt.Errorf("failed to write CSV headers: %w", err)
-	}
-
-	// Write rows
-	for _, row := range result.Rows {
-		record := make([]string, len(row))
-		for i, val := range row {
-			record[i] = val.String()
-		}
-		if err := writer.Write(record); err != nil {
-			return "", fmt.Errorf("failed to write CSV row: %w", err)
-		}
-	}
-
-	writer.Flush()
-	if err := writer.Error(); err != nil {
-		return "", fmt.Errorf("CSV writer error: %w", err)
-	}
-
-	return sb.String(), nil
 }
 
 func SaveQueryResultAsMarkdown(result *QueryResult, query string, connection string, resultWriter io.Writer) error {
 	// Create markdown content
 	var content strings.Builder
 	content.WriteString(fmt.Sprintf("**Query:**\n```sql\n%s\n```\n\n", query))
-	content.WriteString(fmt.Sprintf("**Results:** %d rows\n\n", len(result.Rows)))
 
 	// Add the markdown table (limited to 20 rows)
-	content.WriteString(result.ToMarkdown(20))
+	content.WriteString(ToMarkdown(result, 20))
 	content.WriteString("\n\n")
 
 	// Write to file
@@ -125,17 +102,86 @@ func SaveQueryResultAsMarkdown(result *QueryResult, query string, connection str
 	return nil
 }
 
-func SaveQueryResultAsCSV(result *QueryResult, filePath string) error {
-	csvContent, err := result.ToCSV()
+// StreamCSVWriter handles streaming CSV writes for large result sets
+type StreamCSVWriter struct {
+	file   *os.File
+	writer *csv.Writer
+}
+
+func NewStreamCSVWriter(filePath string) (*StreamCSVWriter, error) {
+	file, err := os.Create(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to generate CSV: %w", err)
+		return nil, fmt.Errorf("failed to create CSV file: %w", err)
 	}
 
-	if err := os.WriteFile(filePath, []byte(csvContent), 0644); err != nil {
-		return fmt.Errorf("failed to write CSV file: %w", err)
+	writer := csv.NewWriter(file)
+	return &StreamCSVWriter{
+		file:   file,
+		writer: writer,
+	}, nil
+}
+
+func (w *StreamCSVWriter) WriteHeaders(columns []string) error {
+	return w.writer.Write(columns)
+}
+
+func (w *StreamCSVWriter) WriteRow(row []Value) error {
+	record := make([]string, len(row))
+	for i, val := range row {
+		record[i] = val.String()
+	}
+	return w.writer.Write(record)
+}
+
+func (w *StreamCSVWriter) Close() error {
+	w.writer.Flush()
+	if err := w.writer.Error(); err != nil {
+		w.file.Close()
+		return fmt.Errorf("CSV writer error: %w", err)
+	}
+	return w.file.Close()
+}
+
+func SaveQueryResultAsStreamingCSV(result *QueryResult, filePath string) (int, error) {
+	count := 0
+	defer result.Close()
+	writer, err := NewStreamCSVWriter(filePath)
+	if err != nil {
+		return count, err
+	}
+	defer writer.Close()
+
+	// Write headers
+	if err := writer.WriteHeaders(result.Columns); err != nil {
+		return count, fmt.Errorf("failed to write CSV headers: %w", err)
 	}
 
-	return nil
+	// Write rows one by one
+	for row := range result.Itor() {
+		if err := writer.WriteRow(row); err != nil {
+			return count, fmt.Errorf("failed to write CSV row: %w", err)
+		}
+		count++
+	}
+
+	if result.Error() != nil {
+		return count, fmt.Errorf("failed to fetch data: %w", err)
+	}
+
+	return count, nil
+}
+
+// GenerateNumberedCSVPath creates a numbered CSV filename for multiple queries
+func GenerateNumberedCSVPath(baseFilePath string, queryIndex int) string {
+	dir := filepath.Dir(baseFilePath)
+	filename := filepath.Base(baseFilePath)
+	ext := filepath.Ext(filename)
+	nameWithoutExt := strings.TrimSuffix(filename, ext)
+
+	if dir == "." {
+		return fmt.Sprintf("%s-%d%s", nameWithoutExt, queryIndex, ext)
+	}
+	return filepath.Join(dir, fmt.Sprintf("%s-%d%s", nameWithoutExt, queryIndex, ext))
 }
 
 func SaveFileQueryResultsAsMarkdown(filename string, queryResults []QueryResultWithQuery, connection string, configDir string) (string, error) {
@@ -161,10 +207,9 @@ func SaveFileQueryResultsAsMarkdown(filename string, queryResults []QueryResultW
 	for i, qr := range queryResults {
 		content.WriteString(fmt.Sprintf("## Query %d\n\n", i+1))
 		content.WriteString(fmt.Sprintf("**SQL:**\n```sql\n%s\n```\n\n", qr.Query))
-		content.WriteString(fmt.Sprintf("**Results:** %d rows\n\n", len(qr.Result.Rows)))
 
 		// Add the markdown table (limited to 20 rows)
-		content.WriteString(qr.Result.ToMarkdown(20))
+		content.WriteString(ToMarkdown(qr.Result, 20))
 		content.WriteString("\n\n")
 	}
 

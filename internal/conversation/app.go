@@ -180,13 +180,6 @@ func (a *App) processQuery(query string, resultWriter io.Writer) error {
 		return fmt.Errorf("query execution failed: %w", err)
 	}
 
-	if len(result.Rows) == 0 {
-		fmt.Println("✅ Query executed (0 rows affected)")
-		return nil
-	}
-
-	fmt.Printf("📊 Query executed (%d rows)\n", len(result.Rows))
-
 	// Save as markdown and show with glow
 	if a.config != nil {
 		if err := a.sessionMgr.EnsureSessionDir(a.config.Name); err != nil {
@@ -322,64 +315,6 @@ func (a *App) truncateQuery(query string) string {
 		return query[:47] + "..."
 	}
 	return query
-}
-
-func (a *App) printQueryResult(result *core.QueryResult) {
-	if len(result.Rows) == 0 {
-		fmt.Println("No results returned.")
-		return
-	}
-
-	// Limit display to top 20 rows
-	displayRows := result.Rows
-	if len(result.Rows) > 20 {
-		displayRows = result.Rows[:20]
-	}
-
-	// Calculate column widths based on displayed rows
-	widths := make([]int, len(result.Columns))
-	for i, col := range result.Columns {
-		widths[i] = len(col)
-	}
-
-	for _, row := range displayRows {
-		for i, val := range row {
-			if len(val.String()) > widths[i] {
-				widths[i] = len(val.String())
-			}
-		}
-	}
-
-	// Print header
-	fmt.Print("│")
-	for i, col := range result.Columns {
-		fmt.Printf(" %-*s │", widths[i], col)
-	}
-	fmt.Println()
-
-	// Print separator
-	fmt.Print("├")
-	for i := range result.Columns {
-		fmt.Print(strings.Repeat("─", widths[i]+2))
-		if i < len(result.Columns)-1 {
-			fmt.Print("┼")
-		}
-	}
-	fmt.Println("┤")
-
-	// Print rows (limited to 20)
-	for _, row := range displayRows {
-		fmt.Print("│")
-		for i, val := range row {
-			fmt.Printf(" %-*s │", widths[i], val.String())
-		}
-		fmt.Println()
-	}
-
-	// Show truncation message if more than 20 rows
-	if len(result.Rows) > 20 {
-		fmt.Printf("\n... and %d more rows. Use CSV export (query > file.csv) for complete results.\n", len(result.Rows)-20)
-	}
 }
 
 func (a *App) printHelp() {
@@ -702,18 +637,19 @@ func (a *App) processQueryWithCSVExport(line string) error {
 	query := strings.TrimSpace(parts[0])
 	filename := strings.TrimSpace(parts[1])
 
-	fmt.Printf("Executing query and exporting to %s...\n", filename)
+	fmt.Printf("📊 Executing query and streaming to %s...\n", filename)
 
 	result, err := a.connection.Execute(query)
 	if err != nil {
 		return fmt.Errorf("query execution failed: %w", err)
 	}
 
-	if err := core.SaveQueryResultAsCSV(result, filename); err != nil {
+	rows, err := core.SaveQueryResultAsStreamingCSV(result, filename)
+	if err != nil {
 		return fmt.Errorf("failed to save CSV: %w", err)
 	}
 
-	fmt.Printf("✅ Exported %d rows to %s\n", len(result.Rows), filename)
+	fmt.Printf("✅ Exported %d rows to %s\n", rows, filename)
 	return nil
 }
 
@@ -797,9 +733,19 @@ func (a *App) executeFileWithCSVExport(filename string, queryRange []int, csvFil
 		start, end = queryRange[0], queryRange[1]
 	}
 
-	// Collect all results for CSV export
-	var allResults []*core.QueryResult
-	var allQueries []string
+	// First pass: count queries that will return results
+	var queriesWithResults []string
+	for i := start - 1; i < end && i < len(queries); i++ {
+		query := strings.TrimSpace(queries[i])
+		if query != "" {
+			queriesWithResults = append(queriesWithResults, query)
+		}
+	}
+
+	// Track exported files and statistics
+	var exportedFiles []string
+	var totalRowsExported int
+	queryNumber := 0
 
 	for i := start - 1; i < end && i < len(queries); i++ {
 		query := strings.TrimSpace(queries[i])
@@ -814,62 +760,43 @@ func (a *App) executeFileWithCSVExport(filename string, queryRange []int, csvFil
 			continue
 		}
 
-		if len(result.Rows) == 0 {
-			fmt.Printf("✅ Query executed (0 rows affected)\n")
+		// Export each query to a separate CSV file
+		queryNumber++
+		var outputPath string
+		if len(queriesWithResults) == 1 {
+			// Single query in file - use original filename
+			outputPath = csvFilename
 		} else {
-			fmt.Printf("📊 Query executed (%d rows)\n", len(result.Rows))
-
-			// Collect results for CSV export
-			allResults = append(allResults, result)
-			allQueries = append(allQueries, query)
+			// Multiple queries - use numbered filenames
+			outputPath = core.GenerateNumberedCSVPath(csvFilename, queryNumber)
 		}
+
+		rows, err := core.SaveQueryResultAsStreamingCSV(result, outputPath)
+		if err != nil {
+			fmt.Printf("❌ Failed to save CSV: %v\n", err)
+			continue
+		}
+		fmt.Printf("📊 Query executed (%d rows)\n", rows)
+
+		exportedFiles = append(exportedFiles, outputPath)
+		totalRowsExported += rows
+		fmt.Printf("✅ Exported %d rows to %s\n", rows, outputPath)
 	}
 
-	// Export all results to CSV
-	if len(allResults) > 0 {
-		if len(allResults) == 1 {
-			// Single result - export directly
-			if err := core.SaveQueryResultAsCSV(allResults[0], csvFilename); err != nil {
-				return fmt.Errorf("failed to save CSV: %w", err)
-			}
-			fmt.Printf("✅ Exported %d rows to %s\n", len(allResults[0].Rows), csvFilename)
+	// Summary of exported files
+	if len(exportedFiles) > 0 {
+		if len(exportedFiles) == 1 {
+			fmt.Printf("\n📁 Exported to: %s\n", exportedFiles[0])
 		} else {
-			// Multiple results - combine them
-			combinedResult := a.combineQueryResults(allResults, allQueries)
-			if err := core.SaveQueryResultAsCSV(combinedResult, csvFilename); err != nil {
-				return fmt.Errorf("failed to save CSV: %w", err)
+			fmt.Printf("\n📁 Exported to %d files:\n", len(exportedFiles))
+			for _, file := range exportedFiles {
+				fmt.Printf("   - %s\n", file)
 			}
-			totalRows := 0
-			for _, result := range allResults {
-				totalRows += len(result.Rows)
-			}
-			fmt.Printf("✅ Exported %d total rows from %d queries to %s\n", totalRows, len(allResults), csvFilename)
 		}
+		fmt.Printf("📊 Total: %d rows exported\n", totalRowsExported)
 	} else {
 		fmt.Printf("⚠️  No results to export to CSV (all queries returned 0 rows)\n")
 	}
 
 	return nil
-}
-
-func (a *App) combineQueryResults(results []*core.QueryResult, queries []string) *core.QueryResult {
-	if len(results) == 0 {
-		return &core.QueryResult{}
-	}
-
-	// Create combined result with query source column
-	combined := &core.QueryResult{
-		Columns: append([]string{"query_source"}, results[0].Columns...),
-		Rows:    [][]core.Value{},
-	}
-
-	for i, result := range results {
-		querySource := fmt.Sprintf("Query %d", i+1)
-		for _, row := range result.Rows {
-			newRow := append([]core.Value{core.StringValue{Value: querySource}}, row...)
-			combined.Rows = append(combined.Rows, newRow)
-		}
-	}
-
-	return combined
 }

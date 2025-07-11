@@ -64,56 +64,8 @@ func (c *connection) Execute(query string) (*QueryResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
-	defer rows.Close()
 
-	columns, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get columns: %w", err)
-	}
-
-	result := &QueryResult{
-		Columns: columns,
-		Rows:    make([][]Value, 0),
-	}
-
-	for rows.Next() {
-		values := make([]interface{}, len(columns))
-		valuePtrs := make([]interface{}, len(columns))
-
-		for i := range values {
-			valuePtrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(valuePtrs...); err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
-		}
-
-		row := make([]Value, len(columns))
-		for i, val := range values {
-			if val == nil {
-				row[i] = NullValue{}
-			} else {
-				switch v := val.(type) {
-				case string:
-					row[i] = StringValue{Value: v}
-				case []byte:
-					row[i] = StringValue{Value: string(v)}
-				case int64:
-					row[i] = IntValue{Value: v}
-				case float64:
-					row[i] = FloatValue{Value: v}
-				case bool:
-					row[i] = BoolValue{Value: v}
-				default:
-					row[i] = StringValue{Value: fmt.Sprintf("%v", v)}
-				}
-			}
-		}
-
-		result.Rows = append(result.Rows, row)
-	}
-
-	return result, nil
+	return NewQueryResult(rows)
 }
 
 func (c *connection) ListTables() ([]string, error) {
@@ -155,8 +107,8 @@ func (c *connection) DescribeTable(tableName string) (*TableInfo, error) {
 	case PostgreSQL:
 		query = fmt.Sprintf(`
 			SELECT column_name, data_type, is_nullable, column_default, ''
-			FROM information_schema.columns 
-			WHERE table_name = '%s' 
+			FROM information_schema.columns
+			WHERE table_name = '%s'
 			ORDER BY ordinal_position`, tableName)
 	case SQLite:
 		query = fmt.Sprintf("PRAGMA table_info(%s)", tableName)
