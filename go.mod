@@ -1,4 +1,4 @@
-module sqlterm-go
+module sqlterm
 
 go 1.24
 

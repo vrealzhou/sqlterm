@@ -54,6 +54,11 @@ func (a *App) SetConnection(conn core.Connection, config *core.ConnectionConfig)
 	a.connection = conn
 	a.config = config
 	a.updatePrompt()
+	
+	// Ensure session directory and configuration exist
+	if err := a.sessionMgr.EnsureSessionDir(config.Name); err != nil {
+		fmt.Printf("Warning: failed to initialize session directory: %v\n", err)
+	}
 }
 
 func (a *App) updatePrompt() {
@@ -351,6 +356,12 @@ Auto-completion:
 - Tab after @ to see .sql files (searches all subdirectories)
 - Tab after > to see/create .csv files
 - Excludes hidden folders (starting with .) and common build directories
+
+Session Management:
+- Results are automatically saved to ~/.config/sqlterm/sessions/{connection}/results/
+- Old result files are automatically cleaned up based on retention settings
+- Configure cleanup in ~/.config/sqlterm/sessions/{connection}/session.yaml
+- Default retention: 30 days (cleanup_retention_days: 30)
 `)
 }
 

@@ -111,7 +111,7 @@ SELECT * FROM orders WHERE date > '2024-01-01' > recent_orders.csv
    ```bash
    sqlterm > /connect
    ```
-   
+
    Follow the prompts to enter your database details.
 
 3. **List tables** in your database:
@@ -141,11 +141,11 @@ sqlterm > /connect
 📝 Enter connection name: my-local-db
 📊 Select database type:
   1. MySQL
-  2. PostgreSQL  
+  2. PostgreSQL
   3. SQLite
 Enter choice (1-3): 1
-📝 Enter host [localhost]: 
-📝 Enter port [3306]: 
+📝 Enter host [localhost]:
+📝 Enter port [3306]:
 📝 Enter database name: testdb
 📝 Enter username: myuser
 🔐 Enter password: [hidden]
@@ -176,8 +176,8 @@ sqlterm connect --db-type mysql --host localhost --database mydb --username myus
 Every query execution automatically saves results as markdown files with:
 - Query metadata (connection, timestamp)
 - Top 20 results formatted as markdown tables
-- Automatic glow preview (press Enter to view, ESC to quit)
-- Files stored in `~/.config/sqlterm/sessions/<connection>/`
+- Automatic glow preview (`:q` to quit)
+- Files stored in `~/.config/sqlterm/sessions/<connection>/results`
 
 ### CSV Export
 
