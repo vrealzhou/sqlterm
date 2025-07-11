@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
+	"sqlterm/internal/config"
+	"sqlterm/internal/conversation"
+	"sqlterm/internal/core"
+
 	"github.com/spf13/viper"
-	"sqlterm-go/internal/config"
-	"sqlterm-go/internal/conversation"
-	"sqlterm-go/internal/core"
+	"github.com/spf13/cobra"
 )
 
 var (

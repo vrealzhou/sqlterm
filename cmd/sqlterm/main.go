@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"sqlterm-go/internal/cli"
+	"sqlterm/internal/cli"
 )
 
 func main() {

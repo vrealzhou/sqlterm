@@ -1,4 +1,4 @@
-# SQLTerm-Go
+# SQLTerm
 
 A modern, terminal-based SQL database management tool built in Go. SQLTerm provides an intuitive conversation-style interface for managing database connections and executing queries across MySQL, PostgreSQL, and SQLite.
 
@@ -29,7 +29,7 @@ A modern, terminal-based SQL database management tool built in Go. SQLTerm provi
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd sqlterm-go
+cd sqlterm
 
 # Build the project
 go build -o sqlterm ./cmd/sqlterm
@@ -177,7 +177,7 @@ Every query execution automatically saves results as markdown files with:
 - Query metadata (connection, timestamp)
 - Top 20 results formatted as markdown tables
 - Automatic glow preview (`:q` to quit)
-- Files stored in `~/.config/sqlterm/sessions/<connection>/results`
+- Files stored in `~/.config/sqlterm/sessions/<connection>/`
 
 ### CSV Export
 
@@ -216,10 +216,10 @@ SQLTerm stores configuration in your system's config directory:
 ├── connections/          # Saved database connections
 │   ├── my-local-db.yaml
 │   └── production.yaml
-├── sessions/             # Query result sessions
-│   └── <connection>/
-│       └── query_results_20241210_143022.md
-└── history.txt          # Command history
+└── sessions/             # Query result sessions and history
+    ├── <connection>/
+    │   └── session.yaml
+    └── history.txt       # Command history
 ```
 
 ## Database Support
@@ -233,16 +233,24 @@ SQLTerm stores configuration in your system's config directory:
 ## Project Structure
 
 ```
-sqlterm-go/
+sqlterm/
 ├── cmd/
 │   └── sqlterm/          # Main application entry point
 ├── internal/
 │   ├── cli/              # Command line interface
 │   ├── config/           # Configuration management
 │   ├── conversation/     # Interactive conversation mode
-│   └── core/            # Core database functionality
+│   ├── core/            # Core database functionality
+│   └── session/         # Session management
+├── database/
+│   ├── migrations/      # Database migration files
+│   └── seeds/           # Database seed files
+├── data/                # Sample data files
+├── queries/             # Sample SQL query files
 ├── go.mod
 ├── go.sum
+├── Makefile
+├── LICENSE
 └── README.md
 ```
 

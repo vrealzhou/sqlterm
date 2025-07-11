@@ -5,8 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"sqlterm/internal/core"
+
 	"gopkg.in/yaml.v3"
-	"sqlterm-go/internal/core"
 )
 
 type Manager struct {
@@ -108,5 +109,6 @@ func (m *Manager) DeleteConnection(name string) error {
 		return fmt.Errorf("failed to delete config file: %w", err)
 	}
 
-	return nil
+	
+return nil
 }

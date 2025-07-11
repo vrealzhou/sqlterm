@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"sqlterm-go/internal/config"
-	"sqlterm-go/internal/core"
-	"sqlterm-go/internal/session"
+	"sqlterm/internal/config"
+	"sqlterm/internal/core"
+	"sqlterm/internal/session"
 
 	"github.com/chzyer/readline"
 )
@@ -34,13 +34,19 @@ func NewApp() (*App, error) {
 		sessionMgr: sessionMgr,
 	}
 
+	// Ensure sessions directory exists for history file
+	sessionsDir := filepath.Join(configMgr.GetConfigDir(), "sessions")
+	if err := os.MkdirAll(sessionsDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create sessions directory: %w", err)
+	}
+
 	// Set up dynamic autocomplete
 	completer := NewAutoCompleter(app)
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:       "sqlterm > ",
 		AutoComplete: completer,
-		HistoryFile:  filepath.Join(configMgr.GetConfigDir(), "history.txt"),
+		HistoryFile:  filepath.Join(configMgr.GetConfigDir(), "sessions", "history.txt"),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create readline: %w", err)
@@ -54,7 +60,7 @@ func (a *App) SetConnection(conn core.Connection, config *core.ConnectionConfig)
 	a.connection = conn
 	a.config = config
 	a.updatePrompt()
-	
+
 	// Ensure session directory and configuration exist
 	if err := a.sessionMgr.EnsureSessionDir(config.Name); err != nil {
 		fmt.Printf("Warning: failed to initialize session directory: %v\n", err)
