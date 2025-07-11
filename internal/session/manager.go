@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/glamour"
+	"sqlterm/internal/core"
 	"gopkg.in/yaml.v3"
 )
 
@@ -35,24 +35,24 @@ func (m *Manager) EnsureSessionDir(connectionName string) error {
 	if err := os.MkdirAll(sessionDir, 0755); err != nil {
 		return err
 	}
-	
+
 	// Create results directory
 	resultsDir := filepath.Join(sessionDir, "results")
 	if err := os.MkdirAll(resultsDir, 0755); err != nil {
 		return err
 	}
-	
+
 	// Ensure session config exists and perform cleanup
 	if err := m.ensureSessionConfig(connectionName); err != nil {
 		return err
 	}
-	
+
 	// Perform automatic cleanup
 	if err := m.performAutoCleanup(connectionName); err != nil {
 		// Don't fail if cleanup fails, just log a warning
 		fmt.Printf("Warning: cleanup failed for %s: %v\n", connectionName, err)
 	}
-	
+
 	return nil
 }
 
@@ -67,32 +67,9 @@ func (m *Manager) ViewMarkdown(filePath string) error {
 }
 
 func (m *Manager) DisplayMarkdown(markdown string) error {
-	// Create a new glamour renderer with auto-style detection
-	r, err := glamour.NewTermRenderer(
-		// Detect background color and pick either the default dark or light theme
-		glamour.WithAutoStyle(),
-		// Wrap output at reasonable width
-		glamour.WithWordWrap(100),
-	)
-	if err != nil {
-		// Fall back to plain text if glamour fails
-		fmt.Println("⚠️  Failed to create markdown renderer, falling back to plain text:\n")
-		fmt.Print(markdown)
-		return nil
-	}
-
-	// Render the markdown
-	out, err := r.Render(markdown)
-	if err != nil {
-		// Fall back to plain text if rendering fails
-		fmt.Println("⚠️  Failed to render markdown, falling back to plain text:\n")
-		fmt.Print(markdown)
-		return nil
-	}
-
-	// Display the rendered markdown
-	fmt.Print(out)
-	return nil
+	// Use the shared markdown renderer
+	renderer := core.NewMarkdownRenderer()
+	return renderer.RenderAndDisplay(markdown)
 }
 
 func (m *Manager) CleanupOldFiles(connectionName string, retentionDays int) error {
@@ -124,7 +101,7 @@ func (m *Manager) getSessionConfigPath(connectionName string) string {
 
 func (m *Manager) getSessionConfig(connectionName string) (*SessionConfig, error) {
 	configPath := m.getSessionConfigPath(connectionName)
-	
+
 	// Check if file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		// Return default config
@@ -132,48 +109,48 @@ func (m *Manager) getSessionConfig(connectionName string) (*SessionConfig, error
 			CleanupRetentionDays: 30, // Default to 30 days
 		}, nil
 	}
-	
+
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read session config: %w", err)
 	}
-	
+
 	var config SessionConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse session config: %w", err)
 	}
-	
+
 	// Set default if not specified
 	if config.CleanupRetentionDays <= 0 {
 		config.CleanupRetentionDays = 30
 	}
-	
+
 	return &config, nil
 }
 
 func (m *Manager) saveSessionConfig(connectionName string, config *SessionConfig) error {
 	configPath := m.getSessionConfigPath(connectionName)
-	
+
 	data, err := yaml.Marshal(config)
 	if err != nil {
 		return fmt.Errorf("failed to marshal session config: %w", err)
 	}
-	
+
 	if err := os.WriteFile(configPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write session config: %w", err)
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) ensureSessionConfig(connectionName string) error {
 	configPath := m.getSessionConfigPath(connectionName)
-	
+
 	// Check if YAML config already exists
 	if _, err := os.Stat(configPath); err == nil {
 		return nil // Config already exists
 	}
-	
+
 	// Check for old TOML config and migrate if exists
 	oldTomlPath := filepath.Join(m.GetSessionDir(connectionName), "session.toml")
 	if _, err := os.Stat(oldTomlPath); err == nil {
@@ -184,16 +161,16 @@ func (m *Manager) ensureSessionConfig(connectionName string) error {
 			return nil
 		}
 	}
-	
+
 	// Create default config
 	defaultConfig := &SessionConfig{
 		CleanupRetentionDays: 30,
 	}
-	
+
 	if err := m.saveSessionConfig(connectionName, defaultConfig); err != nil {
 		return err
 	}
-	
+
 	fmt.Printf("📁 Created session.yaml for %s (cleanup_retention_days: %d)\n", connectionName, defaultConfig.CleanupRetentionDays)
 	return nil
 }
@@ -204,12 +181,12 @@ func (m *Manager) migrateTOMLToYAML(connectionName, oldPath, newPath string) err
 	if err != nil {
 		return fmt.Errorf("failed to read TOML file: %w", err)
 	}
-	
+
 	// Simple parsing for cleanup_retention_days
 	config := &SessionConfig{
 		CleanupRetentionDays: 30, // Default
 	}
-	
+
 	// Basic parsing - look for cleanup_retention_days = value
 	lines := strings.Split(string(data), "\n")
 	for _, line := range lines {
@@ -224,17 +201,17 @@ func (m *Manager) migrateTOMLToYAML(connectionName, oldPath, newPath string) err
 			}
 		}
 	}
-	
+
 	// Save as YAML
 	if err := m.saveSessionConfig(connectionName, config); err != nil {
 		return fmt.Errorf("failed to save migrated config: %w", err)
 	}
-	
+
 	// Remove old TOML file
 	if err := os.Remove(oldPath); err != nil {
 		fmt.Printf("Warning: failed to remove old TOML file %s: %v\n", oldPath, err)
 	}
-	
+
 	return nil
 }
 
@@ -243,7 +220,7 @@ func (m *Manager) performAutoCleanup(connectionName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get session config: %w", err)
 	}
-	
+
 	// Only cleanup results directory, not the entire session
 	resultsDir := filepath.Join(m.GetSessionDir(connectionName), "results")
 	return m.cleanupDirectory(resultsDir, config.CleanupRetentionDays)
@@ -253,21 +230,21 @@ func (m *Manager) cleanupDirectory(dirPath string, retentionDays int) error {
 	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
 		return nil // Directory doesn't exist
 	}
-	
+
 	cutoffTime := time.Now().AddDate(0, 0, -retentionDays)
-	
+
 	return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		// Only remove files, not directories
 		if !info.IsDir() && info.ModTime().Before(cutoffTime) {
 			if err := os.Remove(path); err != nil {
 				return fmt.Errorf("failed to remove old file %s: %w", path, err)
 			}
 		}
-		
+
 		return nil
 	})
 }

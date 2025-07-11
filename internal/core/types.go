@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"iter"
 	"strings"
+	"time"
 )
 
 type DatabaseType int
@@ -128,17 +129,42 @@ func (n NullValue) IsNull() bool {
 	return true
 }
 
+type Column struct {
+	Name string
+	Type string
+}
+
 type QueryResult struct {
-	Columns []string
+	Columns []Column
 	rows    *sql.Rows
 	err     error
 }
 
+func (r *QueryResult) ColumnNames() []string {
+	names := make([]string, len(r.Columns))
+	for i, col := range r.Columns {
+		names[i] = col.Name
+	}
+	return names
+}
+
 func NewQueryResult(rows *sql.Rows) (*QueryResult, error) {
-	columns, err := rows.Columns()
+	columnNames, err := rows.Columns()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get columns: %w", err)
 	}
+	columns := make([]Column, len(columnNames))
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get column types: %w", err)
+	}
+	for i, tp := range columnTypes {
+		columns[i] = Column{
+			Name: columnNames[i],
+			Type: tp.Name(),
+		}
+	}
+
 	return &QueryResult{
 		Columns: columns,
 		rows:    rows,
@@ -149,7 +175,7 @@ func (r *QueryResult) Close() error {
 	return r.rows.Close()
 }
 
-func assambleRow(columns []string, rows *sql.Rows) ([]Value, error) {
+func assambleRow(columns []Column, rows *sql.Rows) ([]Value, error) {
 	values := make([]any, len(columns))
 	valuePtrs := make([]any, len(columns))
 
@@ -177,6 +203,9 @@ func assambleRow(columns []string, rows *sql.Rows) ([]Value, error) {
 				row[i] = FloatValue{Value: v}
 			case bool:
 				row[i] = BoolValue{Value: v}
+			case time.Time:
+				// Format datetime/timestamp to "2006-01-02 15:04:05-0700"
+				row[i] = StringValue{Value: v.Format("2006-01-02 15:04:05-0700")}
 			default:
 				row[i] = StringValue{Value: fmt.Sprintf("%v", v)}
 			}
@@ -205,11 +234,11 @@ func (r *QueryResult) Error() error {
 }
 
 type TableInfo struct {
-	Name         string
-	Columns      []ColumnInfo
-	PrimaryKeys  []string
-	Constraints  []ConstraintInfo
-	ForeignKeys  []ForeignKeyInfo
+	Name        string
+	Columns     []ColumnInfo
+	PrimaryKeys []string
+	Constraints []ConstraintInfo
+	ForeignKeys []ForeignKeyInfo
 }
 
 type ConstraintInfo struct {
@@ -220,12 +249,12 @@ type ConstraintInfo struct {
 }
 
 type ForeignKeyInfo struct {
-	Name           string
-	Column         string
-	ReferencedTable string
+	Name             string
+	Column           string
+	ReferencedTable  string
 	ReferencedColumn string
-	OnDelete       string
-	OnUpdate       string
+	OnDelete         string
+	OnUpdate         string
 }
 
 type ColumnInfo struct {

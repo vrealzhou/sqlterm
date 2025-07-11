@@ -109,6 +109,5 @@ func (m *Manager) DeleteConnection(name string) error {
 		return fmt.Errorf("failed to delete config file: %w", err)
 	}
 
-	
-return nil
+	return nil
 }

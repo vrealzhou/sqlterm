@@ -14,7 +14,6 @@ import (
 	"sqlterm/internal/core"
 	"sqlterm/internal/session"
 
-	"github.com/charmbracelet/glamour"
 	"github.com/chzyer/readline"
 )
 
@@ -647,32 +646,9 @@ func (a *App) generateTableMarkdown(tableInfo *core.TableInfo) string {
 }
 
 func (a *App) displayMarkdown(markdown string) error {
-	// Create a new glamour renderer with auto-style detection
-	r, err := glamour.NewTermRenderer(
-		// Detect background color and pick either the default dark or light theme
-		glamour.WithAutoStyle(),
-		// Wrap output at reasonable width
-		// glamour.WithWordWrap(100),
-	)
-	if err != nil {
-		// Fall back to plain text if glamour fails
-		fmt.Println("⚠️  Failed to create markdown renderer, falling back to plain text:")
-		fmt.Print(markdown)
-		return nil
-	}
-
-	// Render the markdown
-	out, err := r.Render(markdown)
-	if err != nil {
-		// Fall back to plain text if rendering fails
-		fmt.Println("⚠️  Failed to render markdown, falling back to plain text:")
-		fmt.Print(markdown)
-		return nil
-	}
-
-	// Display the rendered markdown
-	fmt.Print(out)
-	return nil
+	// Use the shared markdown renderer
+	renderer := core.NewMarkdownRenderer()
+	return renderer.RenderAndDisplay(markdown)
 }
 
 func (a *App) handleStatus() {

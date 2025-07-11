@@ -20,7 +20,7 @@ func ToMarkdown(result *QueryResult, limit int) string {
 	widths := make([]int, len(result.Columns))
 	rowsToProcess := make([][]string, 0)
 	for i, col := range result.Columns {
-		widths[i] = len(col)
+		widths[i] = len(col.Name)
 	}
 
 	for row := range result.Itor() {
@@ -46,7 +46,7 @@ func ToMarkdown(result *QueryResult, limit int) string {
 	// Write header
 	sb.WriteString("| ")
 	for i, col := range result.Columns {
-		sb.WriteString(fmt.Sprintf("%-*s", widths[i], col))
+		sb.WriteString(fmt.Sprintf("%-*s", widths[i], col.Name))
 		if i < len(result.Columns)-1 {
 			sb.WriteString(" | ")
 		}
@@ -152,7 +152,7 @@ func SaveQueryResultAsStreamingCSV(result *QueryResult, filePath string) (int, e
 	defer writer.Close()
 
 	// Write headers
-	if err := writer.WriteHeaders(result.Columns); err != nil {
+	if err := writer.WriteHeaders(result.ColumnNames()); err != nil {
 		return count, fmt.Errorf("failed to write CSV headers: %w", err)
 	}
 
