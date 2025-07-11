@@ -14,6 +14,7 @@ import (
 	"sqlterm/internal/core"
 	"sqlterm/internal/session"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/chzyer/readline"
 )
 
@@ -191,7 +192,7 @@ func (a *App) processQuery(query string, resultWriter io.Writer) error {
 		return fmt.Errorf("query execution failed: %w", err)
 	}
 
-	// Save as markdown and show with glow
+	// Save as markdown and display with glamour
 	if a.config != nil {
 		if err := a.sessionMgr.EnsureSessionDir(a.config.Name); err != nil {
 			fmt.Printf("Warning: failed to create session directory: %v\n", err)
@@ -286,7 +287,7 @@ func (a *App) executeFile(filename string, queryRange []int) error {
 	}
 	writer.Close()
 
-	if err := a.sessionMgr.ViewMarkdownWithGlow(mdPath); err != nil {
+	if err := a.sessionMgr.ViewMarkdown(mdPath); err != nil {
 		fmt.Printf("Warning: %v\n", err)
 	}
 	fmt.Printf("📍 File location: %s\n", mdPath)
@@ -354,7 +355,7 @@ SELECT * FROM table > output.csv    Export query results to CSV (Tab: autocomple
 
 SQL queries:
 Enter any SQL query directly to execute it.
-Results are automatically saved as markdown and can be viewed with glow.
+Results are automatically saved as markdown and displayed with glamour.
 
 Auto-completion:
 - Tab after /connect to see connection names
@@ -367,8 +368,7 @@ Session Management:
 - Results are automatically saved to ~/.config/sqlterm/sessions/{connection}/results/
 - Old result files are automatically cleaned up based on retention settings
 - Configure cleanup in ~/.config/sqlterm/sessions/{connection}/session.yaml
-- Default retention: 30 days (cleanup_retention_days: 30)
-`)
+- Default retention: 30 days (cleanup_retention_days: 30)`)
 }
 
 func (a *App) handleConnect(args []string) error {
@@ -567,29 +567,111 @@ func (a *App) handleDescribeTable(args []string) error {
 		return fmt.Errorf("failed to describe table: %w", err)
 	}
 
-	fmt.Printf("📊 Table: %s\n", tableInfo.Name)
-	fmt.Println("   Columns:")
+	// Generate markdown content
+	markdown := a.generateTableMarkdown(tableInfo)
+
+	// Display with glamour
+	return a.displayMarkdown(markdown)
+}
+
+func (a *App) generateTableMarkdown(tableInfo *core.TableInfo) string {
+	var sb strings.Builder
+
+	// Title
+	sb.WriteString(fmt.Sprintf("# 📊 Table: %s\n\n", tableInfo.Name))
+
+	// Columns section
+	sb.WriteString("## 📋 Columns\n\n")
+	sb.WriteString("| Column | Type | Nullable | Key | Default |\n")
+	sb.WriteString("|--------|------|----------|-----|----------|\n")
 
 	for _, col := range tableInfo.Columns {
-		nullable := "NOT NULL"
+		nullable := "❌ NOT NULL"
 		if col.Nullable {
-			nullable = "NULL"
+			nullable = "✅ NULL"
 		}
 
 		key := ""
 		if col.Key != "" {
-			key = fmt.Sprintf(" (%s)", col.Key)
+			key = fmt.Sprintf("🔑 %s", col.Key)
 		}
 
 		defaultVal := ""
 		if col.Default != nil {
-			defaultVal = fmt.Sprintf(" (DEFAULT %s)", *col.Default)
+			defaultVal = fmt.Sprintf("`%s`", *col.Default)
 		}
 
-		fmt.Printf("     %-15s %-15s %-8s%s%s\n",
-			col.Name, col.Type, nullable, key, defaultVal)
+		sb.WriteString(fmt.Sprintf("| **%s** | `%s` | %s | %s | %s |\n",
+			col.Name, col.Type, nullable, key, defaultVal))
 	}
 
+	// Primary keys section
+	if len(tableInfo.PrimaryKeys) > 0 {
+		sb.WriteString("\n## 🔑 Primary Keys\n\n")
+		for _, pk := range tableInfo.PrimaryKeys {
+			sb.WriteString(fmt.Sprintf("- **%s**\n", pk))
+		}
+	}
+
+	// Constraints section
+	if len(tableInfo.Constraints) > 0 {
+		sb.WriteString("\n## ⚠️ Constraints\n\n")
+		for _, constraint := range tableInfo.Constraints {
+			sb.WriteString(fmt.Sprintf("### %s (%s)\n", constraint.Name, constraint.Type))
+			sb.WriteString(fmt.Sprintf("- **Column:** %s\n", constraint.Column))
+			if constraint.Check != "" {
+				sb.WriteString(fmt.Sprintf("- **Check:** `%s`\n", constraint.Check))
+			}
+			sb.WriteString("\n")
+		}
+	}
+
+	// Foreign keys section
+	if len(tableInfo.ForeignKeys) > 0 {
+		sb.WriteString("\n## 🔗 Foreign Keys\n\n")
+		for _, fk := range tableInfo.ForeignKeys {
+			sb.WriteString(fmt.Sprintf("### %s\n", fk.Name))
+			sb.WriteString(fmt.Sprintf("- **Column:** %s\n", fk.Column))
+			sb.WriteString(fmt.Sprintf("- **References:** %s.%s\n", fk.ReferencedTable, fk.ReferencedColumn))
+			if fk.OnDelete != "" {
+				sb.WriteString(fmt.Sprintf("- **On Delete:** %s\n", fk.OnDelete))
+			}
+			if fk.OnUpdate != "" {
+				sb.WriteString(fmt.Sprintf("- **On Update:** %s\n", fk.OnUpdate))
+			}
+			sb.WriteString("\n")
+		}
+	}
+
+	return sb.String()
+}
+
+func (a *App) displayMarkdown(markdown string) error {
+	// Create a new glamour renderer with auto-style detection
+	r, err := glamour.NewTermRenderer(
+		// Detect background color and pick either the default dark or light theme
+		glamour.WithAutoStyle(),
+		// Wrap output at reasonable width
+		// glamour.WithWordWrap(100),
+	)
+	if err != nil {
+		// Fall back to plain text if glamour fails
+		fmt.Println("⚠️  Failed to create markdown renderer, falling back to plain text:")
+		fmt.Print(markdown)
+		return nil
+	}
+
+	// Render the markdown
+	out, err := r.Render(markdown)
+	if err != nil {
+		// Fall back to plain text if rendering fails
+		fmt.Println("⚠️  Failed to render markdown, falling back to plain text:")
+		fmt.Print(markdown)
+		return nil
+	}
+
+	// Display the rendered markdown
+	fmt.Print(out)
 	return nil
 }
 
@@ -633,7 +715,7 @@ func (a *App) handleExecQuery(args []string) error {
 		fmt.Println("Warning:", err.Error())
 		return nil
 	}
-	if err := a.sessionMgr.ViewMarkdownWithGlow(mdPath); err != nil {
+	if err := a.sessionMgr.ViewMarkdown(mdPath); err != nil {
 		fmt.Printf("Warning: %v\n", err)
 	}
 	fmt.Printf("📍 File location: %s\n", mdPath)

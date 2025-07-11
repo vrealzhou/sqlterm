@@ -205,8 +205,27 @@ func (r *QueryResult) Error() error {
 }
 
 type TableInfo struct {
-	Name    string
-	Columns []ColumnInfo
+	Name         string
+	Columns      []ColumnInfo
+	PrimaryKeys  []string
+	Constraints  []ConstraintInfo
+	ForeignKeys  []ForeignKeyInfo
+}
+
+type ConstraintInfo struct {
+	Name   string
+	Type   string
+	Column string
+	Check  string
+}
+
+type ForeignKeyInfo struct {
+	Name           string
+	Column         string
+	ReferencedTable string
+	ReferencedColumn string
+	OnDelete       string
+	OnUpdate       string
 }
 
 type ColumnInfo struct {

@@ -3,12 +3,12 @@ package session
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/glamour"
 	"gopkg.in/yaml.v3"
 )
 
@@ -56,22 +56,42 @@ func (m *Manager) EnsureSessionDir(connectionName string) error {
 	return nil
 }
 
-func (m *Manager) ViewMarkdownWithGlow(filePath string) error {
-	// Check if glow is installed
-	if _, err := exec.LookPath("glow"); err != nil {
-		return fmt.Errorf("glow is not installed. Install with: go install github.com/charmbracelet/glow@latest")
+func (m *Manager) ViewMarkdown(filePath string) error {
+	// Read the markdown file
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read markdown file: %w", err)
 	}
 
-	// Run glow with the markdown file
-	cmd := exec.Command("glow", "-p", filePath)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	return m.DisplayMarkdown(string(content))
+}
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to run glow: %w", err)
+func (m *Manager) DisplayMarkdown(markdown string) error {
+	// Create a new glamour renderer with auto-style detection
+	r, err := glamour.NewTermRenderer(
+		// Detect background color and pick either the default dark or light theme
+		glamour.WithAutoStyle(),
+		// Wrap output at reasonable width
+		glamour.WithWordWrap(100),
+	)
+	if err != nil {
+		// Fall back to plain text if glamour fails
+		fmt.Println("⚠️  Failed to create markdown renderer, falling back to plain text:\n")
+		fmt.Print(markdown)
+		return nil
 	}
 
+	// Render the markdown
+	out, err := r.Render(markdown)
+	if err != nil {
+		// Fall back to plain text if rendering fails
+		fmt.Println("⚠️  Failed to render markdown, falling back to plain text:\n")
+		fmt.Print(markdown)
+		return nil
+	}
+
+	// Display the rendered markdown
+	fmt.Print(out)
 	return nil
 }
 
