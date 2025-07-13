@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  sqlterm:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    container_name: sqlterm-dev
+    stdin_open: true
+    tty: true
+    volumes:
+      # Mount local directory for development
+      - ../../:/workspace
+      # Mount config directory
+      - sqlterm-config:/home/sqlterm/.config/sqlterm
+      # Mount current directory for SQL files
+      - ${PWD}:/workspace/sql
+    working_dir: /workspace/sql
+    environment:
+      - TERM=xterm-256color
+    networks:
+      - sqlterm-network
+
+  # Optional: PostgreSQL for testing
+  postgres:
+    image: postgres:15-alpine
+    container_name: sqlterm-postgres
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - sqlterm-network
+
+  # Optional: MySQL for testing
+  mysql:
+    image: mysql:8.0
+    container_name: sqlterm-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - sqlterm-network
+
+  # Optional: SQLite volume for persistent storage
+  sqlite:
+    image: alpine:latest
+    container_name: sqlterm-sqlite
+    volumes:
+      - sqlite-data:/data
+    command: tail -f /dev/null
+    networks:
+      - sqlterm-network
+
+volumes:
+  sqlterm-config:
+  postgres-data:
+  mysql-data:
+  sqlite-data:
+
+networks:
+  sqlterm-network:
+    driver: bridge

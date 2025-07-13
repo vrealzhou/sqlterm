@@ -86,9 +86,13 @@ func ToMarkdown(result *QueryResult, limit int) string {
 }
 
 func SaveQueryResultAsMarkdown(result *QueryResult, query string, connection string, resultWriter io.Writer) error {
+	// Format the SQL query for better readability
+	formatter := NewSQLFormatter()
+	formattedQuery := formatter.Format(query)
+	
 	// Create markdown content
 	var content strings.Builder
-	content.WriteString(fmt.Sprintf("**Query:**\n```sql\n%s\n```\n\n", query))
+	content.WriteString(fmt.Sprintf("**Query:**\n```sql\n%s\n```\n\n", formattedQuery))
 
 	// Add the markdown table (limited to 20 rows)
 	content.WriteString(ToMarkdown(result, 20))

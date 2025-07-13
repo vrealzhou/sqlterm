@@ -57,7 +57,7 @@ func NewApp() (*App, error) {
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:       "sqlterm > ",
 		AutoComplete: completer,
-		HistoryFile:  filepath.Join(configMgr.GetConfigDir(), "sessions", "history.txt"),
+		HistoryFile:  filepath.Join(configMgr.GetConfigDir(), "sessions", "global_history.txt"),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create readline: %w", err)
@@ -76,6 +76,21 @@ func (a *App) SetConnection(conn core.Connection, config *core.ConnectionConfig)
 	if err := a.sessionMgr.EnsureSessionDir(config.Name); err != nil {
 		fmt.Printf("Warning: failed to initialize session directory: %v\n", err)
 	}
+
+	// Switch to session-specific history file
+	if err := a.switchToSessionHistory(config.Name); err != nil {
+		fmt.Printf("Warning: failed to switch to session history: %v\n", err)
+	}
+
+	// Initialize vector store for AI context if AI manager is available
+	if a.aiManager != nil {
+		fmt.Printf("🔍 Initializing AI vector database for %s...\n", config.Name)
+		if err := a.aiManager.InitializeVectorStore(config.Name, conn); err != nil {
+			fmt.Printf("Warning: failed to initialize vector store: %v\n", err)
+		} else {
+			fmt.Printf("✅ Vector database ready in session folder: ~/.config/sqlterm/sessions/%s/\n", config.Name)
+		}
+	}
 }
 
 func (a *App) updatePrompt() {
@@ -89,8 +104,122 @@ func (a *App) updatePrompt() {
 	a.rl.SetPrompt(prompt)
 }
 
+// switchToSessionHistory changes the readline history file to be session-specific
+func (a *App) switchToSessionHistory(connectionName string) error {
+	// Create session-specific history file path
+	sessionDir := filepath.Join(a.configMgr.GetConfigDir(), "sessions", connectionName)
+	historyFile := filepath.Join(sessionDir, "history.txt")
+	
+	// Ensure the session directory exists
+	if err := os.MkdirAll(sessionDir, 0755); err != nil {
+		return fmt.Errorf("failed to create session directory: %w", err)
+	}
+	
+	// Migrate legacy global history if this is the first time using session histories
+	if err := a.migrateLegacyHistory(historyFile); err != nil {
+		fmt.Printf("Warning: failed to migrate legacy history: %v\n", err)
+	}
+	
+	// Update the readline config with the new history file
+	// Note: The chzyer/readline library doesn't support changing history file after creation,
+	// so we need to manage this manually by closing and recreating the instance
+	oldConfig := a.rl.Config
+	a.rl.Close()
+	
+	// Create new readline instance with session-specific history
+	newConfig := &readline.Config{
+		Prompt:       oldConfig.Prompt,
+		AutoComplete: oldConfig.AutoComplete,
+		HistoryFile:  historyFile,
+	}
+	
+	rl, err := readline.NewEx(newConfig)
+	if err != nil {
+		// Fallback: recreate with old config if new one fails
+		a.rl, _ = readline.NewEx(oldConfig)
+		return fmt.Errorf("failed to create readline with session history: %w", err)
+	}
+	
+	a.rl = rl
+	return nil
+}
+
+// migrateLegacyHistory copies the old global history.txt to session-specific history if it exists
+func (a *App) migrateLegacyHistory(sessionHistoryFile string) error {
+	legacyHistoryFile := filepath.Join(a.configMgr.GetConfigDir(), "sessions", "history.txt")
+	
+	// Check if legacy history file exists
+	if _, err := os.Stat(legacyHistoryFile); os.IsNotExist(err) {
+		return nil // No legacy history to migrate
+	}
+	
+	// Check if session history file already exists
+	if _, err := os.Stat(sessionHistoryFile); err == nil {
+		return nil // Session history already exists, don't overwrite
+	}
+	
+	// Copy legacy history to session history
+	input, err := os.ReadFile(legacyHistoryFile)
+	if err != nil {
+		return fmt.Errorf("failed to read legacy history: %w", err)
+	}
+	
+	if err := os.WriteFile(sessionHistoryFile, input, 0644); err != nil {
+		return fmt.Errorf("failed to write session history: %w", err)
+	}
+	
+	fmt.Printf("📦 Migrated command history to session folder\n")
+	return nil
+}
+
+// ClearConnection clears the current database connection and switches back to global history
+func (a *App) ClearConnection() error {
+	a.connection = nil
+	a.config = nil
+	a.updatePrompt()
+	
+	// Close vector store if active
+	if a.aiManager != nil {
+		a.aiManager.CloseVectorStore()
+	}
+	
+	// Switch back to global history
+	return a.switchToGlobalHistory()
+}
+
+// switchToGlobalHistory switches back to the global history file
+func (a *App) switchToGlobalHistory() error {
+	globalHistoryFile := filepath.Join(a.configMgr.GetConfigDir(), "sessions", "global_history.txt")
+	
+	// Update the readline config with the global history file
+	oldConfig := a.rl.Config
+	a.rl.Close()
+	
+	// Create new readline instance with global history
+	newConfig := &readline.Config{
+		Prompt:       oldConfig.Prompt,
+		AutoComplete: oldConfig.AutoComplete,
+		HistoryFile:  globalHistoryFile,
+	}
+	
+	rl, err := readline.NewEx(newConfig)
+	if err != nil {
+		// Fallback: recreate with old config if new one fails
+		a.rl, _ = readline.NewEx(oldConfig)
+		return fmt.Errorf("failed to create readline with global history: %w", err)
+	}
+	
+	a.rl = rl
+	return nil
+}
+
 func (a *App) Run() error {
 	defer a.rl.Close()
+	defer func() {
+		if a.aiManager != nil {
+			a.aiManager.CloseVectorStore()
+		}
+	}()
 
 	fmt.Println("🗄️  SQLTerm - Conversation Mode")
 	fmt.Println("Type /help for available commands, or enter SQL queries directly.")
@@ -360,6 +489,7 @@ Available commands:
 /describe [table]        Show table structure (Tab: autocomplete table names)
 /status                  Show current connection status
 /exec [query]            Execute a query directly
+/exec                    Enter multi-line SQL mode (end with ;)
 /exec [query] > file.csv Export query results to CSV
 /ai-config               Configure AI providers and models
 /show-prompts [count]    Show recent AI prompt history (default: all)
@@ -697,9 +827,7 @@ func (a *App) handleStatus() {
 
 func (a *App) handleExecQuery(args []string) error {
 	if len(args) == 0 {
-		fmt.Println("Usage: /exec <query>")
-		fmt.Println("       /exec <query> > filename.csv")
-		return nil
+		return a.handleMultilineExec()
 	}
 
 	if a.connection == nil {
@@ -719,6 +847,104 @@ func (a *App) handleExecQuery(args []string) error {
 		return nil
 	}
 	err = a.processQuery(line, writer)
+	writer.Close()
+	if err != nil {
+		fmt.Println("Warning:", err.Error())
+		return nil
+	}
+	if err := a.sessionMgr.ViewMarkdown(mdPath); err != nil {
+		fmt.Printf("Warning: %v\n", err)
+	}
+	fmt.Printf("📍 File location: %s\n", mdPath)
+	return nil
+}
+
+func (a *App) handleMultilineExec() error {
+	if a.connection == nil {
+		fmt.Println("No database connection. Use /connect to connect to a database.")
+		return nil
+	}
+
+	fmt.Println("📝 Multi-line SQL mode. Enter your query:")
+	fmt.Println("   • Paste multiple lines")
+	fmt.Println("   • End with ; to execute")
+	fmt.Println("   • Or press Ctrl+C to cancel")
+	fmt.Println("   • Use > filename.csv at the end for CSV export")
+	fmt.Println()
+
+	var queryLines []string
+	lineNumber := 1
+	
+	// Temporarily disable history for multi-line input
+	a.rl.HistoryDisable()
+	defer a.rl.HistoryEnable()
+
+	for {
+		// Create a custom prompt for multi-line input
+		prompt := fmt.Sprintf("  %2d│ ", lineNumber)
+		a.rl.SetPrompt(prompt)
+		
+		line, err := a.rl.Readline()
+		if err != nil {
+			// User pressed Ctrl+C or EOF
+			fmt.Println("\n❌ Multi-line input cancelled.")
+			a.updatePrompt() // Restore original prompt
+			return nil
+		}
+
+		line = strings.TrimSpace(line)
+		
+		if line != "" {
+			queryLines = append(queryLines, line)
+			
+			// Check if this line ends with semicolon - if so, we're done
+			// Also handle cases like "; -- comment" or "; > file.csv"
+			if strings.Contains(line, ";") {
+				// Find the position of the last semicolon
+				lastSemi := strings.LastIndex(line, ";")
+				afterSemi := strings.TrimSpace(line[lastSemi+1:])
+				
+				// If there's nothing after the semicolon, or only CSV export syntax, we're done
+				if afterSemi == "" || strings.HasPrefix(afterSemi, ">") || strings.HasPrefix(afterSemi, "--") {
+					break
+				}
+			}
+		}
+		lineNumber++
+	}
+
+	// Restore original prompt
+	a.updatePrompt()
+
+	if len(queryLines) == 0 {
+		fmt.Println("❌ No query entered.")
+		return nil
+	}
+
+	// Join all lines into a single query
+	fullQuery := strings.Join(queryLines, " ")
+	
+	// Add the complete multi-line query as a single history entry
+	historyEntry := "/exec " + fullQuery
+	if err := a.rl.SaveHistory(historyEntry); err != nil {
+		fmt.Printf("Warning: failed to save command to history: %v\n", err)
+	}
+	
+	fmt.Printf("🔍 Executing query...\n")
+	fmt.Printf("📋 Query: %s\n\n", a.truncateQuery(fullQuery))
+
+	// Check if it's a CSV export
+	if strings.Contains(fullQuery, " > ") {
+		return a.processQueryWithCSVExport(fullQuery)
+	}
+
+	// Regular execution
+	mdPath, writer, err := a.prepareQueryResultMarkdown()
+	if err != nil {
+		fmt.Println("Warning:", err.Error())
+		return nil
+	}
+	err = a.processQuery(fullQuery, writer)
 	writer.Close()
 	if err != nil {
 		fmt.Println("Warning:", err.Error())
@@ -919,7 +1145,6 @@ func (a *App) processAIChat(message string) error {
 
 	// Generate system prompt with database context
 	var tables []string
-	var currentTable string
 	if a.connection != nil {
 		var err error
 		tables, err = a.connection.ListTables()
@@ -928,7 +1153,7 @@ func (a *App) processAIChat(message string) error {
 		}
 	}
 
-	systemPrompt := a.aiManager.GenerateSystemPrompt(tables, currentTable)
+	systemPrompt := a.aiManager.GenerateVectorSystemPrompt(message, tables)
 	
 	// Create context with timeout for AI requests
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -948,12 +1173,15 @@ func (a *App) processAIChat(message string) error {
 		return fmt.Errorf("AI chat failed: %w", err)
 	}
 
+	// Format any SQL code blocks in the response
+	formattedResponse := core.FormatSQLInMarkdown(response)
+	
 	// Display response using markdown renderer
 	renderer := core.NewMarkdownRenderer()
-	if err := renderer.RenderAndDisplay(response); err != nil {
+	if err := renderer.RenderAndDisplay(formattedResponse); err != nil {
 		// Fallback to plain text if markdown rendering fails
 		fmt.Println("🤖 AI Response:")
-		fmt.Println(response)
+		fmt.Println(formattedResponse)
 	}
 
 	// Show AI status after response
@@ -1546,9 +1774,10 @@ func (a *App) handleShowPrompts(args []string) error {
 			markdown.WriteString("---\n\n")
 		}
 		
-		// Display using markdown renderer
+		// Format any SQL in the markdown and display using markdown renderer
+		formattedMarkdown := core.FormatSQLInMarkdown(markdown.String())
 		renderer := core.NewMarkdownRenderer()
-		if err := renderer.RenderAndDisplay(markdown.String()); err != nil {
+		if err := renderer.RenderAndDisplay(formattedMarkdown); err != nil {
 			// Fallback to plain text
 			fmt.Printf("Prompt #%d - %s\n", i+1, timeStr)
 			fmt.Printf("Provider: %s | Model: %s\n", entry.Provider, entry.Model)

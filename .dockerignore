@@ -1,0 +1,53 @@
+# Binaries and build artifacts
+# Build artifacts
+bin/
+dist/
+release/
+infra/dist/
+*.exe
+*.zip
+*.tar.gz
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test and coverage files
+*.out
+coverage.html
+
+# Git files
+.git/
+.gitignore
+
+# Documentation
+README.md
+RELEASE.md
+*.md
+
+# CI/CD files
+.github/
+infra/docker/Dockerfile
+Dockerfile
+.dockerignore
+
+# Local configuration
+.env
+.env.local
+config.yaml
+sessions/
+~/.config/sqlterm/
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/

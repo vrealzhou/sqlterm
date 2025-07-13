@@ -103,6 +103,38 @@ type PromptHistory struct {
 	MaxSize int           `json:"max_size"`
 }
 
+// TableInfo represents detailed table information for AI context
+type TableInfo struct {
+	Name         string            `json:"name"`
+	Columns      []ColumnInfo      `json:"columns"`
+	Relationships []Relationship   `json:"relationships"`
+	RecentlyUsed bool              `json:"recently_used"`
+	Relevance    float64           `json:"relevance"`
+}
+
+// ColumnInfo represents column details
+type ColumnInfo struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Nullable bool   `json:"nullable"`
+	Key      string `json:"key"` // PRI, UNI, MUL, etc.
+}
+
+// Relationship represents foreign key relationships
+type Relationship struct {
+	FromTable  string `json:"from_table"`
+	FromColumn string `json:"from_column"`
+	ToTable    string `json:"to_table"`
+	ToColumn   string `json:"to_column"`
+}
+
+// SchemaContext holds optimized schema information for AI
+type SchemaContext struct {
+	RelevantTables []TableInfo `json:"relevant_tables"`
+	TotalTables    int         `json:"total_tables"`
+	LimitReason    string      `json:"limit_reason"`
+}
+
 // Client interface for AI providers
 type Client interface {
 	Chat(ctx context.Context, request ChatRequest) (*ChatResponse, error)
