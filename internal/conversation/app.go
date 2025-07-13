@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"sqlterm/internal/ai"
 	"sqlterm/internal/config"
 	"sqlterm/internal/core"
 	"sqlterm/internal/session"
@@ -23,15 +25,24 @@ type App struct {
 	config     *core.ConnectionConfig
 	configMgr  *config.Manager
 	sessionMgr *session.Manager
+	aiManager  *ai.Manager
 }
 
 func NewApp() (*App, error) {
 	configMgr := config.NewManager()
 	sessionMgr := session.NewManager(configMgr.GetConfigDir())
+	
+	// Initialize AI manager
+	aiManager, err := ai.NewManager(configMgr.GetConfigDir())
+	if err != nil {
+		// AI manager initialization failed completely
+		aiManager = nil
+	}
 
 	app := &App{
 		configMgr:  configMgr,
 		sessionMgr: sessionMgr,
+		aiManager:  aiManager,
 	}
 
 	// Ensure sessions directory exists for history file
@@ -68,11 +79,14 @@ func (a *App) SetConnection(conn core.Connection, config *core.ConnectionConfig)
 }
 
 func (a *App) updatePrompt() {
+	var prompt string
 	if a.config != nil {
-		a.rl.SetPrompt(fmt.Sprintf("sqlterm (%s) > ", a.config.Database))
+		prompt = fmt.Sprintf("sqlterm (%s) > ", a.config.Database)
 	} else {
-		a.rl.SetPrompt("sqlterm > ")
+		prompt = "sqlterm > "
 	}
+	
+	a.rl.SetPrompt(prompt)
 }
 
 func (a *App) Run() error {
@@ -108,8 +122,10 @@ func (a *App) processLine(line string) error {
 		return a.processCommand(line)
 	} else if strings.HasPrefix(line, "@") {
 		return a.processQueryFile(line)
+	} else {
+		// Handle as AI chat
+		return a.processAIChat(line)
 	}
-	return nil
 }
 
 func (a *App) processCommand(line string) error {
@@ -138,6 +154,10 @@ func (a *App) processCommand(line string) error {
 		a.handleStatus()
 	case "/exec":
 		return a.handleExecQuery(args)
+	case "/ai-config":
+		return a.handleAIConfig(args)
+	case "/show-prompts":
+		return a.handleShowPrompts(args)
 	default:
 		fmt.Printf("Unknown command: %s. Type /help for available commands.\n", command)
 	}
@@ -341,7 +361,14 @@ Available commands:
 /status                  Show current connection status
 /exec [query]            Execute a query directly
 /exec [query] > file.csv Export query results to CSV
+/ai-config               Configure AI providers and models
+/show-prompts [count]    Show recent AI prompt history (default: all)
 /quit, /exit             Exit SQLTerm
+
+AI Chat:
+Enter any message without / or @ prefix to chat with AI.
+AI can help generate SQL queries, explain database concepts, and more.
+Use /ai-config to set up AI providers (OpenRouter, Ollama, LM Studio).
 
 File commands:
 @filename.sql            Execute all queries in file (Tab: autocomplete files)
@@ -359,6 +386,7 @@ Results are automatically saved as markdown and displayed with glamour.
 Auto-completion:
 - Tab after /connect to see connection names
 - Tab after /describe to see table names
+- Tab after /ai-config to see AI subcommands and models
 - Tab after @ to see .sql files (searches all subdirectories)
 - Tab after > to see/create .csv files
 - Excludes hidden folders (starting with .) and common build directories
@@ -674,6 +702,11 @@ func (a *App) handleExecQuery(args []string) error {
 		return nil
 	}
 
+	if a.connection == nil {
+		fmt.Println("No database connection. Use /connect to connect to a database.")
+		return nil
+	}
+
 	line := strings.Join(args, " ")
 
 	// Check if it's a CSV export
@@ -874,4 +907,672 @@ func (a *App) executeFileWithCSVExport(filename string, queryRange []int, csvFil
 	}
 
 	return nil
+}
+
+func (a *App) processAIChat(message string) error {
+	if a.aiManager == nil || !a.aiManager.IsConfigured() {
+		fmt.Println("🤖 AI is not configured. Use /ai-config to set up AI providers.")
+		return nil
+	}
+
+	fmt.Printf("🤖 Thinking... (this may take up to 2 minutes for complex queries)\n")
+
+	// Generate system prompt with database context
+	var tables []string
+	var currentTable string
+	if a.connection != nil {
+		var err error
+		tables, err = a.connection.ListTables()
+		if err != nil {
+			fmt.Printf("Warning: failed to get table list for AI context: %v\n", err)
+		}
+	}
+
+	systemPrompt := a.aiManager.GenerateSystemPrompt(tables, currentTable)
+	
+	// Create context with timeout for AI requests
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	
+	response, err := a.aiManager.Chat(ctx, message, systemPrompt)
+	if err != nil {
+		// Provide more helpful error messages for common issues
+		if strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "deadline exceeded") {
+			fmt.Printf("⏰ AI request timed out. This can happen with:\n")
+			fmt.Printf("   - Complex queries that take time to process\n")
+			fmt.Printf("   - Network connectivity issues\n")
+			fmt.Printf("   - AI provider being overloaded\n")
+			fmt.Printf("💡 Try simplifying your message or try again later.\n")
+			return nil
+		}
+		return fmt.Errorf("AI chat failed: %w", err)
+	}
+
+	// Display response using markdown renderer
+	renderer := core.NewMarkdownRenderer()
+	if err := renderer.RenderAndDisplay(response); err != nil {
+		// Fallback to plain text if markdown rendering fails
+		fmt.Println("🤖 AI Response:")
+		fmt.Println(response)
+	}
+
+	// Show AI status after response
+	if a.aiManager != nil && a.aiManager.IsConfigured() {
+		aiConfig := a.aiManager.GetConfig()
+		aiInfo := fmt.Sprintf("🤖 %s | %s", aiConfig.FormatProviderInfo(), aiConfig.FormatUsageStats())
+		fmt.Printf("\n%s\n", aiInfo)
+	}
+
+	return nil
+}
+
+func (a *App) handleAIConfig(args []string) error {
+	if len(args) == 0 {
+		return a.interactiveAIConfig()
+	}
+
+	subcmd := args[0]
+	switch subcmd {
+	case "status":
+		return a.handleAIConfigStatus()
+	case "provider":
+		return a.handleAIConfigProvider(args[1:])
+	case "model":
+		return a.handleAIConfigModel(args[1:])
+	case "api-key":
+		return a.handleAIConfigAPIKey(args[1:])
+	case "base-url":
+		return a.handleAIConfigBaseURL(args[1:])
+	case "list-models":
+		return a.handleAIConfigListModels()
+	default:
+		fmt.Printf("Unknown subcommand: %s\n", subcmd)
+		a.printAIConfigHelp()
+		return nil
+	}
+}
+
+func (a *App) printAIConfigHelp() {
+	fmt.Println(`
+🤖 AI Configuration Commands:
+
+/ai-config                     Interactive AI setup wizard (recommended)
+/ai-config status              Show current AI configuration and usage
+/ai-config provider <name>     Set AI provider (openrouter, ollama, lmstudio)
+/ai-config model <model>       Set AI model for current provider
+/ai-config api-key <provider> <key>  Set API key for provider
+/ai-config base-url <provider> <url> Set base URL for local providers
+/ai-config list-models         List available models for current provider
+
+Interactive Setup:
+Run /ai-config without arguments to start the setup wizard that will:
+1. Let you choose between OpenRouter, Ollama, or LM Studio
+2. Configure API keys (for cloud providers) or base URLs (for local)
+3. Fetch and display available models for your provider
+4. Let you select your preferred model with pricing information
+
+Manual Examples:
+/ai-config provider openrouter
+/ai-config api-key openrouter sk-or-v1-xxx...
+/ai-config model anthropic/claude-3.5-sonnet
+/ai-config base-url ollama http://localhost:11434
+
+Providers:
+- openrouter: Cloud AI models (requires API key from https://openrouter.ai/keys)
+- ollama: Local AI models (requires Ollama installation)
+- lmstudio: Local AI models (requires LM Studio)`)
+}
+
+func (a *App) handleAIConfigStatus() error {
+	if a.aiManager == nil {
+		fmt.Println("❌ AI manager not initialized")
+		return nil
+	}
+
+	config := a.aiManager.GetConfig()
+	fmt.Printf("🤖 AI Configuration:\n")
+	fmt.Printf("   Provider: %s\n", config.Provider)
+	fmt.Printf("   Model: %s\n", config.Model)
+	fmt.Printf("   Usage: %s\n", config.FormatUsageStats())
+	
+	// Show API key status (masked)
+	for provider, key := range config.APIKeys {
+		if key != "" {
+			maskedKey := key[:min(8, len(key))] + "..." + key[max(0, len(key)-4):]
+			fmt.Printf("   %s API Key: %s\n", provider, maskedKey)
+		}
+	}
+
+	// Show base URLs
+	for provider, url := range config.BaseURLs {
+		if url != "" {
+			fmt.Printf("   %s Base URL: %s\n", provider, url)
+		}
+	}
+
+	return nil
+}
+
+func (a *App) handleAIConfigProvider(args []string) error {
+	if len(args) == 0 {
+		fmt.Println("Usage: /ai-config provider <openrouter|ollama|lmstudio>")
+		return nil
+	}
+
+	if a.aiManager == nil {
+		return fmt.Errorf("AI manager not initialized")
+	}
+
+	provider := ai.Provider(args[0])
+	config := a.aiManager.GetConfig()
+	defaultModel := config.GetDefaultModel(provider)
+
+	if err := a.aiManager.SetProvider(provider, defaultModel); err != nil {
+		return fmt.Errorf("failed to set provider: %w", err)
+	}
+
+	fmt.Printf("✅ Set AI provider to %s with model %s\n", provider, defaultModel)
+	a.updatePrompt()
+
+	return nil
+}
+
+func (a *App) handleAIConfigModel(args []string) error {
+	if len(args) == 0 {
+		fmt.Println("Usage: /ai-config model <model_name>")
+		return nil
+	}
+
+	if a.aiManager == nil {
+		return fmt.Errorf("AI manager not initialized")
+	}
+
+	model := args[0]
+	config := a.aiManager.GetConfig()
+
+	if err := a.aiManager.SetProvider(config.Provider, model); err != nil {
+		return fmt.Errorf("failed to set model: %w", err)
+	}
+
+	fmt.Printf("✅ Set AI model to %s\n", model)
+	a.updatePrompt()
+
+	return nil
+}
+
+func (a *App) handleAIConfigAPIKey(args []string) error {
+	if len(args) < 2 {
+		fmt.Println("Usage: /ai-config api-key <provider> <api_key>")
+		return nil
+	}
+
+	if a.aiManager == nil {
+		return fmt.Errorf("AI manager not initialized")
+	}
+
+	provider := ai.Provider(args[0])
+	apiKey := args[1]
+
+	if err := a.aiManager.SetAPIKey(provider, apiKey); err != nil {
+		return fmt.Errorf("failed to set API key: %w", err)
+	}
+
+	fmt.Printf("✅ Set API key for %s\n", provider)
+
+	return nil
+}
+
+func (a *App) handleAIConfigBaseURL(args []string) error {
+	if len(args) < 2 {
+		fmt.Println("Usage: /ai-config base-url <provider> <url>")
+		return nil
+	}
+
+	if a.aiManager == nil {
+		return fmt.Errorf("AI manager not initialized")
+	}
+
+	provider := ai.Provider(args[0])
+	baseURL := args[1]
+
+	if err := a.aiManager.SetBaseURL(provider, baseURL); err != nil {
+		return fmt.Errorf("failed to set base URL: %w", err)
+	}
+
+	fmt.Printf("✅ Set base URL for %s to %s\n", provider, baseURL)
+
+	return nil
+}
+
+func (a *App) handleAIConfigListModels() error {
+	if a.aiManager == nil {
+		return fmt.Errorf("AI manager not initialized")
+	}
+
+	fmt.Printf("🔍 Fetching available models...\n")
+
+	ctx := context.Background()
+	models, err := a.aiManager.ListModels(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list models: %w", err)
+	}
+
+	if len(models) == 0 {
+		fmt.Println("No models available for current provider")
+		return nil
+	}
+
+	fmt.Printf("📋 Available models for %s:\n", a.aiManager.GetConfig().Provider)
+	for i, model := range models {
+		fmt.Printf("  %d. %s - %s\n", i+1, model.ID, model.Description)
+		if model.Pricing != nil {
+			inputCost := ai.FormatPrice(model.Pricing.InputCostPerToken * 1000000)  // per 1M tokens
+			outputCost := ai.FormatPrice(model.Pricing.OutputCostPerToken * 1000000) // per 1M tokens
+			fmt.Printf("     Pricing: %s input / %s output (per 1M tokens)\n", inputCost, outputCost)
+		}
+	}
+
+	return nil
+}
+
+func (a *App) interactiveAIConfig() error {
+	fmt.Println("🤖 Interactive AI Configuration")
+	
+	// Use readline instance instead of os.Stdin to avoid conflicts
+	fmt.Println("\nNote: Use Ctrl+C to cancel setup at any time")
+
+	// Step 1: Provider Selection
+	fmt.Println("\n📊 Select AI provider:")
+	fmt.Println("  1. OpenRouter (Cloud AI - requires API key)")
+	fmt.Println("  2. Ollama (Local AI - requires Ollama installation)")
+	fmt.Println("  3. LM Studio (Local AI - requires LM Studio)")
+	
+	a.rl.SetPrompt("Enter choice (1-3): ")
+	choice, err := a.rl.Readline()
+	if err != nil {
+		return fmt.Errorf("failed to read input: %w", err)
+	}
+	choice = strings.TrimSpace(choice)
+
+	var selectedProvider ai.Provider
+	switch choice {
+	case "1":
+		selectedProvider = ai.ProviderOpenRouter
+	case "2":
+		selectedProvider = ai.ProviderOllama
+	case "3":
+		selectedProvider = ai.ProviderLMStudio
+	default:
+		return fmt.Errorf("invalid choice: %s", choice)
+	}
+
+	fmt.Printf("✅ Selected provider: %s\n", selectedProvider)
+
+	// Step 2: API Key Setup (for cloud providers)
+	var needsAPIKey bool
+	var apiKey string
+	
+	if selectedProvider == ai.ProviderOpenRouter {
+		needsAPIKey = true
+		
+		// Check if API key already exists
+		if a.aiManager != nil {
+			config := a.aiManager.GetConfig()
+			existingKey := config.GetAPIKey(selectedProvider)
+			if existingKey != "" {
+				maskedKey := existingKey[:min(8, len(existingKey))] + "..." + existingKey[max(0, len(existingKey)-4):]
+				fmt.Printf("\n🔑 Existing API key found: %s\n", maskedKey)
+				a.rl.SetPrompt("Keep existing key? (y/N): ")
+				keepChoice, err := a.rl.Readline()
+				if err != nil {
+					return fmt.Errorf("failed to read input: %w", err)
+				}
+				keepChoice = strings.TrimSpace(keepChoice)
+				
+				if strings.ToLower(keepChoice) == "y" || strings.ToLower(keepChoice) == "yes" {
+					apiKey = existingKey
+					needsAPIKey = false
+				}
+			}
+		}
+		
+		if needsAPIKey {
+			a.rl.SetPrompt("\n🔐 Enter OpenRouter API key (get one from https://openrouter.ai/keys): ")
+			apiKey, err = a.rl.Readline()
+			if err != nil {
+				return fmt.Errorf("failed to read API key: %w", err)
+			}
+			apiKey = strings.TrimSpace(apiKey)
+			
+			if apiKey == "" {
+				return fmt.Errorf("API key is required for OpenRouter")
+			}
+		}
+	}
+
+	// Step 3: Base URL Setup (for local providers)
+	var baseURL string
+	if selectedProvider == ai.ProviderOllama || selectedProvider == ai.ProviderLMStudio {
+		var defaultURL string
+		if selectedProvider == ai.ProviderOllama {
+			defaultURL = "http://localhost:11434"
+		} else {
+			defaultURL = "http://localhost:1234"
+		}
+		
+		a.rl.SetPrompt(fmt.Sprintf("\n🌐 Enter base URL for %s [%s]: ", selectedProvider, defaultURL))
+		baseURL, err = a.rl.Readline()
+		if err != nil {
+			return fmt.Errorf("failed to read base URL: %w", err)
+		}
+		baseURL = strings.TrimSpace(baseURL)
+		if baseURL == "" {
+			baseURL = defaultURL
+		}
+	}
+
+	// Step 4: Initialize/Update AI Manager
+	if a.aiManager == nil {
+		var err error
+		a.aiManager, err = ai.NewManager(a.configMgr.GetConfigDir())
+		if err != nil {
+			return fmt.Errorf("failed to initialize AI manager: %w", err)
+		}
+	}
+
+	// Set API key if needed
+	if apiKey != "" {
+		if err := a.aiManager.SetAPIKey(selectedProvider, apiKey); err != nil {
+			return fmt.Errorf("failed to set API key: %w", err)
+		}
+		fmt.Printf("✅ API key configured for %s\n", selectedProvider)
+	}
+
+	// Set base URL if needed
+	if baseURL != "" {
+		if err := a.aiManager.SetBaseURL(selectedProvider, baseURL); err != nil {
+			return fmt.Errorf("failed to set base URL: %w", err)
+		}
+		fmt.Printf("✅ Base URL set to %s\n", baseURL)
+	}
+
+	// Step 5: Model Selection
+	fmt.Printf("\n🔍 Fetching available models for %s...\n", selectedProvider)
+	
+	// Temporarily set the provider to fetch models
+	tempConfig := a.aiManager.GetConfig()
+	
+	if err := a.aiManager.SetProvider(selectedProvider, tempConfig.GetDefaultModel(selectedProvider)); err != nil {
+		return fmt.Errorf("failed to set temporary provider: %w", err)
+	}
+
+	ctx := context.Background()
+	models, err := a.aiManager.ListModels(ctx)
+	if err != nil {
+		// If we can't fetch models, fall back to defaults
+		fmt.Printf("⚠️  Could not fetch models from %s: %v\n", selectedProvider, err)
+		fmt.Println("Using default model for provider.")
+		
+		defaultModel := tempConfig.GetDefaultModel(selectedProvider)
+		if err := a.aiManager.SetProvider(selectedProvider, defaultModel); err != nil {
+			return fmt.Errorf("failed to set default model: %w", err)
+		}
+		
+		fmt.Printf("✅ AI configured with %s using model %s\n", selectedProvider, defaultModel)
+		a.updatePrompt()
+		return nil
+	}
+
+	if len(models) == 0 {
+		fmt.Printf("⚠️  No models available for %s\n", selectedProvider)
+		defaultModel := tempConfig.GetDefaultModel(selectedProvider)
+		if err := a.aiManager.SetProvider(selectedProvider, defaultModel); err != nil {
+			return fmt.Errorf("failed to set default model: %w", err)
+		}
+		fmt.Printf("✅ Using default model: %s\n", defaultModel)
+		a.updatePrompt()
+		return nil
+	}
+
+	// Set up model selection with autocomplete
+	fmt.Printf("\n🎯 Found %d available models for %s\n", len(models), selectedProvider)
+	
+	// Show a few popular examples to help users
+	if selectedProvider == ai.ProviderOpenRouter && len(models) > 3 {
+		fmt.Println("💡 Popular models:")
+		count := 0
+		for _, model := range models {
+			if strings.Contains(model.ID, "claude") || strings.Contains(model.ID, "gpt-4") || strings.Contains(model.ID, "llama") {
+				fmt.Printf("   - %s", model.ID)
+				if model.Description != "" && len(model.Description) < 50 {
+					fmt.Printf(" (%s)", model.Description)
+				}
+				if model.Pricing != nil {
+					inputCost := ai.FormatPrice(model.Pricing.InputCostPerToken * 1000000)
+					outputCost := ai.FormatPrice(model.Pricing.OutputCostPerToken * 1000000)
+					fmt.Printf(" [%s/%s per 1M tokens]", inputCost, outputCost)
+				}
+				fmt.Println()
+				count++
+				if count >= 3 {
+					break
+				}
+			}
+		}
+		fmt.Println("")
+	}
+	
+	// Create model name mapping for lookup
+	modelMap := make(map[string]ai.ModelInfo)
+	for _, model := range models {
+		modelMap[model.ID] = model
+	}
+	
+	// Create a temporary autocompleter that provides full model names as suggestions
+	modelCompleter := readline.NewPrefixCompleter(
+		readline.PcItemDynamic(func(line string) []string {
+			var candidates []string
+			prefix := strings.ToLower(line)
+			for _, model := range models {
+				if strings.Contains(strings.ToLower(model.ID), prefix) {
+					candidates = append(candidates, model.ID)
+				}
+			}
+			// Limit suggestions to keep it manageable
+			if len(candidates) > 10 {
+				candidates = candidates[:10]
+			}
+			return candidates
+		}),
+	)
+	
+	// Temporarily replace autocompleter
+	originalCompleter := a.rl.Config.AutoComplete
+	a.rl.Config.AutoComplete = modelCompleter
+	
+	var selectedModel ai.ModelInfo
+	var modelChoice string
+	
+	for {
+		a.rl.SetPrompt("🤖 Enter model name (Tab for autocomplete): ")
+		modelChoice, err = a.rl.Readline()
+		if err != nil {
+			// Restore original autocompleter before returning
+			a.rl.Config.AutoComplete = originalCompleter
+			return fmt.Errorf("failed to read model choice: %w", err)
+		}
+		modelChoice = strings.TrimSpace(modelChoice)
+		
+		if modelChoice == "" {
+			fmt.Println("Please enter a model name.")
+			continue
+		}
+		
+		// Look for exact match first
+		if model, exists := modelMap[modelChoice]; exists {
+			selectedModel = model
+			break
+		}
+		
+		// Look for partial matches
+		var matches []ai.ModelInfo
+		lowerChoice := strings.ToLower(modelChoice)
+		for _, model := range models {
+			if strings.Contains(strings.ToLower(model.ID), lowerChoice) {
+				matches = append(matches, model)
+			}
+		}
+		
+		if len(matches) == 1 {
+			selectedModel = matches[0]
+			fmt.Printf("✅ Selected: %s\n", selectedModel.ID)
+			break
+		} else if len(matches) > 1 {
+			fmt.Printf("⚠️  Found %d matches:\n", len(matches))
+			for i, match := range matches {
+				if i >= 5 { // Show max 5 matches
+					fmt.Printf("   ... and %d more\n", len(matches)-5)
+					break
+				}
+				fmt.Printf("   - %s", match.ID)
+				if match.Description != "" && len(match.Description) < 60 {
+					fmt.Printf(" (%s)", match.Description)
+				}
+				fmt.Println()
+			}
+			fmt.Println("Please be more specific or copy-paste the exact model name.")
+		} else {
+			fmt.Printf("❌ No model found matching '%s'.\n", modelChoice)
+			fmt.Println("💡 Use Tab for autocomplete or try a different search term.")
+		}
+	}
+	
+	// Restore original autocompleter
+	a.rl.Config.AutoComplete = originalCompleter
+	
+	// Step 6: Final Configuration
+	if err := a.aiManager.SetProvider(selectedProvider, selectedModel.ID); err != nil {
+		return fmt.Errorf("failed to set final configuration: %w", err)
+	}
+
+	// Ensure the client is properly configured
+	if err := a.aiManager.EnsureConfigured(); err != nil {
+		return fmt.Errorf("failed to initialize AI client: %w", err)
+	}
+
+	fmt.Printf("\n🎉 AI Configuration Complete!\n")
+	fmt.Printf("   Provider: %s\n", selectedProvider)
+	fmt.Printf("   Model: %s\n", selectedModel.ID)
+	if selectedModel.Description != "" {
+		fmt.Printf("   Description: %s\n", selectedModel.Description)
+	}
+	
+	if selectedProvider == ai.ProviderOpenRouter && selectedModel.Pricing != nil {
+		inputCost := ai.FormatPrice(selectedModel.Pricing.InputCostPerToken * 1000000)
+		outputCost := ai.FormatPrice(selectedModel.Pricing.OutputCostPerToken * 1000000)
+		fmt.Printf("   Pricing: %s input / %s output (per 1M tokens)\n", inputCost, outputCost)
+	}
+
+	fmt.Println("\n💬 You can now chat with AI by typing messages without / or @ prefixes!")
+	fmt.Println("Example: 'show me all tables' or 'help me write a query to find users'")
+
+	// Restore the original prompt
+	a.updatePrompt()
+	return nil
+}
+
+func (a *App) handleShowPrompts(args []string) error {
+	if a.aiManager == nil {
+		fmt.Println("🤖 AI is not configured. Use /ai-config to set up AI providers.")
+		return nil
+	}
+
+	history := a.aiManager.GetPromptHistory()
+	
+	if len(history) == 0 {
+		fmt.Println("📝 No AI prompt history found.")
+		fmt.Println("Start chatting with AI (type messages without / or @ prefixes) to see history here.")
+		return nil
+	}
+
+	// Support optional count argument
+	count := len(history)
+	if len(args) > 0 {
+		if parsedCount, err := strconv.Atoi(args[0]); err == nil && parsedCount > 0 {
+			if parsedCount < count {
+				count = parsedCount
+			}
+		}
+	}
+
+	// Show the last N prompts
+	startIdx := len(history) - count
+	if startIdx < 0 {
+		startIdx = 0
+	}
+
+	fmt.Printf("📝 Showing last %d AI prompt(s):\n\n", count)
+
+	for i := startIdx; i < len(history); i++ {
+		entry := history[i]
+		
+		// Format timestamp
+		timeStr := entry.Timestamp.Format("2006-01-02 15:04:05")
+		
+		// Create markdown content for this prompt entry
+		var markdown strings.Builder
+		markdown.WriteString(fmt.Sprintf("## 🤖 Prompt #%d - %s\n\n", i+1, timeStr))
+		markdown.WriteString(fmt.Sprintf("**Provider:** %s | **Model:** %s\n\n", entry.Provider, entry.Model))
+		
+		if entry.Cost > 0 {
+			markdown.WriteString(fmt.Sprintf("**Tokens:** %d input, %d output | **Cost:** %s\n\n", 
+				entry.InputTokens, entry.OutputTokens, ai.FormatPrice(entry.Cost)))
+		} else {
+			markdown.WriteString(fmt.Sprintf("**Tokens:** %d input, %d output | **Cost:** Free\n\n", 
+				entry.InputTokens, entry.OutputTokens))
+		}
+		
+		markdown.WriteString("### 📋 System Prompt\n")
+		markdown.WriteString("```\n")
+		markdown.WriteString(entry.SystemPrompt)
+		markdown.WriteString("\n```\n\n")
+		
+		markdown.WriteString("### 💬 User Message\n")
+		markdown.WriteString("```\n")
+		markdown.WriteString(entry.UserMessage)
+		markdown.WriteString("\n```\n\n")
+		
+		if i < len(history)-1 {
+			markdown.WriteString("---\n\n")
+		}
+		
+		// Display using markdown renderer
+		renderer := core.NewMarkdownRenderer()
+		if err := renderer.RenderAndDisplay(markdown.String()); err != nil {
+			// Fallback to plain text
+			fmt.Printf("Prompt #%d - %s\n", i+1, timeStr)
+			fmt.Printf("Provider: %s | Model: %s\n", entry.Provider, entry.Model)
+			if entry.Cost > 0 {
+				fmt.Printf("Tokens: %d input, %d output | Cost: %s\n", 
+					entry.InputTokens, entry.OutputTokens, ai.FormatPrice(entry.Cost))
+			} else {
+				fmt.Printf("Tokens: %d input, %d output | Cost: Free\n", 
+					entry.InputTokens, entry.OutputTokens)
+			}
+			fmt.Printf("\nSystem Prompt:\n%s\n", entry.SystemPrompt)
+			fmt.Printf("\nUser Message:\n%s\n", entry.UserMessage)
+			if i < len(history)-1 {
+				fmt.Println("\n" + strings.Repeat("-", 50) + "\n")
+			}
+		}
+	}
+
+	return nil
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

@@ -33,6 +33,9 @@ func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int)
 	case strings.HasPrefix(lineStr, "/describe ") && len(words) > 1:
 		candidates = ac.getTableCandidates(words, lineStr)
 		completionLength = ac.getCompletionLength(lineStr)
+	case strings.HasPrefix(lineStr, "/ai-config "):
+		candidates = ac.getAIConfigCandidates(words, lineStr)
+		completionLength = ac.getCompletionLength(lineStr)
 	case strings.HasPrefix(lineStr, "@"):
 		candidates = ac.getFileCandidates(lineStr)
 		completionLength = ac.getCompletionLength(lineStr)
@@ -56,7 +59,7 @@ func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int)
 func (ac *AutoCompleter) getCommands() [][]rune {
 	commands := []string{
 		"/help", "/quit", "/exit", "/connect", "/list-connections",
-		"/tables", "/describe", "/status", "/exec",
+		"/tables", "/describe", "/status", "/exec", "/ai-config", "/show-prompts",
 	}
 
 	result := make([][]rune, len(commands))
@@ -139,7 +142,7 @@ func (ac *AutoCompleter) findCommonPrefix(candidates []string) string {
 func (ac *AutoCompleter) getCommandCandidates(partial string) []string {
 	commands := []string{
 		"/help", "/quit", "/exit", "/connect", "/list-connections",
-		"/tables", "/describe", "/status", "/exec",
+		"/tables", "/describe", "/status", "/exec", "/ai-config", "/show-prompts",
 	}
 
 	var candidates []string
@@ -457,4 +460,105 @@ func (ac *AutoCompleter) getCompletionLength(line string) int {
 
 	// For other completions, return the length of the last word
 	return len(words[len(words)-1])
+}
+
+func (ac *AutoCompleter) getAIConfigCandidates(words []string, line string) []string {
+	if len(words) < 2 {
+		return nil
+	}
+
+	// Subcommands for /ai-config
+	subcommands := []string{"provider", "model", "api-key", "base-url", "status", "list-models"}
+	
+	if len(words) == 2 {
+		// Complete subcommands
+		var candidates []string
+		currentWord := words[1]
+		for _, subcmd := range subcommands {
+			if strings.HasPrefix(subcmd, currentWord) {
+				completion := subcmd[len(currentWord):]
+				candidates = append(candidates, completion)
+			}
+		}
+		return candidates
+	}
+
+	// Handle specific subcommand completions
+	subcmd := words[1]
+	switch subcmd {
+	case "provider":
+		if len(words) == 3 {
+			providers := []string{"openrouter", "ollama", "lmstudio"}
+			var candidates []string
+			currentWord := words[2]
+			for _, provider := range providers {
+				if strings.HasPrefix(provider, currentWord) {
+					completion := provider[len(currentWord):]
+					candidates = append(candidates, completion)
+				}
+			}
+			return candidates
+		}
+	case "model":
+		if len(words) == 3 {
+			// Try to get available models from the current provider
+			if ac.app.aiManager != nil {
+				models := ac.getAvailableModels()
+				var candidates []string
+				currentWord := words[2]
+				for _, model := range models {
+					if strings.HasPrefix(model, currentWord) {
+						completion := model[len(currentWord):]
+						candidates = append(candidates, completion)
+					}
+				}
+				return candidates
+			}
+		}
+	}
+
+	return nil
+}
+
+func (ac *AutoCompleter) getAvailableModels() []string {
+	if ac.app.aiManager == nil {
+		return nil
+	}
+
+	// Get current provider's models
+	config := ac.app.aiManager.GetConfig()
+	switch config.Provider {
+	case "openrouter":
+		return []string{
+			"anthropic/claude-3.5-sonnet",
+			"anthropic/claude-3-haiku",
+			"openai/gpt-4o",
+			"openai/gpt-4o-mini",
+			"openai/o1-preview",
+			"openai/o1-mini",
+			"meta-llama/llama-3.1-405b-instruct",
+			"meta-llama/llama-3.1-70b-instruct",
+			"meta-llama/llama-3.1-8b-instruct",
+		}
+	case "ollama":
+		// For Ollama, we'd ideally query the API, but for autocomplete
+		// we'll provide common models
+		return []string{
+			"llama3.2",
+			"llama3.1",
+			"codellama",
+			"mistral",
+			"phi3",
+			"qwen2.5",
+		}
+	case "lmstudio":
+		// LM Studio models are dynamic, provide common ones
+		return []string{
+			"lmstudio-community/Meta-Llama-3-8B-Instruct-GGUF",
+			"microsoft/Phi-3-mini-4k-instruct-gguf",
+			"bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+		}
+	}
+
+	return nil
 }
