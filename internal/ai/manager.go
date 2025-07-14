@@ -904,6 +904,9 @@ func (m *Manager) generateSchemaAnalysisPrompt(convCtx *ConversationContext) str
 		prompt.WriteString("\n")
 	}
 
+	// Add information about available related tables
+	m.addRelatedTableSuggestions(&prompt, convCtx)
+
 	prompt.WriteString("Your task:\n")
 	prompt.WriteString("1. Analyze the provided schemas and relationships\n")
 	prompt.WriteString("2. If you need information about related tables (via foreign keys), request them using: 'I need schema for related tables: [table1], [table2]'\n")
@@ -1038,4 +1041,81 @@ func (m *Manager) processConversationTurn(requestedInfo []string, allTables []st
 	}
 
 	return nil
+}
+
+// addRelatedTableSuggestions adds information about available related tables to prompt
+func (m *Manager) addRelatedTableSuggestions(prompt *strings.Builder, convCtx *ConversationContext) {
+	if m.vectorStore == nil {
+		return
+	}
+
+	// Get current loaded table names
+	var loadedTableNames []string
+	for tableName := range convCtx.LoadedTables {
+		loadedTableNames = append(loadedTableNames, tableName)
+	}
+
+	if len(loadedTableNames) == 0 {
+		return
+	}
+
+	// Find related tables using enhanced relationship discovery
+	ctx := context.Background()
+	relatedTables, err := m.vectorStore.SearchRelatedTablesForQuery(ctx, loadedTableNames, 5)
+	if err != nil || len(relatedTables) == 0 {
+		return
+	}
+
+	// Also get detailed relationship mapping
+	relationships, err := m.vectorStore.FindRelatedTables(loadedTableNames)
+	if err == nil && len(relationships) > 0 {
+		prompt.WriteString("## Available Related Tables\n\n")
+		prompt.WriteString("The following tables are related to your loaded tables and might be useful:\n\n")
+
+		// Show direct relationships first
+		for sourceTable, related := range relationships {
+			if len(related) > 0 {
+				prompt.WriteString(fmt.Sprintf("**%s** is related to:\n", sourceTable))
+				for _, relTable := range related {
+					// Check if this is a foreign key relationship
+					if tableInfo, exists := convCtx.LoadedTables[sourceTable]; exists {
+						for _, fk := range tableInfo.ForeignKeys {
+							if fk.ReferencedTable == relTable {
+								prompt.WriteString(fmt.Sprintf("- %s (via foreign key %s)\n", relTable, fk.Column))
+								goto nextTable
+							}
+						}
+					}
+					prompt.WriteString(fmt.Sprintf("- %s (similar naming pattern)\n", relTable))
+					nextTable:
+				}
+				prompt.WriteString("\n")
+			}
+		}
+
+		// Add additional suggestions from similarity search
+		additionalTables := make(map[string]bool)
+		for _, table := range relatedTables {
+			alreadyShown := false
+			for _, related := range relationships {
+				if m.contains(related, table) {
+					alreadyShown = true
+					break
+				}
+			}
+			if !alreadyShown && !convCtx.HasTableLoaded(table) {
+				additionalTables[table] = true
+			}
+		}
+
+		if len(additionalTables) > 0 {
+			prompt.WriteString("**Additional potentially relevant tables:**\n")
+			for table := range additionalTables {
+				prompt.WriteString(fmt.Sprintf("- %s\n", table))
+			}
+			prompt.WriteString("\n")
+		}
+
+		prompt.WriteString("💡 You can request any of these tables by saying: 'I need schema for related tables: table1, table2'\n\n")
+	}
 }
