@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"sqlterm/internal/core"
+	"sqlterm/internal/i18n"
 )
 
 // Manager manages AI clients and configuration
@@ -22,6 +23,7 @@ type Manager struct {
 	maxTables     int          // Maximum tables to include in context
 	vectorStore   *VectorStore // Vector database for semantic search
 	conversationCtx *ConversationContext // Current conversation context
+	i18nMgr       *i18n.Manager // Internationalization manager
 }
 
 // NewManager creates a new AI manager
@@ -29,6 +31,13 @@ func NewManager(configDir string) (*Manager, error) {
 	config, err := LoadConfig(configDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AI config: %w", err)
+	}
+
+	// Initialize i18n manager
+	i18nMgr, err := i18n.NewManager(config.Language)
+	if err != nil {
+		// Fallback to default language if i18n fails
+		i18nMgr, _ = i18n.NewManager("en_au")
 	}
 
 	manager := &Manager{
@@ -40,6 +49,7 @@ func NewManager(configDir string) (*Manager, error) {
 		},
 		recentTables: make([]string, 0),
 		maxTables:    15, // Limit context to 15 most relevant tables
+		i18nMgr:      i18nMgr,
 	}
 
 	// Try to initialize client, but don't fail if it's not possible
@@ -56,6 +66,13 @@ func NewManagerWithValidation(configDir string) (*Manager, error) {
 		return nil, fmt.Errorf("failed to load AI config: %w", err)
 	}
 
+	// Initialize i18n manager
+	i18nMgr, err := i18n.NewManager(config.Language)
+	if err != nil {
+		// Fallback to default language if i18n fails
+		i18nMgr, _ = i18n.NewManager("en_au")
+	}
+
 	manager := &Manager{
 		config:    config,
 		configDir: configDir,
@@ -65,6 +82,7 @@ func NewManagerWithValidation(configDir string) (*Manager, error) {
 		},
 		recentTables: make([]string, 0),
 		maxTables:    15, // Limit context to 15 most relevant tables
+		i18nMgr:      i18nMgr,
 	}
 
 	// Initialize client - this will fail if configuration is invalid
@@ -77,7 +95,7 @@ func NewManagerWithValidation(configDir string) (*Manager, error) {
 
 // initializeClient initializes the appropriate client based on current provider
 func (m *Manager) initializeClient() error {
-	switch m.config.Provider {
+	switch m.config.AI.Provider {
 	case ProviderOpenRouter:
 		apiKey := m.config.GetAPIKey(ProviderOpenRouter)
 		if apiKey == "" {
@@ -91,7 +109,7 @@ func (m *Manager) initializeClient() error {
 		baseURL := m.config.GetBaseURL(ProviderLMStudio)
 		m.client = NewLMStudioClient(baseURL)
 	default:
-		return fmt.Errorf("unsupported provider: %s", m.config.Provider)
+		return fmt.Errorf("unsupported provider: %s", m.config.AI.Provider)
 	}
 
 	return nil
@@ -110,6 +128,14 @@ func (m *Manager) EnsureConfigured() error {
 	return nil
 }
 
+// UpdateLanguage updates the i18n manager when language changes
+func (m *Manager) UpdateLanguage(language string) error {
+	if m.i18nMgr != nil {
+		m.i18nMgr.SetLanguage(language)
+	}
+	return nil
+}
+
 // Chat sends a chat message and returns the response
 func (m *Manager) Chat(ctx context.Context, message string, systemPrompt string) (string, error) {
 	if !m.IsConfigured() {
@@ -122,7 +148,7 @@ func (m *Manager) Chat(ctx context.Context, message string, systemPrompt string)
 	}
 
 	request := ChatRequest{
-		Model:       m.config.Model,
+		Model:       m.config.AI.Model,
 		Messages:    messages,
 		Temperature: 0.7,
 		MaxTokens:   4000,
@@ -146,7 +172,7 @@ func (m *Manager) Chat(ctx context.Context, message string, systemPrompt string)
 		m.configDir,
 	); err != nil {
 		// Don't fail the request if usage update fails
-		fmt.Printf("Warning: failed to update usage stats: %v\n", err)
+		fmt.Printf(m.i18nMgr.Get("usage_update_warning"), err)
 	}
 
 	// Add to prompt history
@@ -159,7 +185,7 @@ func (m *Manager) Chat(ctx context.Context, message string, systemPrompt string)
 // calculateCost calculates the cost based on token usage and current model
 func (m *Manager) calculateCost(inputTokens, outputTokens int) float64 {
 	// Only calculate cost for OpenRouter (others are free/local)
-	if m.config.Provider != ProviderOpenRouter {
+	if m.config.AI.Provider != ProviderOpenRouter {
 		return 0.0
 	}
 
@@ -183,7 +209,7 @@ func (m *Manager) calculateCost(inputTokens, outputTokens int) float64 {
 		},
 	}
 
-	modelPricing, exists := pricing[m.config.Model]
+	modelPricing, exists := pricing[m.config.AI.Model]
 	if !exists {
 		// Default pricing if model not found
 		return float64(inputTokens)*0.001/1000 + float64(outputTokens)*0.003/1000
@@ -215,7 +241,7 @@ func (m *Manager) SetAPIKey(provider Provider, apiKey string) error {
 	m.config.SetAPIKey(provider, apiKey)
 
 	// Re-initialize client if this is the current provider
-	if provider == m.config.Provider {
+	if provider == m.config.AI.Provider {
 		_ = m.initializeClient()
 	}
 
@@ -227,7 +253,7 @@ func (m *Manager) SetBaseURL(provider Provider, baseURL string) error {
 	m.config.SetBaseURL(provider, baseURL)
 
 	// Re-initialize client if this is the current provider
-	if provider == m.config.Provider {
+	if provider == m.config.AI.Provider {
 		_ = m.initializeClient()
 	}
 
@@ -322,8 +348,8 @@ func (m *Manager) addToPromptHistory(userMessage, systemPrompt, aiResponse strin
 		UserMessage:  userMessage,
 		SystemPrompt: systemPrompt,
 		AIResponse:   aiResponse,
-		Provider:     m.config.Provider,
-		Model:        m.config.Model,
+		Provider:     m.config.AI.Provider,
+		Model:        m.config.AI.Model,
 		InputTokens:  inputTokens,
 		OutputTokens: outputTokens,
 		Cost:         cost,
@@ -761,7 +787,7 @@ func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, 
 	}
 
 	request := ChatRequest{
-		Model:       m.config.Model,
+		Model:       m.config.AI.Model,
 		Messages:    messages,
 		Temperature: 0.7,
 		MaxTokens:   4000,
@@ -795,7 +821,7 @@ func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, 
 	initialPhase := m.conversationCtx.CurrentPhase
 	err = m.processConversationTurn(requestedInfo, allTables)
 	if err != nil {
-		fmt.Printf("Warning: failed to process conversation turn: %v\n", err)
+		fmt.Printf(m.i18nMgr.Get("conversation_turn_warning"), err)
 	}
 
 	// Calculate cost and update usage
@@ -806,7 +832,7 @@ func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, 
 		cost,
 		m.configDir,
 	); err != nil {
-		fmt.Printf("Warning: failed to update usage stats: %v\n", err)
+		fmt.Printf(m.i18nMgr.Get("usage_update_warning"), err)
 	}
 
 	// Add to prompt history
@@ -822,7 +848,7 @@ func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, 
 			// Make follow-up call with schema information
 			followUpResponse, err := m.ChatWithConversation(ctx, followUpMessage, allTables)
 			if err != nil {
-				fmt.Printf("Warning: failed to continue conversation with schemas: %v\n", err)
+				fmt.Printf(m.i18nMgr.Get("conversation_continue_warning"), err)
 				return aiResponse, nil
 			}
 			return followUpResponse, nil
@@ -836,7 +862,7 @@ func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, 
 			// Make follow-up call with additional schema information
 			followUpResponse, err := m.ChatWithConversation(ctx, followUpMessage, allTables)
 			if err != nil {
-				fmt.Printf("Warning: failed to continue conversation with additional schemas: %v\n", err)
+				fmt.Printf(m.i18nMgr.Get("conversation_continue_additional_warning"), err)
 				return aiResponse, nil
 			}
 			return followUpResponse, nil

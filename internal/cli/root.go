@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 
+	"sqlterm/internal/ai"
 	"sqlterm/internal/config"
 	"sqlterm/internal/conversation"
 	"sqlterm/internal/core"
+	"sqlterm/internal/i18n"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -169,10 +171,27 @@ func init() {
 	addCmd.MarkFlagRequired("username")
 }
 
-func connectAndRunConversation(config *core.ConnectionConfig) error {
-	fmt.Printf("Connecting to %s...\n", config.Name)
+func connectAndRunConversation(connConfig *core.ConnectionConfig) error {
+	// Initialize i18n manager for CLI
+	configMgr := config.NewManager()
+	language := "en_au" // Default language
+	
+	// Try to get language from AI config
+	if aiManager, err := ai.NewManager(configMgr.GetConfigDir()); err == nil && aiManager != nil {
+		if aiConfig := aiManager.GetConfig(); aiConfig != nil {
+			language = aiConfig.Language
+		}
+	}
+	
+	i18nMgr, err := i18n.NewManager(language)
+	if err != nil {
+		// Fallback to default language if i18n fails
+		i18nMgr, _ = i18n.NewManager("en_au")
+	}
 
-	conn, err := core.NewConnection(config)
+	fmt.Printf(i18nMgr.Get("connecting_to"), connConfig.Name)
+
+	conn, err := core.NewConnection(connConfig)
 	if err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
@@ -181,15 +200,15 @@ func connectAndRunConversation(config *core.ConnectionConfig) error {
 		return fmt.Errorf("connection test failed: %w", err)
 	}
 
-	fmt.Printf("✓ Connected successfully to %s\n", config.Name)
-	fmt.Println("Starting conversation mode...")
+	fmt.Printf(i18nMgr.Get("connected_successfully"), connConfig.Name)
+	fmt.Print(i18nMgr.Get("starting_conversation_mode"))
 
 	app, err := conversation.NewApp()
 	if err != nil {
 		return fmt.Errorf("failed to create conversation app: %w", err)
 	}
 
-	app.SetConnection(conn, config)
+	app.SetConnection(conn, connConfig)
 	return app.Run()
 }
 

@@ -26,15 +26,20 @@ type Usage struct {
 	LastRequestTime time.Time `json:"last_request_time"`
 }
 
-// Config holds AI configuration
-type Config struct {
+// AIConfig holds AI-specific configuration
+type AIConfig struct {
 	Provider      Provider          `yaml:"provider"`
 	Model         string            `yaml:"model"`
-	Language      string            `yaml:"language"`
 	APIKeys       map[string]string `yaml:"api_keys"`
 	BaseURLs      map[string]string `yaml:"base_urls"`
 	DefaultModels map[string]string `yaml:"default_models"`
 	Usage         Usage             `yaml:"usage"`
+}
+
+// Config holds the main configuration with AI section
+type Config struct {
+	Language string   `yaml:"language"`
+	AI       AIConfig `yaml:"ai"`
 }
 
 // ChatMessage represents a chat message

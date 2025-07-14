@@ -123,7 +123,7 @@
     },
     {
       "id": "help_ai_config",
-      "text": "/ai-config               Configure AI providers and models"
+      "text": "/config                  Configure application settings"
     },
     {
       "id": "help_last_ai_call",
@@ -150,8 +150,160 @@
       "text": "Unknown command: %s. Type /help for available commands.\n"
     },
     {
+      "id": "connecting_to",
+      "text": "Connecting to %s...\n"
+    },
+    {
+      "id": "connected_to",
+      "text": "✅ Connected to %s (%s)\n"
+    },
+    {
+      "id": "connection_failed",
+      "text": "❌ Connection failed: %v\n"
+    },
+    {
+      "id": "session_init_warning",
+      "text": "Warning: failed to initialize session directory: %v\n"
+    },
+    {
+      "id": "session_history_warning",
+      "text": "Warning: failed to switch to session history: %v\n"
+    },
+    {
+      "id": "vector_db_init_warning",
+      "text": "Warning: failed to initialize vector store: %v\n"
+    },
+    {
+      "id": "usage_update_warning",
+      "text": "Warning: failed to update usage stats: %v\n"
+    },
+    {
+      "id": "conversation_continue_warning",
+      "text": "Warning: failed to continue conversation with schemas: %v\n"
+    },
+    {
+      "id": "conversation_continue_additional_warning",
+      "text": "Warning: failed to continue conversation with additional schemas: %v\n"
+    },
+    {
+      "id": "conversation_turn_warning",
+      "text": "Warning: failed to process conversation turn: %v\n"
+    },
+    {
+      "id": "markdown_view_warning",
+      "text": "Warning: %v\n"
+    },
+    {
+      "id": "markdown_export_warning",
+      "text": "Warning: failed to create markdown file: %v\n"
+    },
+    {
+      "id": "prompt_welcome",
+      "text": "Type /help for available commands, or enter SQL queries directly.\n"
+    },
+    {
+      "id": "example_message",
+      "text": "Example: 'show me all tables' or 'help me write a query to find users'\n"
+    },
+    {
       "id": "help_full",
-      "text": "\nAvailable commands:\n\n/help                    Show this help message\n/connect                 Interactive connection setup\n/connect [name]          Connect to saved connection (Tab: autocomplete names)\n/list-connections        List all saved connections\n/tables                  List tables in current database\n/describe [table]        Show table structure (Tab: autocomplete table names)\n/status                  Show current connection status\n/exec [query]            Execute a query directly\n/exec                    Enter multi-line SQL mode (end with ;)\n/exec [query] > file.csv Export query results to CSV\n/ai-config               Configure AI providers and models\n/last-ai-call [count]    Show AI conversation history with request/response details\n/clear-conversation      Clear current AI conversation and start fresh\n/quit, /exit             Exit SQLTerm\n\nAI Chat:\nEnter any message without / or @ prefix to chat with AI.\nAI uses multi-turn conversations to progressively gather table information.\nUse /clear-conversation to start fresh or /ai-config to set up providers.\n\nFile commands:\n@filename.sql            Execute all queries in file (Tab: autocomplete files)\n@filename.sql 1          Execute only query 1\n@filename.sql 2-5        Execute queries 2 through 5\n\nCSV Export:\nSELECT * FROM table > output.csv    Export query results to CSV (Tab: autocomplete filenames)\n/exec SELECT * FROM table > out.csv Export with /exec command\n\nSQL queries:\nEnter any SQL query directly to execute it.\nResults are automatically saved as markdown and displayed with glamour.\n\nAuto-completion:\n- Tab after /connect to see connection names\n- Tab after /describe to see table names\n- Tab after /ai-config to see AI subcommands and models\n- Tab after @ to see .sql files (searches all subdirectories)\n- Tab after > to see/create .csv files\n- Excludes hidden folders (starting with .) and common build directories\n\nSession Management:\n- Results are automatically saved to ~/.config/sqlterm/sessions/{connection}/results/\n- Old result files are automatically cleaned up based on retention settings\n- Configure cleanup in ~/.config/sqlterm/sessions/{connection}/session.yaml\n- Default retention: 30 days (cleanup_retention_days: 30)"
+      "text": "\nAvailable commands:\n\n/help                    Show this help message\n/connect                 Interactive connection setup\n/connect [name]          Connect to saved connection (Tab: autocomplete names)\n/list-connections        List all saved connections\n/tables                  List tables in current database\n/describe [table]        Show table structure (Tab: autocomplete table names)\n/status                  Show current connection status\n/exec [query]            Execute a query directly\n/exec                    Enter multi-line SQL mode (end with ;)\n/exec [query] > file.csv Export query results to CSV\n/config                  Configure application settings\n/config ai               Configure AI providers and models\n/config language <lang>  Set interface language (en_au, zh_cn)\n/last-ai-call [count]    Show AI conversation history with request/response details\n/clear-conversation      Clear current AI conversation and start fresh\n/quit, /exit             Exit SQLTerm\n\nAI Chat:\nEnter any message without / or @ prefix to chat with AI.\nAI uses multi-turn conversations to progressively gather table information.\nUse /clear-conversation to start fresh or /config ai to set up providers.\n\nFile commands:\n@filename.sql            Execute all queries in file (Tab: autocomplete files)\n@filename.sql 1          Execute only query 1\n@filename.sql 2-5        Execute queries 2 through 5\n\nCSV Export:\nSELECT * FROM table > output.csv    Export query results to CSV (Tab: autocomplete filenames)\n/exec SELECT * FROM table > out.csv Export with /exec command\n\nSQL queries:\nEnter any SQL query directly to execute it.\nResults are automatically saved as markdown and displayed with glamour.\n\nAuto-completion:\n- Tab after /connect to see connection names\n- Tab after /describe to see table names\n- Tab after /config to see configuration sections and options\n- Tab after @ to see .sql files (searches all subdirectories)\n- Tab after > to see/create .csv files\n- Excludes hidden folders (starting with .) and common build directories\n\nSession Management:\n- Results are automatically saved to ~/.config/sqlterm/sessions/{connection}/results/\n- Old result files are automatically cleaned up based on retention settings\n- Configure cleanup in ~/.config/sqlterm/sessions/{connection}/session.yaml\n- Default retention: 30 days (cleanup_retention_days: 30)"
+    },
+    {
+      "id": "connection_saved",
+      "text": "💾 Connection saved!\n"
+    },
+    {
+      "id": "starting_conversation_mode",
+      "text": "Starting conversation mode...\n"
+    },
+    {
+      "id": "markdown_truncation_note",
+      "text": "*Note: Showing top %d rows. Use CSV export for complete results.*"
+    },
+    {
+      "id": "query_error",
+      "text": "Query error"
+    },
+    {
+      "id": "markdown_query_header",
+      "text": "**Query:**"
+    },
+    {
+      "id": "failed_to_write_markdown",
+      "text": "failed to write markdown file: %w"
+    },
+    {
+      "id": "failed_to_create_session_dir",
+      "text": "failed to create session directory: %w"
+    },
+    {
+      "id": "file_query_results_header",
+      "text": "File Query Results"
+    },
+    {
+      "id": "connection_header",
+      "text": "Connection"
+    },
+    {
+      "id": "source_file_header",
+      "text": "Source File"
+    },
+    {
+      "id": "total_queries_header",
+      "text": "Total Queries"
+    },
+    {
+      "id": "query_header",
+      "text": "Query"
+    },
+    {
+      "id": "failed_to_create_results_dir",
+      "text": "failed to create results directory %s: %w"
+    },
+    {
+      "id": "query_results_header",
+      "text": "Query Results"
+    },
+    {
+      "id": "no_connection_for_session_dir",
+      "text": "no database connection for session directory"
+    },
+    {
+      "id": "failed_to_migrate_config",
+      "text": "failed to migrate config from ai.yaml to config.yaml: %w"
+    },
+    {
+      "id": "failed_to_create_default_config",
+      "text": "failed to create default config: %w"
+    },
+    {
+      "id": "failed_to_read_config_file",
+      "text": "failed to read config file: %w"
+    },
+    {
+      "id": "failed_to_parse_config_file",
+      "text": "failed to parse config file: %w"
+    },
+    {
+      "id": "failed_to_create_config_dir",
+      "text": "failed to create config directory: %w"
+    },
+    {
+      "id": "failed_to_marshal_config",
+      "text": "failed to marshal config: %w"
+    },
+    {
+      "id": "failed_to_write_config_file",
+      "text": "failed to write config file: %w"
+    },
+    {
+      "id": "ai_conversation_history_header",
+      "text": "AI Conversation History"
+    },
+    {
+      "id": "connected_successfully",
+      "text": "✓ Connected successfully to %s\n"
     }
   ]
 }

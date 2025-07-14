@@ -18,6 +18,8 @@ A modern, AI-powered terminal-based SQL database management tool built in Go. SQ
 - 📈 **CSV Export**: Export complete results to CSV with `> filename.csv`
 - 🎯 **Auto-completion**: Tab completion for commands and files
 - 💻 **Session Management**: Organized per-connection storage in `~/.config/sqlterm/sessions/{connection}/`
+- 🌍 **Internationalization**: Multi-language support (English, Chinese)
+- ⚙️ **Unified Configuration**: Hierarchical `/config` command for all settings
 
 ## Installation
 
@@ -81,9 +83,9 @@ SQLTerm uses a conversation-style interface with the following command types:
 
 # AI Commands (when configured)
 <question>           # Ask AI about your database or SQL
-/ai-config               # Configure AI providers and settings
-/ai-usage                # Show AI usage statistics
-/show-prompts              # View recent AI prompt history
+/config ai               # Configure AI providers and settings
+/config language zh_cn   # Set interface language
+/last-ai-call            # View recent AI conversation history
 ```
 
 #### `@` File References - Execute SQL Files
@@ -194,8 +196,8 @@ SQLTerm supports multiple AI providers for intelligent database assistance:
 Set up AI providers with the interactive configuration:
 
 ```bash
-sqlterm > /ai-config
-🤖 AI Configuration
+sqlterm > /config ai
+🤖 Interactive AI Configuration
 📊 Select provider:
   1. OpenRouter (Cloud)
   2. Ollama (Local)
@@ -204,6 +206,19 @@ Enter choice (1-3): 1
 🔑 Enter OpenRouter API key: sk-or-...
 📝 Enter model [anthropic/claude-3.5-sonnet]:
 ✅ AI configured successfully!
+```
+
+Or use specific commands for quick setup:
+
+```bash
+# Set OpenRouter API key
+sqlterm > /config ai openrouter key sk-or-v1-xxx...
+
+# Set language to Chinese
+sqlterm > /config language zh_cn
+
+# Check AI status
+sqlterm > /config ai status
 ```
 
 ### Intelligent Context Selection
@@ -300,11 +315,70 @@ SQLTerm stores configuration in your system's config directory:
 - **Linux/macOS**: `~/.config/sqlterm/`
 - **Windows**: `%APPDATA%\sqlterm\`
 
+### Configuration Commands
+
+The new `/config` command provides a unified interface for all application settings:
+
+```bash
+# View all configuration options
+sqlterm > /config
+
+# Language configuration
+sqlterm > /config language zh_cn        # Set to Chinese
+sqlterm > /config language en_au        # Set to English (Australian)
+
+# AI configuration
+sqlterm > /config ai                     # Interactive AI setup
+sqlterm > /config ai status              # Show AI configuration
+sqlterm > /config ai provider openrouter # Set AI provider
+sqlterm > /config ai model anthropic/claude-3.5-sonnet
+sqlterm > /config ai openrouter key sk-or-v1-xxx...
+```
+
+### Configuration File Structure
+
+The main configuration file (`config.yaml`) uses a hierarchical structure:
+
+```yaml
+language: "en_au"              # Interface language
+ai:                            # AI settings section
+  provider: "openrouter"
+  model: "anthropic/claude-3.5-sonnet"
+  api_keys:
+    openrouter: "sk-or-v1-..."
+  base_urls:
+    ollama: "http://localhost:11434"
+    lmstudio: "http://localhost:1234"
+  usage:
+    request_count: 42
+    cost: 0.125
+```
+
+### Internationalization
+
+SQLTerm supports multiple languages:
+
+- **English (Australian)**: `en_au` (default)
+- **Chinese (Simplified)**: `zh_cn`
+
+Language settings affect:
+- Help text and command descriptions
+- Error messages and prompts
+- AI conversation history displays
+
+```bash
+# Switch to Chinese interface
+sqlterm > /config language zh_cn
+
+# Now help will be displayed in Chinese
+sqlterm > /help
+```
+
 ### Directory Structure
 
 ```
 ~/.config/sqlterm/
-├── ai.yaml               # AI provider configuration
+├── config.yaml           # Main configuration (AI settings, language)
 ├── usage.yaml            # AI usage statistics
 ├── connections/          # Saved database connections
 │   ├── my-local-db.yaml

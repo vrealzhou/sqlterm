@@ -123,7 +123,7 @@
     },
     {
       "id": "help_ai_config",
-      "text": "/ai-config               配置 AI 提供商和模型"
+      "text": "/config                  配置应用程序设置"
     },
     {
       "id": "help_last_ai_call",
@@ -150,8 +150,160 @@
       "text": "未知命令：%s。输入 /help 查看可用命令。\n"
     },
     {
+      "id": "connecting_to",
+      "text": "正在连接到 %s...\n"
+    },
+    {
+      "id": "connected_to",
+      "text": "✅ 已连接到 %s (%s)\n"
+    },
+    {
+      "id": "connection_failed",
+      "text": "❌ 连接失败：%v\n"
+    },
+    {
+      "id": "session_init_warning",
+      "text": "警告：初始化会话目录失败：%v\n"
+    },
+    {
+      "id": "session_history_warning",
+      "text": "警告：切换到会话历史失败：%v\n"
+    },
+    {
+      "id": "vector_db_init_warning",
+      "text": "警告：初始化向量存储失败：%v\n"
+    },
+    {
+      "id": "usage_update_warning",
+      "text": "警告：更新使用统计失败：%v\n"
+    },
+    {
+      "id": "conversation_continue_warning",
+      "text": "警告：继续架构对话失败：%v\n"
+    },
+    {
+      "id": "conversation_continue_additional_warning",
+      "text": "警告：继续附加架构对话失败：%v\n"
+    },
+    {
+      "id": "conversation_turn_warning",
+      "text": "警告：处理对话回合失败：%v\n"
+    },
+    {
+      "id": "markdown_view_warning",
+      "text": "警告：%v\n"
+    },
+    {
+      "id": "markdown_export_warning",
+      "text": "警告：创建 markdown 文件失败：%v\n"
+    },
+    {
+      "id": "prompt_welcome",
+      "text": "输入 /help 查看可用命令，或直接输入 SQL 查询。\n"
+    },
+    {
+      "id": "example_message",
+      "text": "示例：'显示所有表' 或 '帮我写一个查询来找用户'\n"
+    },
+    {
       "id": "help_full",
-      "text": "\n可用命令：\n\n/help                    显示此帮助信息\n/connect                 交互式连接设置\n/connect [名称]          连接到已保存的连接（Tab：自动补全名称）\n/list-connections        列出所有已保存的连接\n/tables                  列出当前数据库中的表\n/describe [表名]         显示表结构（Tab：自动补全表名）\n/status                  显示当前连接状态\n/exec [查询]             直接执行查询\n/exec                    进入多行 SQL 模式（以 ; 结束）\n/exec [查询] > 文件.csv  将查询结果导出到 CSV\n/ai-config               配置 AI 提供商和模型\n/last-ai-call [数量]     显示 AI 对话历史及请求/响应详情\n/clear-conversation      清除当前 AI 对话并重新开始\n/quit, /exit             退出 SQLTerm\n\nAI 聊天：\n直接输入不带 / 或 @ 前缀的消息与 AI 聊天。\nAI 使用多轮对话逐步收集表信息。\n使用 /clear-conversation 重新开始或 /ai-config 设置提供商。\n\n文件命令：\n@文件名.sql              执行文件中的所有查询（Tab：自动补全文件）\n@文件名.sql 1            仅执行查询 1\n@文件名.sql 2-5          执行查询 2 到 5\n\nCSV 导出：\nSELECT * FROM table > output.csv    将查询结果导出到 CSV（Tab：自动补全文件名）\n/exec SELECT * FROM table > out.csv 使用 /exec 命令导出\n\nSQL 查询：\n直接输入任何 SQL 查询以执行它。\n结果会自动保存为 markdown 并使用 glamour 显示。\n\n自动补全：\n- 在 /connect 后按 Tab 查看连接名称\n- 在 /describe 后按 Tab 查看表名\n- 在 /ai-config 后按 Tab 查看 AI 子命令和模型\n- 在 @ 后按 Tab 查看 .sql 文件（搜索所有子目录）\n- 在 > 后按 Tab 查看/创建 .csv 文件\n- 排除隐藏文件夹（以 . 开头）和常见构建目录\n\n会话管理：\n- 结果自动保存到 ~/.config/sqlterm/sessions/{连接}/results/\n- 旧结果文件根据保留设置自动清理\n- 在 ~/.config/sqlterm/sessions/{连接}/session.yaml 中配置清理\n- 默认保留期：30 天（cleanup_retention_days: 30）"
+      "text": "\n可用命令：\n\n/help                    显示此帮助信息\n/connect                 交互式连接设置\n/connect [名称]          连接到已保存的连接（Tab：自动补全名称）\n/list-connections        列出所有已保存的连接\n/tables                  列出当前数据库中的表\n/describe [表名]         显示表结构（Tab：自动补全表名）\n/status                  显示当前连接状态\n/exec [查询]             直接执行查询\n/exec                    进入多行 SQL 模式（以 ; 结束）\n/exec [查询] > 文件.csv  将查询结果导出到 CSV\n/config                  配置应用程序设置\n/config ai               配置 AI 提供商和模型\n/config language <语言>  设置界面语言（en_au, zh_cn）\n/last-ai-call [数量]     显示 AI 对话历史及请求/响应详情\n/clear-conversation      清除当前 AI 对话并重新开始\n/quit, /exit             退出 SQLTerm\n\nAI 聊天：\n直接输入不带 / 或 @ 前缀的消息与 AI 聊天。\nAI 使用多轮对话逐步收集表信息。\n使用 /clear-conversation 重新开始或 /config ai 设置提供商。\n\n文件命令：\n@文件名.sql              执行文件中的所有查询（Tab：自动补全文件）\n@文件名.sql 1            仅执行查询 1\n@文件名.sql 2-5          执行查询 2 到 5\n\nCSV 导出：\nSELECT * FROM table > output.csv    将查询结果导出到 CSV（Tab：自动补全文件名）\n/exec SELECT * FROM table > out.csv 使用 /exec 命令导出\n\nSQL 查询：\n直接输入任何 SQL 查询以执行它。\n结果会自动保存为 markdown 并使用 glamour 显示。\n\n自动补全：\n- 在 /connect 后按 Tab 查看连接名称\n- 在 /describe 后按 Tab 查看表名\n- 在 /config 后按 Tab 查看配置部分和选项\n- 在 @ 后按 Tab 查看 .sql 文件（搜索所有子目录）\n- 在 > 后按 Tab 查看/创建 .csv 文件\n- 排除隐藏文件夹（以 . 开头）和常见构建目录\n\n会话管理：\n- 结果自动保存到 ~/.config/sqlterm/sessions/{连接}/results/\n- 旧结果文件根据保留设置自动清理\n- 在 ~/.config/sqlterm/sessions/{连接}/session.yaml 中配置清理\n- 默认保留期：30 天（cleanup_retention_days: 30）"
+    },
+    {
+      "id": "connection_saved",
+      "text": "💾 连接已保存！\n"
+    },
+    {
+      "id": "starting_conversation_mode",
+      "text": "启动对话模式...\n"
+    },
+    {
+      "id": "markdown_truncation_note",
+      "text": "*注意：仅显示前 %d 行。使用 CSV 导出可获取完整结果。*"
+    },
+    {
+      "id": "query_error",
+      "text": "查询错误"
+    },
+    {
+      "id": "markdown_query_header",
+      "text": "**查询：**"
+    },
+    {
+      "id": "failed_to_write_markdown",
+      "text": "写入 markdown 文件失败：%w"
+    },
+    {
+      "id": "failed_to_create_session_dir",
+      "text": "创建会话目录失败：%w"
+    },
+    {
+      "id": "file_query_results_header",
+      "text": "文件查询结果"
+    },
+    {
+      "id": "connection_header",
+      "text": "连接"
+    },
+    {
+      "id": "source_file_header",
+      "text": "源文件"
+    },
+    {
+      "id": "total_queries_header",
+      "text": "总查询数"
+    },
+    {
+      "id": "query_header",
+      "text": "查询"
+    },
+    {
+      "id": "failed_to_create_results_dir",
+      "text": "创建结果目录 %s 失败：%w"
+    },
+    {
+      "id": "query_results_header",
+      "text": "查询结果"
+    },
+    {
+      "id": "no_connection_for_session_dir",
+      "text": "没有用于会话目录的数据库连接"
+    },
+    {
+      "id": "failed_to_migrate_config",
+      "text": "无法将配置从 ai.yaml 迁移到 config.yaml: %w"
+    },
+    {
+      "id": "failed_to_create_default_config",
+      "text": "创建默认配置失败: %w"
+    },
+    {
+      "id": "failed_to_read_config_file",
+      "text": "读取配置文件失败: %w"
+    },
+    {
+      "id": "failed_to_parse_config_file",
+      "text": "解析配置文件失败: %w"
+    },
+    {
+      "id": "failed_to_create_config_dir",
+      "text": "创建配置目录失败: %w"
+    },
+    {
+      "id": "failed_to_marshal_config",
+      "text": "序列化配置失败: %w"
+    },
+    {
+      "id": "failed_to_write_config_file",
+      "text": "写入配置文件失败: %w"
+    },
+    {
+      "id": "ai_conversation_history_header",
+      "text": "AI 对话历史"
+    },
+    {
+      "id": "connected_successfully",
+      "text": "✓ 已成功连接到 %s\n"
     }
   ]
 }

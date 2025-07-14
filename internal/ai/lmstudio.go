@@ -33,30 +33,30 @@ func (c *LMStudioClient) Chat(ctx context.Context, request ChatRequest) (*ChatRe
 
 	jsonData, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, fmt.Errorf(i18nMgr.Get("failed_to_marshal_request"), err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf(i18nMgr.Get("failed_to_create_request"), err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf(i18nMgr.Get("request_failed"), err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf(i18nMgr.Get("api_request_failed"), resp.StatusCode, string(body))
 	}
 
 	var response ChatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, fmt.Errorf(i18nMgr.Get("failed_to_decode_response"), err)
 	}
 
 	return &response, nil
@@ -67,18 +67,18 @@ func (c *LMStudioClient) ListModels(ctx context.Context) ([]ModelInfo, error) {
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf(i18nMgr.Get("failed_to_create_request"), err)
 	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf(i18nMgr.Get("request_failed"), err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf(i18nMgr.Get("api_request_failed"), resp.StatusCode, string(body))
 	}
 
 	var response struct {
@@ -92,7 +92,7 @@ func (c *LMStudioClient) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, fmt.Errorf(i18nMgr.Get("failed_to_decode_response"), err)
 	}
 
 	models := make([]ModelInfo, len(response.Data))
