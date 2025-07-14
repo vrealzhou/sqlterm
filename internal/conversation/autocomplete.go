@@ -59,7 +59,7 @@ func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int)
 func (ac *AutoCompleter) getCommands() [][]rune {
 	commands := []string{
 		"/help", "/quit", "/exit", "/connect", "/list-connections",
-		"/tables", "/describe", "/status", "/exec", "/ai-config", "/show-prompts",
+		"/tables", "/describe", "/status", "/exec", "/ai-config", "/last-ai-call",
 	}
 
 	result := make([][]rune, len(commands))
@@ -142,7 +142,7 @@ func (ac *AutoCompleter) findCommonPrefix(candidates []string) string {
 func (ac *AutoCompleter) getCommandCandidates(partial string) []string {
 	commands := []string{
 		"/help", "/quit", "/exit", "/connect", "/list-connections",
-		"/tables", "/describe", "/status", "/exec", "/ai-config", "/show-prompts",
+		"/tables", "/describe", "/status", "/exec", "/ai-config", "/last-ai-call",
 	}
 
 	var candidates []string

@@ -285,7 +285,7 @@ func (a *App) processCommand(line string) error {
 		return a.handleExecQuery(args)
 	case "/ai-config":
 		return a.handleAIConfig(args)
-	case "/show-prompts":
+	case "/last-ai-call":
 		return a.handleShowPrompts(args)
 	case "/clear-conversation":
 		return a.handleClearConversation()
@@ -528,7 +528,7 @@ Available commands:
 /exec                    Enter multi-line SQL mode (end with ;)
 /exec [query] > file.csv Export query results to CSV
 /ai-config               Configure AI providers and models
-/show-prompts [count]    Show full conversation history and AI prompts
+/last-ai-call [count]    Show AI conversation history with request/response details
 /clear-conversation      Clear current AI conversation and start fresh
 /quit, /exit             Exit SQLTerm
 
