@@ -9,35 +9,31 @@ import (
 	"strings"
 	"time"
 
+	"sqlterm/internal/config"
 	"sqlterm/internal/core"
 	"sqlterm/internal/i18n"
 )
 
 // Manager manages AI clients and configuration
 type Manager struct {
-	config        *Config
-	configDir     string
-	client        Client
-	promptHistory *PromptHistory
-	recentTables  []string     // Session memory for recently mentioned tables
-	maxTables     int          // Maximum tables to include in context
-	vectorStore   *VectorStore // Vector database for semantic search
+	config          *config.Config
+	configDir       string
+	client          Client
+	promptHistory   *PromptHistory
+	recentTables    []string             // Session memory for recently mentioned tables
+	maxTables       int                  // Maximum tables to include in context
+	vectorStore     *VectorStore         // Vector database for semantic search
 	conversationCtx *ConversationContext // Current conversation context
-	i18nMgr       *i18n.Manager // Internationalization manager
+	i18nMgr         *i18n.Manager        // Internationalization manager
+	usageStore      *UsageStore          // Usage tracking store
+	sessionID       string               // Current session ID for usage tracking
 }
 
 // NewManager creates a new AI manager
 func NewManager(configDir string) (*Manager, error) {
-	config, err := LoadConfig(configDir)
+	i18nMgr, config, err := config.LoadConfig(configDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AI config: %w", err)
-	}
-
-	// Initialize i18n manager
-	i18nMgr, err := i18n.NewManager(config.Language)
-	if err != nil {
-		// Fallback to default language if i18n fails
-		i18nMgr, _ = i18n.NewManager("en_au")
 	}
 
 	manager := &Manager{
@@ -50,6 +46,7 @@ func NewManager(configDir string) (*Manager, error) {
 		recentTables: make([]string, 0),
 		maxTables:    15, // Limit context to 15 most relevant tables
 		i18nMgr:      i18nMgr,
+		sessionID:    generateSessionID(),
 	}
 
 	// Try to initialize client, but don't fail if it's not possible
@@ -61,16 +58,9 @@ func NewManager(configDir string) (*Manager, error) {
 
 // NewManagerWithValidation creates a new AI manager and requires valid client initialization
 func NewManagerWithValidation(configDir string) (*Manager, error) {
-	config, err := LoadConfig(configDir)
+	i18nMgr, config, err := config.LoadConfig(configDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AI config: %w", err)
-	}
-
-	// Initialize i18n manager
-	i18nMgr, err := i18n.NewManager(config.Language)
-	if err != nil {
-		// Fallback to default language if i18n fails
-		i18nMgr, _ = i18n.NewManager("en_au")
 	}
 
 	manager := &Manager{
@@ -83,6 +73,7 @@ func NewManagerWithValidation(configDir string) (*Manager, error) {
 		recentTables: make([]string, 0),
 		maxTables:    15, // Limit context to 15 most relevant tables
 		i18nMgr:      i18nMgr,
+		sessionID:    generateSessionID(),
 	}
 
 	// Initialize client - this will fail if configuration is invalid
@@ -96,18 +87,18 @@ func NewManagerWithValidation(configDir string) (*Manager, error) {
 // initializeClient initializes the appropriate client based on current provider
 func (m *Manager) initializeClient() error {
 	switch m.config.AI.Provider {
-	case ProviderOpenRouter:
-		apiKey := m.config.GetAPIKey(ProviderOpenRouter)
+	case config.ProviderOpenRouter:
+		apiKey := m.config.GetAPIKey(config.ProviderOpenRouter)
 		if apiKey == "" {
 			return fmt.Errorf("OpenRouter API key not configured")
 		}
 		m.client = NewOpenRouterClient(apiKey)
-	case ProviderOllama:
-		baseURL := m.config.GetBaseURL(ProviderOllama)
+	case config.ProviderOllama:
+		baseURL := m.config.GetBaseURL(config.ProviderOllama)
 		m.client = NewOllamaClient(baseURL)
-	case ProviderLMStudio:
-		baseURL := m.config.GetBaseURL(ProviderLMStudio)
-		m.client = NewLMStudioClient(baseURL)
+	case config.ProviderLMStudio:
+		baseURL := m.config.GetBaseURL(config.ProviderLMStudio)
+		m.client = NewLMStudioClient(baseURL, m.i18nMgr)
 	default:
 		return fmt.Errorf("unsupported provider: %s", m.config.AI.Provider)
 	}
@@ -165,15 +156,6 @@ func (m *Manager) Chat(ctx context.Context, message string, systemPrompt string)
 
 	// Calculate cost and update usage
 	cost := m.calculateCost(response.Usage.PromptTokens, response.Usage.CompletionTokens)
-	if err := m.config.UpdateUsage(
-		response.Usage.PromptTokens,
-		response.Usage.CompletionTokens,
-		cost,
-		m.configDir,
-	); err != nil {
-		// Don't fail the request if usage update fails
-		fmt.Printf(m.i18nMgr.Get("usage_update_warning"), err)
-	}
 
 	// Add to prompt history
 	aiResponse := response.Choices[0].Message.Content
@@ -185,7 +167,7 @@ func (m *Manager) Chat(ctx context.Context, message string, systemPrompt string)
 // calculateCost calculates the cost based on token usage and current model
 func (m *Manager) calculateCost(inputTokens, outputTokens int) float64 {
 	// Only calculate cost for OpenRouter (others are free/local)
-	if m.config.AI.Provider != ProviderOpenRouter {
+	if m.config.AI.Provider != config.ProviderOpenRouter {
 		return 0.0
 	}
 
@@ -227,17 +209,17 @@ func (m *Manager) ListModels(ctx context.Context) ([]ModelInfo, error) {
 }
 
 // SetProvider changes the current provider and model
-func (m *Manager) SetProvider(provider Provider, model string) error {
+func (m *Manager) SetProvider(provider config.Provider, model string) error {
 	m.config.SetProvider(provider, model)
 
 	// Try to initialize client, but don't fail if credentials aren't ready yet
 	_ = m.initializeClient()
 
-	return SaveConfig(m.config, m.configDir)
+	return config.SaveConfig(m.config, m.configDir, m.i18nMgr)
 }
 
 // SetAPIKey sets an API key for a provider
-func (m *Manager) SetAPIKey(provider Provider, apiKey string) error {
+func (m *Manager) SetAPIKey(provider config.Provider, apiKey string) error {
 	m.config.SetAPIKey(provider, apiKey)
 
 	// Re-initialize client if this is the current provider
@@ -245,11 +227,11 @@ func (m *Manager) SetAPIKey(provider Provider, apiKey string) error {
 		_ = m.initializeClient()
 	}
 
-	return SaveConfig(m.config, m.configDir)
+	return config.SaveConfig(m.config, m.configDir, m.i18nMgr)
 }
 
 // SetBaseURL sets a base URL for a provider
-func (m *Manager) SetBaseURL(provider Provider, baseURL string) error {
+func (m *Manager) SetBaseURL(provider config.Provider, baseURL string) error {
 	m.config.SetBaseURL(provider, baseURL)
 
 	// Re-initialize client if this is the current provider
@@ -257,18 +239,18 @@ func (m *Manager) SetBaseURL(provider Provider, baseURL string) error {
 		_ = m.initializeClient()
 	}
 
-	return SaveConfig(m.config, m.configDir)
+	return config.SaveConfig(m.config, m.configDir, m.i18nMgr)
 }
 
 // GetConfig returns the current configuration
-func (m *Manager) GetConfig() *Config {
+func (m *Manager) GetConfig() *config.Config {
 	return m.config
 }
 
 // SetLanguage updates the language configuration
 func (m *Manager) SetLanguage(language string) error {
 	m.config.SetLanguage(language)
-	return SaveConfig(m.config, m.configDir)
+	return config.SaveConfig(m.config, m.configDir, m.i18nMgr)
 }
 
 // GenerateSystemPrompt creates a system prompt with database context
@@ -308,17 +290,17 @@ func (m *Manager) GenerateSystemPrompt(tables []string, currentTable string) str
 }
 
 // ParseModelString parses a model string in format "provider/model"
-func ParseModelString(modelStr string) (Provider, string, error) {
+func ParseModelString(modelStr string) (config.Provider, string, error) {
 	parts := strings.SplitN(modelStr, "/", 2)
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("invalid model format, expected 'provider/model'")
 	}
 
-	provider := Provider(parts[0])
+	provider := config.Provider(parts[0])
 	model := parts[1]
 
 	switch provider {
-	case ProviderOpenRouter, ProviderOllama, ProviderLMStudio:
+	case config.ProviderOpenRouter, config.ProviderOllama, config.ProviderLMStudio:
 		return provider, model, nil
 	default:
 		return "", "", fmt.Errorf("unsupported provider: %s", provider)
@@ -362,6 +344,15 @@ func (m *Manager) addToPromptHistory(userMessage, systemPrompt, aiResponse strin
 		m.promptHistory.Entries = m.promptHistory.Entries[len(m.promptHistory.Entries)-m.promptHistory.MaxSize:]
 	}
 
+	// Record usage statistics in the database
+	if m.usageStore != nil {
+		err := m.usageStore.RecordUsage(m.sessionID, m.config.AI.Provider, m.config.AI.Model, 
+			inputTokens, outputTokens, cost, userMessage, aiResponse)
+		if err != nil {
+			fmt.Printf("Warning: failed to record usage: %v\n", err)
+		}
+	}
+
 	// Learn from successful queries for vector store
 	if m.vectorStore != nil {
 		m.learnFromQuery(userMessage)
@@ -403,6 +394,13 @@ func (m *Manager) InitializeVectorStore(connectionName string, connection core.C
 	}
 
 	m.vectorStore = vectorStore
+
+	// Initialize usage store with the vector store
+	usageStore, err := NewUsageStore(vectorStore)
+	if err != nil {
+		return fmt.Errorf("failed to initialize usage store: %w", err)
+	}
+	m.usageStore = usageStore
 
 	// Update embeddings in background
 	go func() {
@@ -813,7 +811,7 @@ func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, 
 		SystemPrompt:  systemPrompt,
 		AIResponse:    aiResponse,
 		RequestedInfo: requestedInfo,
-		Phase:        m.conversationCtx.CurrentPhase,
+		Phase:         m.conversationCtx.CurrentPhase,
 	}
 	m.conversationCtx.AddTurn(turn)
 
@@ -826,14 +824,6 @@ func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, 
 
 	// Calculate cost and update usage
 	cost := m.calculateCost(response.Usage.PromptTokens, response.Usage.CompletionTokens)
-	if err := m.config.UpdateUsage(
-		response.Usage.PromptTokens,
-		response.Usage.CompletionTokens,
-		cost,
-		m.configDir,
-	); err != nil {
-		fmt.Printf(m.i18nMgr.Get("usage_update_warning"), err)
-	}
 
 	// Add to prompt history
 	m.addToPromptHistory(userMessage, systemPrompt, aiResponse, response.Usage.PromptTokens, response.Usage.CompletionTokens, cost)
@@ -844,7 +834,7 @@ func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, 
 		if m.conversationCtx.CurrentPhase != initialPhase && m.conversationCtx.CurrentPhase == PhaseSchemaAnalysis {
 			fmt.Printf("📋 Schemas loaded for %v. Analyzing...\n", requestedInfo)
 			followUpMessage := "Please analyze the provided table schemas and generate the SQL query for my original request."
-			
+
 			// Make follow-up call with schema information
 			followUpResponse, err := m.ChatWithConversation(ctx, followUpMessage, allTables)
 			if err != nil {
@@ -853,12 +843,12 @@ func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, 
 			}
 			return followUpResponse, nil
 		}
-		
+
 		// Schema analysis phase: continue with additional schema requests
 		if m.conversationCtx.CurrentPhase == PhaseSchemaAnalysis {
 			fmt.Printf("📋 Additional schemas loaded for %v. Continuing analysis...\n", requestedInfo)
 			followUpMessage := "Please continue your analysis with the newly provided table schemas."
-			
+
 			// Make follow-up call with additional schema information
 			followUpResponse, err := m.ChatWithConversation(ctx, followUpMessage, allTables)
 			if err != nil {
@@ -903,7 +893,7 @@ func (m *Manager) generateDiscoveryPrompt(convCtx *ConversationContext, allTable
 				prompt.WriteString(fmt.Sprintf("%d. **%s** (relevance: %.2f) - %s\n",
 					i+1, result.Table.TableName, result.Similarity, result.Reason))
 			}
-			
+
 			// Store discovered tables in context
 			for _, result := range results {
 				convCtx.DiscoveredTables = append(convCtx.DiscoveredTables, result.Table.TableName)
@@ -935,7 +925,7 @@ func (m *Manager) generateDiscoveryPrompt(convCtx *ConversationContext, allTable
 	return prompt.String()
 }
 
-// generateSchemaAnalysisPrompt creates prompt for schema analysis phase  
+// generateSchemaAnalysisPrompt creates prompt for schema analysis phase
 func (m *Manager) generateSchemaAnalysisPrompt(convCtx *ConversationContext) string {
 	var prompt strings.Builder
 
@@ -1003,7 +993,7 @@ func (m *Manager) generateSQLGenerationPrompt(convCtx *ConversationContext) stri
 			}
 			prompt.WriteString(fmt.Sprintf("- %s (%s) %s\n", col.Name, col.Type, nullable))
 		}
-		
+
 		if len(tableInfo.ForeignKeys) > 0 {
 			prompt.WriteString("Relationships:\n")
 			for _, fk := range tableInfo.ForeignKeys {
@@ -1028,13 +1018,13 @@ func (m *Manager) generateSQLGenerationPrompt(convCtx *ConversationContext) stri
 // parseAIResponse extracts requested information from AI response
 func (m *Manager) parseAIResponse(response string, phase ConversationPhase) []string {
 	var requested []string
-	
+
 	switch phase {
 	case PhaseDiscovery, PhaseSchemaAnalysis:
 		// Look for table requests in various formats
 		patterns := []string{
 			`I need detailed schema for:\s*([^.]+)`,
-			`I need schema for related tables:\s*([^.]+)`, 
+			`I need schema for related tables:\s*([^.]+)`,
 			`Please provide schema for:\s*([^.]+)`,
 			`Need table structure for:\s*([^.]+)`,
 		}
@@ -1153,7 +1143,7 @@ func (m *Manager) addRelatedTableSuggestions(prompt *strings.Builder, convCtx *C
 						}
 					}
 					prompt.WriteString(fmt.Sprintf("- %s (similar naming pattern)\n", relTable))
-					nextTable:
+				nextTable:
 				}
 				prompt.WriteString("\n")
 			}
@@ -1184,4 +1174,25 @@ func (m *Manager) addRelatedTableSuggestions(prompt *strings.Builder, convCtx *C
 
 		prompt.WriteString("💡 You can request any of these tables by saying: 'I need schema for related tables: table1, table2'\n\n")
 	}
+}
+
+// generateSessionID creates a unique session ID
+func generateSessionID() string {
+	return fmt.Sprintf("session_%d_%s", time.Now().Unix(), randomString(8))
+}
+
+
+// GetUsageStore returns the usage store for accessing usage statistics
+func (m *Manager) GetUsageStore() *UsageStore {
+	return m.usageStore
+}
+
+// GetSessionID returns the current session ID
+func (m *Manager) GetSessionID() string {
+	return m.sessionID
+}
+
+// NewSession starts a new session with a new session ID
+func (m *Manager) NewSession() {
+	m.sessionID = generateSessionID()
 }
