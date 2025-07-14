@@ -784,6 +784,7 @@ func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, 
 	m.conversationCtx.AddTurn(turn)
 
 	// Process AI's requests and advance conversation if needed
+	initialPhase := m.conversationCtx.CurrentPhase
 	err = m.processConversationTurn(requestedInfo, allTables)
 	if err != nil {
 		fmt.Printf("Warning: failed to process conversation turn: %v\n", err)
@@ -802,6 +803,25 @@ func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, 
 
 	// Add to prompt history
 	m.addToPromptHistory(userMessage, systemPrompt, response.Usage.PromptTokens, response.Usage.CompletionTokens, cost)
+
+	// If schemas were loaded and phase advanced, automatically continue with schema analysis
+	if len(requestedInfo) > 0 && m.conversationCtx.CurrentPhase != initialPhase && 
+	   m.conversationCtx.CurrentPhase == PhaseSchemaAnalysis {
+		fmt.Printf("📋 Schemas loaded for %v. Analyzing...\n", requestedInfo)
+		
+		// Generate follow-up message for schema analysis
+		followUpMessage := "Please analyze the provided table schemas and generate the SQL query for my original request."
+		
+		// Make follow-up call with schema information
+		followUpResponse, err := m.ChatWithConversation(ctx, followUpMessage, allTables)
+		if err != nil {
+			fmt.Printf("Warning: failed to continue conversation with schemas: %v\n", err)
+			return aiResponse, nil // Return original response if follow-up fails
+		}
+		
+		// Return the follow-up response instead of the schema request
+		return followUpResponse, nil
+	}
 
 	return aiResponse, nil
 }

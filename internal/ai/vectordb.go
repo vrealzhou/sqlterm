@@ -733,7 +733,7 @@ func (vs *VectorStore) SearchRelatedTablesForQuery(ctx context.Context, initialT
 
 	tableScores := make(map[string]int)
 
-	for sourceTable, relatedTables := range relationships {
+	for _, relatedTables := range relationships {
 		for _, relatedTable := range relatedTables {
 			if !processed[relatedTable] {
 				// Score based on relationship type and frequency

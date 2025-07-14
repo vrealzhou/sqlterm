@@ -287,6 +287,8 @@ func (a *App) processCommand(line string) error {
 		return a.handleAIConfig(args)
 	case "/show-prompts":
 		return a.handleShowPrompts(args)
+	case "/clear-conversation":
+		return a.handleClearConversation()
 	default:
 		fmt.Printf("Unknown command: %s. Type /help for available commands.\n", command)
 	}
@@ -493,12 +495,13 @@ Available commands:
 /exec [query] > file.csv Export query results to CSV
 /ai-config               Configure AI providers and models
 /show-prompts [count]    Show recent AI prompt history (default: all)
+/clear-conversation      Clear current AI conversation and start fresh
 /quit, /exit             Exit SQLTerm
 
 AI Chat:
 Enter any message without / or @ prefix to chat with AI.
-AI can help generate SQL queries, explain database concepts, and more.
-Use /ai-config to set up AI providers (OpenRouter, Ollama, LM Studio).
+AI uses multi-turn conversations to progressively gather table information.
+Use /clear-conversation to start fresh or /ai-config to set up providers.
 
 File commands:
 @filename.sql            Execute all queries in file (Tab: autocomplete files)
@@ -1141,9 +1144,15 @@ func (a *App) processAIChat(message string) error {
 		return nil
 	}
 
-	fmt.Printf("🤖 Thinking... (this may take up to 2 minutes for complex queries)\n")
+	// Get current conversation or show thinking message
+	conversation := a.aiManager.GetCurrentConversation()
+	if conversation == nil {
+		fmt.Printf("🤖 Starting new conversation... (this may take up to 2 minutes for complex queries)\n")
+	} else {
+		fmt.Printf("🤖 Processing conversation (Phase: %s)... \n", conversation.CurrentPhase.String())
+	}
 
-	// Generate system prompt with database context
+	// Get database tables for context
 	var tables []string
 	if a.connection != nil {
 		var err error
@@ -1153,13 +1162,12 @@ func (a *App) processAIChat(message string) error {
 		}
 	}
 
-	systemPrompt := a.aiManager.GenerateVectorSystemPrompt(message, tables)
-	
 	// Create context with timeout for AI requests
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	
-	response, err := a.aiManager.Chat(ctx, message, systemPrompt)
+	// Use new conversational chat system
+	response, err := a.aiManager.ChatWithConversation(ctx, message, tables)
 	if err != nil {
 		// Provide more helpful error messages for common issues
 		if strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "deadline exceeded") {
@@ -1184,11 +1192,22 @@ func (a *App) processAIChat(message string) error {
 		fmt.Println(formattedResponse)
 	}
 
+	// Show conversation status and AI info
+	conversation = a.aiManager.GetCurrentConversation()
+	if conversation != nil {
+		statusInfo := fmt.Sprintf("📊 Conversation: %s | Tables loaded: %d", 
+			conversation.CurrentPhase.String(), len(conversation.LoadedTables))
+		if conversation.IsComplete {
+			statusInfo += " | ✅ Complete"
+		}
+		fmt.Printf("\n%s\n", statusInfo)
+	}
+
 	// Show AI status after response
 	if a.aiManager != nil && a.aiManager.IsConfigured() {
 		aiConfig := a.aiManager.GetConfig()
 		aiInfo := fmt.Sprintf("🤖 %s | %s", aiConfig.FormatProviderInfo(), aiConfig.FormatUsageStats())
-		fmt.Printf("\n%s\n", aiInfo)
+		fmt.Printf("%s\n", aiInfo)
 	}
 
 	return nil
@@ -1796,6 +1815,29 @@ func (a *App) handleShowPrompts(args []string) error {
 		}
 	}
 
+	return nil
+}
+
+func (a *App) handleClearConversation() error {
+	if a.aiManager == nil {
+		fmt.Println("🤖 AI is not configured.")
+		return nil
+	}
+
+	conversation := a.aiManager.GetCurrentConversation()
+	if conversation == nil {
+		fmt.Println("📝 No active conversation to clear.")
+		return nil
+	}
+
+	// Show conversation summary before clearing
+	fmt.Printf("📊 Clearing conversation (Phase: %s, Tables loaded: %d)\n", 
+		conversation.CurrentPhase.String(), len(conversation.LoadedTables))
+	
+	// Clear the conversation
+	a.aiManager.ClearConversation()
+	fmt.Println("✅ Conversation cleared. Next message will start a new conversation.")
+	
 	return nil
 }
 
