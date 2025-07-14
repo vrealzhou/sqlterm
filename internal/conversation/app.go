@@ -1281,6 +1281,8 @@ func (a *App) handleAIConfig(args []string) error {
 		return a.handleAIConfigAPIKey(args[1:])
 	case "base-url":
 		return a.handleAIConfigBaseURL(args[1:])
+	case "language":
+		return a.handleAIConfigLanguage(args[1:])
 	case "list-models":
 		return a.handleAIConfigListModels()
 	default:
@@ -1300,6 +1302,7 @@ func (a *App) printAIConfigHelp() {
 /ai-config model <model>       Set AI model for current provider
 /ai-config api-key <provider> <key>  Set API key for provider
 /ai-config base-url <provider> <url> Set base URL for local providers
+/ai-config language <lang>     Set interface language (en_au, zh_cn)
 /ai-config list-models         List available models for current provider
 
 Interactive Setup:
@@ -1439,6 +1442,51 @@ func (a *App) handleAIConfigBaseURL(args []string) error {
 
 	fmt.Printf("✅ Set base URL for %s to %s\n", provider, baseURL)
 
+	return nil
+}
+
+func (a *App) handleAIConfigLanguage(args []string) error {
+	if a.aiManager == nil {
+		return fmt.Errorf("AI manager not initialized")
+	}
+
+	if len(args) == 0 {
+		// Show current language
+		config := a.aiManager.GetConfig()
+		fmt.Printf("Current language: %s\n", config.Language)
+		
+		// Show available languages
+		availableLanguages := a.i18nMgr.GetAvailableLanguages()
+		fmt.Printf("Available languages: %s\n", strings.Join(availableLanguages, ", "))
+		return nil
+	}
+
+	newLanguage := args[0]
+	
+	// Check if language is available
+	availableLanguages := a.i18nMgr.GetAvailableLanguages()
+	isAvailable := false
+	for _, lang := range availableLanguages {
+		if lang == newLanguage {
+			isAvailable = true
+			break
+		}
+	}
+	
+	if !isAvailable {
+		return fmt.Errorf("language '%s' is not available. Available languages: %s", 
+			newLanguage, strings.Join(availableLanguages, ", "))
+	}
+
+	// Update language in AI config
+	if err := a.aiManager.SetLanguage(newLanguage); err != nil {
+		return fmt.Errorf("failed to update language: %w", err)
+	}
+
+	// Update i18n manager
+	a.i18nMgr.SetLanguage(newLanguage)
+
+	fmt.Printf("✅ Language changed to %s\n", newLanguage)
 	return nil
 }
 

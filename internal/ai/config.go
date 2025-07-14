@@ -165,6 +165,11 @@ func (c *Config) GetDefaultModel(provider Provider) string {
 	return c.DefaultModels[string(provider)]
 }
 
+// SetLanguage sets the language for the configuration
+func (c *Config) SetLanguage(language string) {
+	c.Language = language
+}
+
 // FormatUsageStats returns formatted usage statistics
 func (c *Config) FormatUsageStats() string {
 	if c.Usage.RequestCount == 0 {

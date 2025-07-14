@@ -468,7 +468,7 @@ func (ac *AutoCompleter) getAIConfigCandidates(words []string, line string) []st
 	}
 
 	// Subcommands for /ai-config
-	subcommands := []string{"provider", "model", "api-key", "base-url", "status", "list-models"}
+	subcommands := []string{"provider", "model", "api-key", "base-url", "language", "status", "list-models"}
 	
 	if len(words) == 2 {
 		// Complete subcommands
@@ -514,6 +514,19 @@ func (ac *AutoCompleter) getAIConfigCandidates(words []string, line string) []st
 				}
 				return candidates
 			}
+		}
+	case "language":
+		if len(words) == 3 {
+			languages := []string{"en_au", "zh_cn"}
+			var candidates []string
+			currentWord := words[2]
+			for _, lang := range languages {
+				if strings.HasPrefix(lang, currentWord) {
+					completion := lang[len(currentWord):]
+					candidates = append(candidates, completion)
+				}
+			}
+			return candidates
 		}
 	}
 

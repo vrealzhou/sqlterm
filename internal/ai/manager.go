@@ -239,6 +239,12 @@ func (m *Manager) GetConfig() *Config {
 	return m.config
 }
 
+// SetLanguage updates the language configuration
+func (m *Manager) SetLanguage(language string) error {
+	m.config.SetLanguage(language)
+	return SaveConfig(m.config, m.configDir)
+}
+
 // GenerateSystemPrompt creates a system prompt with database context
 func (m *Manager) GenerateSystemPrompt(tables []string, currentTable string) string {
 	var prompt strings.Builder
