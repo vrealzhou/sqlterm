@@ -9,13 +9,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const DefaultConfigFile = "ai.yaml"
+const DefaultConfigFile = "config.yaml"
 
 // DefaultConfig returns a default AI configuration
 func DefaultConfig() *Config {
 	return &Config{
 		Provider: ProviderOpenRouter,
 		Model:    "anthropic/claude-3.5-sonnet",
+		Language: "en_au",
 		APIKeys:  make(map[string]string),
 		BaseURLs: map[string]string{
 			string(ProviderOllama):   "http://localhost:11434",
@@ -36,14 +37,25 @@ func DefaultConfig() *Config {
 // LoadConfig loads AI configuration from file
 func LoadConfig(configDir string) (*Config, error) {
 	configPath := filepath.Join(configDir, DefaultConfigFile)
+	legacyConfigPath := filepath.Join(configDir, "ai.yaml")
 	
-	// Create default config if file doesn't exist
+	// Handle migration from ai.yaml to config.yaml
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		config := DefaultConfig()
-		if err := SaveConfig(config, configDir); err != nil {
-			return nil, fmt.Errorf("failed to create default config: %w", err)
+		// Check if legacy ai.yaml exists
+		if _, err := os.Stat(legacyConfigPath); err == nil {
+			// Migrate from ai.yaml to config.yaml
+			if err := os.Rename(legacyConfigPath, configPath); err != nil {
+				return nil, fmt.Errorf("failed to migrate config from ai.yaml to config.yaml: %w", err)
+			}
+			fmt.Printf("📦 Migrated configuration from ai.yaml to config.yaml\n")
+		} else {
+			// Create default config if neither file exists
+			config := DefaultConfig()
+			if err := SaveConfig(config, configDir); err != nil {
+				return nil, fmt.Errorf("failed to create default config: %w", err)
+			}
+			return config, nil
 		}
-		return config, nil
 	}
 
 	data, err := os.ReadFile(configPath)
@@ -65,6 +77,11 @@ func LoadConfig(configDir string) (*Config, error) {
 	}
 	if config.DefaultModels == nil {
 		config.DefaultModels = make(map[string]string)
+	}
+	
+	// Set default language if not specified
+	if config.Language == "" {
+		config.Language = "en_au"
 	}
 
 	return &config, nil

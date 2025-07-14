@@ -30,6 +30,7 @@ type Usage struct {
 type Config struct {
 	Provider      Provider          `yaml:"provider"`
 	Model         string            `yaml:"model"`
+	Language      string            `yaml:"language"`
 	APIKeys       map[string]string `yaml:"api_keys"`
 	BaseURLs      map[string]string `yaml:"base_urls"`
 	DefaultModels map[string]string `yaml:"default_models"`
