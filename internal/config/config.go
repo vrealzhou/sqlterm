@@ -1,10 +1,10 @@
-package ai
+package config
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
+	"sqlterm/internal/i18n"
 
 	"gopkg.in/yaml.v3"
 )
@@ -28,46 +28,46 @@ func DefaultConfig() *Config {
 				string(ProviderOllama):     "llama3.2",
 				string(ProviderLMStudio):   "lmstudio-community/Meta-Llama-3-8B-Instruct-GGUF",
 			},
-			Usage: Usage{
-				RequestCount: 0,
-				Cost:         0.0,
-			},
 		},
 	}
 }
 
 // LoadConfig loads AI configuration from file
-func LoadConfig(configDir string) (*Config, error) {
+func LoadConfig(configDir string) (*i18n.Manager, *Config, error) {
+	i18nMgr, err := i18n.NewManager("en_au")
+	if err != nil {
+		return nil, nil, err
+	}
 	configPath := filepath.Join(configDir, DefaultConfigFile)
 	legacyConfigPath := filepath.Join(configDir, "ai.yaml")
-	
+
 	// Handle migration from ai.yaml to config.yaml
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		// Check if legacy ai.yaml exists
 		if _, err := os.Stat(legacyConfigPath); err == nil {
 			// Migrate from ai.yaml to config.yaml
 			if err := os.Rename(legacyConfigPath, configPath); err != nil {
-				return nil, fmt.Errorf(i18nMgr.Get("failed_to_migrate_config"), err)
+				return nil, nil, fmt.Errorf(i18nMgr.Get("failed_to_migrate_config"), err)
 			}
 			fmt.Printf("📦 Migrated configuration from ai.yaml to config.yaml\n")
 		} else {
 			// Create default config if neither file exists
 			config := DefaultConfig()
 			if err := SaveConfig(config, configDir, i18nMgr); err != nil {
-				return nil, fmt.Errorf(i18nMgr.Get("failed_to_create_default_config"), err)
+				return nil, nil, fmt.Errorf(i18nMgr.Get("failed_to_create_default_config"), err)
 			}
-			return config, nil
+			return i18nMgr, config, nil
 		}
 	}
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf(i18nMgr.Get("failed_to_read_config_file"), err)
+		return nil, nil, fmt.Errorf(i18nMgr.Get("failed_to_read_config_file"), err)
 	}
 
 	var config Config
 	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf(i18nMgr.Get("failed_to_parse_config_file"), err)
+		return nil, nil, fmt.Errorf(i18nMgr.Get("failed_to_parse_config_file"), err)
 	}
 
 	// Ensure maps are initialized
@@ -80,13 +80,14 @@ func LoadConfig(configDir string) (*Config, error) {
 	if config.AI.DefaultModels == nil {
 		config.AI.DefaultModels = make(map[string]string)
 	}
-	
+
 	// Set default language if not specified
 	if config.Language == "" {
 		config.Language = "en_au"
 	}
+	i18nMgr.SetLanguage(config.Language)
 
-	return &config, nil
+	return i18nMgr, &config, nil
 }
 
 // SaveConfig saves AI configuration to file
@@ -96,7 +97,7 @@ func SaveConfig(config *Config, configDir string, i18nMgr *i18n.Manager) error {
 	}
 
 	configPath := filepath.Join(configDir, DefaultConfigFile)
-	
+
 	data, err := yaml.Marshal(config)
 	if err != nil {
 		return fmt.Errorf(i18nMgr.Get("failed_to_marshal_config"), err)
@@ -107,18 +108,6 @@ func SaveConfig(config *Config, configDir string, i18nMgr *i18n.Manager) error {
 	}
 
 	return nil
-}
-
-// UpdateUsage updates usage statistics and saves config
-func (c *Config) UpdateUsage(inputTokens, outputTokens int, cost float64, configDir string) error {
-	c.AI.Usage.InputTokens += inputTokens
-	c.AI.Usage.OutputTokens += outputTokens
-	c.AI.Usage.TotalTokens += inputTokens + outputTokens
-	c.AI.Usage.Cost += cost
-	c.AI.Usage.RequestCount++
-	c.AI.Usage.LastRequestTime = time.Now()
-
-	return SaveConfig(c, configDir)
 }
 
 // SetProvider sets the current provider and model
@@ -170,21 +159,6 @@ func (c *Config) GetDefaultModel(provider Provider) string {
 // SetLanguage sets the language for the configuration
 func (c *Config) SetLanguage(language string) {
 	c.Language = language
-}
-
-// FormatUsageStats returns formatted usage statistics
-func (c *Config) FormatUsageStats() string {
-	if c.AI.Usage.RequestCount == 0 {
-		return "No requests made yet"
-	}
-
-	return fmt.Sprintf("Requests: %d | Tokens: %d in/%d out/%d total | Cost: $%.4f",
-		c.AI.Usage.RequestCount,
-		c.AI.Usage.InputTokens,
-		c.AI.Usage.OutputTokens,
-		c.AI.Usage.TotalTokens,
-		c.AI.Usage.Cost,
-	)
 }
 
 // FormatProviderInfo returns formatted provider and model information
