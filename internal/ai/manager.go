@@ -21,6 +21,7 @@ type Manager struct {
 	recentTables  []string     // Session memory for recently mentioned tables
 	maxTables     int          // Maximum tables to include in context
 	vectorStore   *VectorStore // Vector database for semantic search
+	conversationCtx *ConversationContext // Current conversation context
 }
 
 // NewManager creates a new AI manager
@@ -710,4 +711,331 @@ func (m *Manager) addGuidelines(prompt *strings.Builder) string {
 	prompt.WriteString("- Validate against available tables and expected schema\n")
 
 	return prompt.String()
+}
+
+// StartConversation begins a new multi-turn conversation
+func (m *Manager) StartConversation(userQuery string) *ConversationContext {
+	m.conversationCtx = NewConversationContext(userQuery)
+	return m.conversationCtx
+}
+
+// GetCurrentConversation returns the current conversation context
+func (m *Manager) GetCurrentConversation() *ConversationContext {
+	return m.conversationCtx
+}
+
+// ClearConversation clears the current conversation context
+func (m *Manager) ClearConversation() {
+	m.conversationCtx = nil
+}
+
+// ChatWithConversation handles chat with conversation context
+func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, allTables []string) (string, error) {
+	if !m.IsConfigured() {
+		return "", fmt.Errorf("AI client not configured")
+	}
+
+	// Start new conversation if none exists
+	if m.conversationCtx == nil {
+		m.conversationCtx = NewConversationContext(userMessage)
+	}
+
+	// Generate system prompt based on conversation phase
+	systemPrompt, err := m.generateConversationalPrompt(m.conversationCtx, allTables)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate prompt: %w", err)
+	}
+
+	// Send chat request
+	messages := []ChatMessage{
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: userMessage},
+	}
+
+	request := ChatRequest{
+		Model:       m.config.Model,
+		Messages:    messages,
+		Temperature: 0.7,
+		MaxTokens:   4000,
+	}
+
+	response, err := m.client.Chat(ctx, request)
+	if err != nil {
+		return "", fmt.Errorf("chat request failed: %w", err)
+	}
+
+	if len(response.Choices) == 0 {
+		return "", fmt.Errorf("no response choices returned")
+	}
+
+	aiResponse := response.Choices[0].Message.Content
+
+	// Parse AI response for requested tables/actions
+	requestedInfo := m.parseAIResponse(aiResponse, m.conversationCtx.CurrentPhase)
+
+	// Add turn to conversation history
+	turn := ConversationTurn{
+		UserMessage:   userMessage,
+		SystemPrompt:  systemPrompt,
+		AIResponse:    aiResponse,
+		RequestedInfo: requestedInfo,
+		Phase:        m.conversationCtx.CurrentPhase,
+	}
+	m.conversationCtx.AddTurn(turn)
+
+	// Process AI's requests and advance conversation if needed
+	err = m.processConversationTurn(requestedInfo, allTables)
+	if err != nil {
+		fmt.Printf("Warning: failed to process conversation turn: %v\n", err)
+	}
+
+	// Calculate cost and update usage
+	cost := m.calculateCost(response.Usage.PromptTokens, response.Usage.CompletionTokens)
+	if err := m.config.UpdateUsage(
+		response.Usage.PromptTokens,
+		response.Usage.CompletionTokens,
+		cost,
+		m.configDir,
+	); err != nil {
+		fmt.Printf("Warning: failed to update usage stats: %v\n", err)
+	}
+
+	// Add to prompt history
+	m.addToPromptHistory(userMessage, systemPrompt, response.Usage.PromptTokens, response.Usage.CompletionTokens, cost)
+
+	return aiResponse, nil
+}
+
+// generateConversationalPrompt creates phase-specific prompts
+func (m *Manager) generateConversationalPrompt(convCtx *ConversationContext, allTables []string) (string, error) {
+	switch convCtx.CurrentPhase {
+	case PhaseDiscovery:
+		return m.generateDiscoveryPrompt(convCtx, allTables), nil
+	case PhaseSchemaAnalysis:
+		return m.generateSchemaAnalysisPrompt(convCtx), nil
+	case PhaseSQLGeneration:
+		return m.generateSQLGenerationPrompt(convCtx), nil
+	default:
+		return "", fmt.Errorf("unknown conversation phase: %v", convCtx.CurrentPhase)
+	}
+}
+
+// generateDiscoveryPrompt creates prompt for table discovery phase
+func (m *Manager) generateDiscoveryPrompt(convCtx *ConversationContext, allTables []string) string {
+	var prompt strings.Builder
+
+	prompt.WriteString("You are an AI assistant helping with SQL queries and database operations. ")
+	prompt.WriteString(fmt.Sprintf("The user wants to: %s\n\n", convCtx.OriginalQuery))
+
+	// Use vector search to find most relevant tables
+	if m.vectorStore != nil && len(allTables) > 0 {
+		ctx := context.Background()
+		results, err := m.vectorStore.SearchSimilarTables(ctx, convCtx.OriginalQuery, 10)
+		if err == nil && len(results) > 0 {
+			prompt.WriteString(fmt.Sprintf("Database has %d tables total. Most relevant tables for this query:\n\n", len(allTables)))
+			for i, result := range results {
+				prompt.WriteString(fmt.Sprintf("%d. **%s** (relevance: %.2f) - %s\n",
+					i+1, result.Table.TableName, result.Similarity, result.Reason))
+			}
+			
+			// Store discovered tables in context
+			for _, result := range results {
+				convCtx.DiscoveredTables = append(convCtx.DiscoveredTables, result.Table.TableName)
+			}
+		} else {
+			// Fallback to simple list
+			prompt.WriteString(fmt.Sprintf("Available tables (%d total):\n", len(allTables)))
+			for i, table := range allTables {
+				if i >= 15 { // Limit to first 15
+					prompt.WriteString(fmt.Sprintf("... and %d more tables\n", len(allTables)-15))
+					break
+				}
+				prompt.WriteString(fmt.Sprintf("- %s\n", table))
+			}
+		}
+	} else {
+		prompt.WriteString("No database connection available.\n")
+	}
+
+	prompt.WriteString("\nYour task:\n")
+	prompt.WriteString("1. Analyze the user's request and identify which tables you need detailed schema information for\n")
+	prompt.WriteString("2. Respond with: 'I need detailed schema for: [table1], [table2], [table3]' to request specific table structures\n")
+	prompt.WriteString("3. Be selective - only request tables that are directly relevant to the query\n")
+	prompt.WriteString("4. If you can answer with the information already provided, do so\n\n")
+
+	prompt.WriteString("Important: If you need table schemas, use EXACTLY this format:\n")
+	prompt.WriteString("'I need detailed schema for: table1, table2, table3'\n")
+
+	return prompt.String()
+}
+
+// generateSchemaAnalysisPrompt creates prompt for schema analysis phase  
+func (m *Manager) generateSchemaAnalysisPrompt(convCtx *ConversationContext) string {
+	var prompt strings.Builder
+
+	prompt.WriteString("You are an AI assistant helping with SQL queries. ")
+	prompt.WriteString(fmt.Sprintf("The user wants to: %s\n\n", convCtx.OriginalQuery))
+
+	prompt.WriteString("You have requested detailed schema information. Here are the table structures:\n\n")
+
+	// Include loaded table schemas
+	for tableName, tableInfo := range convCtx.LoadedTables {
+		prompt.WriteString(fmt.Sprintf("## Table: %s\n", tableName))
+		prompt.WriteString("Columns:\n")
+		for _, col := range tableInfo.Columns {
+			nullable := "NOT NULL"
+			if col.Nullable {
+				nullable = "NULL"
+			}
+			key := ""
+			if col.Key != "" {
+				key = fmt.Sprintf(" [%s]", col.Key)
+			}
+			prompt.WriteString(fmt.Sprintf("- %s (%s) %s%s\n", col.Name, col.Type, nullable, key))
+		}
+
+		// Include foreign key relationships
+		if len(tableInfo.ForeignKeys) > 0 {
+			prompt.WriteString("Foreign Keys:\n")
+			for _, fk := range tableInfo.ForeignKeys {
+				prompt.WriteString(fmt.Sprintf("- %s → %s.%s\n", fk.Column, fk.ReferencedTable, fk.ReferencedColumn))
+			}
+		}
+		prompt.WriteString("\n")
+	}
+
+	prompt.WriteString("Your task:\n")
+	prompt.WriteString("1. Analyze the provided schemas and relationships\n")
+	prompt.WriteString("2. If you need information about related tables (via foreign keys), request them using: 'I need schema for related tables: [table1], [table2]'\n")
+	prompt.WriteString("3. If you have sufficient information, generate the SQL query\n")
+	prompt.WriteString("4. Include explanations for complex queries\n\n")
+
+	prompt.WriteString("Use ```sql blocks for any SQL queries you generate.\n")
+
+	return prompt.String()
+}
+
+// generateSQLGenerationPrompt creates prompt for final SQL generation
+func (m *Manager) generateSQLGenerationPrompt(convCtx *ConversationContext) string {
+	var prompt strings.Builder
+
+	prompt.WriteString("You are an AI assistant specialized in SQL query generation. ")
+	prompt.WriteString(fmt.Sprintf("The user wants to: %s\n\n", convCtx.OriginalQuery))
+
+	prompt.WriteString("You have complete schema information for the following tables:\n\n")
+
+	// Include all loaded table information
+	for tableName, tableInfo := range convCtx.LoadedTables {
+		prompt.WriteString(fmt.Sprintf("## %s\n", tableName))
+		for _, col := range tableInfo.Columns {
+			nullable := "NOT NULL"
+			if col.Nullable {
+				nullable = "NULL"
+			}
+			prompt.WriteString(fmt.Sprintf("- %s (%s) %s\n", col.Name, col.Type, nullable))
+		}
+		
+		if len(tableInfo.ForeignKeys) > 0 {
+			prompt.WriteString("Relationships:\n")
+			for _, fk := range tableInfo.ForeignKeys {
+				prompt.WriteString(fmt.Sprintf("- %s → %s.%s\n", fk.Column, fk.ReferencedTable, fk.ReferencedColumn))
+			}
+		}
+		prompt.WriteString("\n")
+	}
+
+	prompt.WriteString("Generate the complete SQL query to fulfill the user's request.\n")
+	prompt.WriteString("Include:\n")
+	prompt.WriteString("- Proper JOINs based on foreign key relationships\n")
+	prompt.WriteString("- Appropriate WHERE clauses and conditions\n")
+	prompt.WriteString("- Comments explaining complex parts\n")
+	prompt.WriteString("- Performance optimization suggestions if relevant\n\n")
+
+	prompt.WriteString("Use ```sql blocks for your query.\n")
+
+	return prompt.String()
+}
+
+// parseAIResponse extracts requested information from AI response
+func (m *Manager) parseAIResponse(response string, phase ConversationPhase) []string {
+	var requested []string
+	
+	switch phase {
+	case PhaseDiscovery, PhaseSchemaAnalysis:
+		// Look for table requests in various formats
+		patterns := []string{
+			`I need detailed schema for:\s*([^.]+)`,
+			`I need schema for related tables:\s*([^.]+)`, 
+			`Please provide schema for:\s*([^.]+)`,
+			`Need table structure for:\s*([^.]+)`,
+		}
+
+		for _, pattern := range patterns {
+			re := regexp.MustCompile(pattern)
+			if matches := re.FindStringSubmatch(response); len(matches) > 1 {
+				// Parse comma-separated table names
+				tableNames := strings.Split(matches[1], ",")
+				for _, name := range tableNames {
+					name = strings.TrimSpace(name)
+					if name != "" {
+						requested = append(requested, name)
+					}
+				}
+				break
+			}
+		}
+	}
+
+	return requested
+}
+
+// processConversationTurn handles the AI's requests and advances conversation
+func (m *Manager) processConversationTurn(requestedInfo []string, allTables []string) error {
+	if len(requestedInfo) == 0 {
+		// No specific requests, advance phase if appropriate
+		if m.conversationCtx.CurrentPhase == PhaseDiscovery && len(m.conversationCtx.LoadedTables) > 0 {
+			m.conversationCtx.AdvancePhase()
+		}
+		return nil
+	}
+
+	// Process table schema requests
+	if m.vectorStore != nil && m.vectorStore.connection != nil {
+		for _, tableName := range requestedInfo {
+			// Verify table exists
+			if !m.contains(allTables, tableName) {
+				continue
+			}
+
+			// Skip if already loaded
+			if m.conversationCtx.HasTableLoaded(tableName) {
+				continue
+			}
+
+			// Load table schema
+			tableInfo, err := m.vectorStore.connection.DescribeTable(tableName)
+			if err != nil {
+				fmt.Printf("Warning: failed to describe table %s: %v\n", tableName, err)
+				continue
+			}
+
+			// Add to conversation context
+			m.conversationCtx.AddLoadedTable(tableName, tableInfo)
+			m.conversationCtx.RequestedTables = append(m.conversationCtx.RequestedTables, tableName)
+
+			// Find related tables via foreign keys
+			for _, fk := range tableInfo.ForeignKeys {
+				if !m.contains(m.conversationCtx.RelatedTables, fk.ReferencedTable) {
+					m.conversationCtx.RelatedTables = append(m.conversationCtx.RelatedTables, fk.ReferencedTable)
+				}
+			}
+		}
+
+		// Advance phase if we have loaded tables
+		if len(m.conversationCtx.LoadedTables) > 0 && m.conversationCtx.CurrentPhase == PhaseDiscovery {
+			m.conversationCtx.AdvancePhase()
+		}
+	}
+
+	return nil
 }
