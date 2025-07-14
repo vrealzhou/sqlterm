@@ -493,6 +493,295 @@ func (vs *VectorStore) GetRecentTables(limit int) ([]string, error) {
 	return tables, nil
 }
 
+// FindRelatedTables discovers tables related to the given tables via foreign key relationships
+func (vs *VectorStore) FindRelatedTables(baseTableNames []string) (map[string][]string, error) {
+	relationships := make(map[string][]string)
+
+	for _, tableName := range baseTableNames {
+		// Get table schema to analyze foreign keys
+		tableInfo, err := vs.connection.DescribeTable(tableName)
+		if err != nil {
+			continue // Skip tables we can't describe
+		}
+
+		var relatedTables []string
+
+		// Find tables this table references (via foreign keys)
+		for _, fk := range tableInfo.ForeignKeys {
+			if !vs.contains(relatedTables, fk.ReferencedTable) {
+				relatedTables = append(relatedTables, fk.ReferencedTable)
+			}
+		}
+
+		// Find tables that reference this table (reverse foreign keys)
+		reverseFKTables, err := vs.findTablesReferencingTable(tableName)
+		if err == nil {
+			for _, refTable := range reverseFKTables {
+				if !vs.contains(relatedTables, refTable) && !vs.contains(baseTableNames, refTable) {
+					relatedTables = append(relatedTables, refTable)
+				}
+			}
+		}
+
+		// Find tables with similar naming patterns
+		similarTables := vs.findSimilarlyNamedTables(tableName, baseTableNames)
+		for _, simTable := range similarTables {
+			if !vs.contains(relatedTables, simTable) {
+				relatedTables = append(relatedTables, simTable)
+			}
+		}
+
+		if len(relatedTables) > 0 {
+			relationships[tableName] = relatedTables
+		}
+	}
+
+	return relationships, nil
+}
+
+// findTablesReferencingTable finds tables that have foreign keys pointing to the given table
+func (vs *VectorStore) findTablesReferencingTable(targetTableName string) ([]string, error) {
+	var referencingTables []string
+
+	// Get all tables to check their foreign keys
+	allTables, err := vs.connection.ListTables()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, tableName := range allTables {
+		if tableName == targetTableName {
+			continue // Skip the target table itself
+		}
+
+		tableInfo, err := vs.connection.DescribeTable(tableName)
+		if err != nil {
+			continue // Skip tables we can't describe
+		}
+
+		// Check if this table has foreign keys pointing to target table
+		for _, fk := range tableInfo.ForeignKeys {
+			if fk.ReferencedTable == targetTableName {
+				referencingTables = append(referencingTables, tableName)
+				break // Found one FK, that's enough
+			}
+		}
+	}
+
+	return referencingTables, nil
+}
+
+// findSimilarlyNamedTables finds tables with similar naming patterns
+func (vs *VectorStore) findSimilarlyNamedTables(targetTableName string, excludeTables []string) []string {
+	var similarTables []string
+
+	allTables, err := vs.connection.ListTables()
+	if err != nil {
+		return similarTables
+	}
+
+	// Get base name patterns
+	targetPrefix := vs.extractTablePrefix(targetTableName)
+	targetBase := vs.extractTableBaseWord(targetTableName)
+
+	for _, tableName := range allTables {
+		if tableName == targetTableName || vs.contains(excludeTables, tableName) {
+			continue
+		}
+
+		// Check for similar prefixes
+		if targetPrefix != "" && vs.extractTablePrefix(tableName) == targetPrefix {
+			similarTables = append(similarTables, tableName)
+			continue
+		}
+
+		// Check for similar base words
+		if targetBase != "" && vs.extractTableBaseWord(tableName) == targetBase {
+			similarTables = append(similarTables, tableName)
+			continue
+		}
+
+		// Check for common junction table patterns (e.g., user_roles, order_items)
+		if vs.isJunctionTable(tableName, targetTableName) {
+			similarTables = append(similarTables, tableName)
+		}
+	}
+
+	return similarTables
+}
+
+// extractTablePrefix extracts prefix from table names (e.g., "user_" from "user_profiles")
+func (vs *VectorStore) extractTablePrefix(tableName string) string {
+	parts := strings.Split(tableName, "_")
+	if len(parts) > 1 {
+		return parts[0]
+	}
+	return ""
+}
+
+// extractTableBaseWord extracts the main concept from table name
+func (vs *VectorStore) extractTableBaseWord(tableName string) string {
+	// Remove common suffixes
+	name := strings.ToLower(tableName)
+	suffixes := []string{"s", "es", "ies", "_table", "_data", "_info"}
+	
+	for _, suffix := range suffixes {
+		if strings.HasSuffix(name, suffix) {
+			name = strings.TrimSuffix(name, suffix)
+			break
+		}
+	}
+
+	// Extract base word before underscore
+	parts := strings.Split(name, "_")
+	if len(parts) > 0 {
+		return parts[0]
+	}
+
+	return name
+}
+
+// isJunctionTable checks if a table might be a junction/bridge table between two entities
+func (vs *VectorStore) isJunctionTable(candidateTable, targetTable string) bool {
+	candidate := strings.ToLower(candidateTable)
+	target := strings.ToLower(targetTable)
+
+	// Remove plural suffixes for better matching
+	targetBase := vs.extractTableBaseWord(target)
+	if targetBase == "" {
+		targetBase = target
+	}
+
+	// Check if candidate table contains the target table name
+	if strings.Contains(candidate, targetBase) || strings.Contains(candidate, target) {
+		// Look for junction table patterns
+		junctionPatterns := []string{"_", "2", "to", "has", "belongs"}
+		for _, pattern := range junctionPatterns {
+			if strings.Contains(candidate, pattern) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// GetTableRelationshipMap builds a comprehensive map of table relationships
+func (vs *VectorStore) GetTableRelationshipMap() (map[string][]string, error) {
+	allTables, err := vs.connection.ListTables()
+	if err != nil {
+		return nil, err
+	}
+
+	relationshipMap := make(map[string][]string)
+
+	// Build relationships for all tables
+	for _, tableName := range allTables {
+		var relatedTables []string
+
+		tableInfo, err := vs.connection.DescribeTable(tableName)
+		if err != nil {
+			continue
+		}
+
+		// Add directly referenced tables
+		for _, fk := range tableInfo.ForeignKeys {
+			if !vs.contains(relatedTables, fk.ReferencedTable) {
+				relatedTables = append(relatedTables, fk.ReferencedTable)
+			}
+		}
+
+		// Add tables that reference this table
+		referencingTables, err := vs.findTablesReferencingTable(tableName)
+		if err == nil {
+			for _, refTable := range referencingTables {
+				if !vs.contains(relatedTables, refTable) {
+					relatedTables = append(relatedTables, refTable)
+				}
+			}
+		}
+
+		if len(relatedTables) > 0 {
+			relationshipMap[tableName] = relatedTables
+		}
+	}
+
+	return relationshipMap, nil
+}
+
+// SearchRelatedTablesForQuery finds tables related to a specific query context
+func (vs *VectorStore) SearchRelatedTablesForQuery(ctx context.Context, initialTables []string, maxRelated int) ([]string, error) {
+	var allRelatedTables []string
+	processed := make(map[string]bool)
+
+	// Mark initial tables as processed
+	for _, table := range initialTables {
+		processed[table] = true
+	}
+
+	// Find relationships for initial tables
+	relationships, err := vs.FindRelatedTables(initialTables)
+	if err != nil {
+		return nil, err
+	}
+
+	// Collect all related tables with scoring
+	type scoredTable struct {
+		name  string
+		score int
+	}
+
+	tableScores := make(map[string]int)
+
+	for sourceTable, relatedTables := range relationships {
+		for _, relatedTable := range relatedTables {
+			if !processed[relatedTable] {
+				// Score based on relationship type and frequency
+				score := 1
+				
+				// Higher score for tables referenced by multiple source tables
+				if existing, exists := tableScores[relatedTable]; exists {
+					score = existing + 2 // Bonus for multiple references
+				}
+
+				tableScores[relatedTable] = score
+			}
+		}
+	}
+
+	// Sort by score and select top related tables
+	var scoredTables []scoredTable
+	for table, score := range tableScores {
+		scoredTables = append(scoredTables, scoredTable{table, score})
+	}
+
+	sort.Slice(scoredTables, func(i, j int) bool {
+		return scoredTables[i].score > scoredTables[j].score
+	})
+
+	// Limit results
+	limit := maxRelated
+	if len(scoredTables) < limit {
+		limit = len(scoredTables)
+	}
+
+	for i := 0; i < limit; i++ {
+		allRelatedTables = append(allRelatedTables, scoredTables[i].name)
+	}
+
+	return allRelatedTables, nil
+}
+
+// contains checks if a slice contains a string (helper method)
+func (vs *VectorStore) contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
 // Close closes the vector store database connection
 func (vs *VectorStore) Close() error {
 	if vs.db != nil {
