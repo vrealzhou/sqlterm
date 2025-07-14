@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -66,7 +67,7 @@ func NewApp() (*App, error) {
 	// Ensure sessions directory exists for history file
 	sessionsDir := filepath.Join(configMgr.GetConfigDir(), "sessions")
 	if err := os.MkdirAll(sessionsDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create sessions directory: %w", err)
+		return nil, fmt.Errorf(i18nMgr.Get("failed_to_create_sessions_dir"), err)
 	}
 
 	// Set up dynamic autocomplete
@@ -78,7 +79,7 @@ func NewApp() (*App, error) {
 		HistoryFile:  filepath.Join(configMgr.GetConfigDir(), "sessions", "global_history.txt"),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create readline: %w", err)
+		return nil, fmt.Errorf(i18nMgr.Get("failed_to_create_readline"), err)
 	}
 
 	app.rl = rl
@@ -130,7 +131,7 @@ func (a *App) switchToSessionHistory(connectionName string) error {
 
 	// Ensure the session directory exists
 	if err := os.MkdirAll(sessionDir, 0755); err != nil {
-		return fmt.Errorf("failed to create session directory: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_create_session_dir"), err)
 	}
 
 	// Migrate legacy global history if this is the first time using session histories
@@ -155,7 +156,7 @@ func (a *App) switchToSessionHistory(connectionName string) error {
 	if err != nil {
 		// Fallback: recreate with old config if new one fails
 		a.rl, _ = readline.NewEx(oldConfig)
-		return fmt.Errorf("failed to create readline with session history: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_create_readline_session_history"), err)
 	}
 
 	a.rl = rl
@@ -179,11 +180,11 @@ func (a *App) migrateLegacyHistory(sessionHistoryFile string) error {
 	// Copy legacy history to session history
 	input, err := os.ReadFile(legacyHistoryFile)
 	if err != nil {
-		return fmt.Errorf("failed to read legacy history: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_read_legacy_history"), err)
 	}
 
 	if err := os.WriteFile(sessionHistoryFile, input, 0644); err != nil {
-		return fmt.Errorf("failed to write session history: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_write_session_history"), err)
 	}
 
 	fmt.Printf("📦 Migrated command history to session folder\n")
@@ -224,7 +225,7 @@ func (a *App) switchToGlobalHistory() error {
 	if err != nil {
 		// Fallback: recreate with old config if new one fails
 		a.rl, _ = readline.NewEx(oldConfig)
-		return fmt.Errorf("failed to create readline with global history: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_create_readline_global_history"), err)
 	}
 
 	a.rl = rl
@@ -239,8 +240,8 @@ func (a *App) Run() error {
 		}
 	}()
 
-	fmt.Println("🗄️  SQLTerm - Conversation Mode")
-	fmt.Println("Type /help for available commands, or enter SQL queries directly.")
+	fmt.Println(a.i18nMgr.Get("sqlterm_conversation_mode"))
+	fmt.Println(a.i18nMgr.Get("prompt_welcome"))
 	fmt.Println()
 
 	for {
@@ -351,13 +352,13 @@ func (a *App) processQueryFile(line string) error {
 
 func (a *App) processQuery(query string, resultWriter io.Writer) error {
 	if a.connection == nil {
-		fmt.Println("No database connection. Use /connect to connect to a database.")
+		fmt.Println(a.i18nMgr.Get("no_database_connection"))
 		return nil
 	}
 
 	result, err := a.connection.Execute(query)
 	if err != nil {
-		return fmt.Errorf("query execution failed: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("query_execution_failed"), err)
 	}
 
 	// Save as markdown and display with glamour
@@ -436,7 +437,7 @@ func (a *App) preparePromptHistoryMarkdown() (string, *os.File, error) {
 
 func (a *App) executeFile(filename string, queryRange []int) error {
 	if a.connection == nil {
-		fmt.Println("No database connection. Use /connect to connect to a database.")
+		fmt.Println(a.i18nMgr.Get("no_database_connection"))
 		return nil
 	}
 
@@ -447,23 +448,23 @@ func (a *App) executeFile(filename string, queryRange []int) error {
 	} else if _, err := os.Stat("queries/" + filename); err == nil {
 		filepath = "queries/" + filename
 	} else {
-		return fmt.Errorf("file not found: %s", filename)
+		return fmt.Errorf(a.i18nMgr.Get("file_not_found"), filename)
 	}
 
 	file, err := os.Open(filepath)
 	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_open_file"), err)
 	}
 	defer file.Close()
 
 	content, err := io.ReadAll(file)
 	if err != nil {
-		return fmt.Errorf("failed to read file: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_read_file"), err)
 	}
 
 	queries := a.parseQueries(string(content))
-	fmt.Printf("📁 Executing SQL file: %s\n", filename)
-	fmt.Printf("🔄 Found %d queries in file\n", len(queries))
+	fmt.Printf(a.i18nMgr.Get("executing_sql_file"), filename)
+	fmt.Printf(a.i18nMgr.Get("found_queries_in_file"), len(queries))
 
 	start, end := 1, len(queries)
 	if len(queryRange) == 2 {
@@ -484,7 +485,7 @@ func (a *App) executeFile(filename string, queryRange []int) error {
 
 		err = a.processQuery(query, writer)
 		if err != nil {
-			fmt.Printf("❌ Query failed: %v\n", err)
+			fmt.Printf(a.i18nMgr.Get("query_failed"), err)
 		}
 	}
 	writer.Close()
@@ -492,7 +493,7 @@ func (a *App) executeFile(filename string, queryRange []int) error {
 	if err := a.sessionMgr.ViewMarkdown(mdPath); err != nil {
 		fmt.Printf("Warning: %v\n", err)
 	}
-	fmt.Printf("📍 File location: %s\n", mdPath)
+	fmt.Printf("📍 %s: %s\n", a.i18nMgr.Get("file_location"), mdPath)
 
 	return nil
 }
@@ -543,17 +544,17 @@ func (a *App) handleConnect(args []string) error {
 	name := args[0]
 	config, err := a.configMgr.LoadConnection(name)
 	if err != nil {
-		return fmt.Errorf("failed to load connection '%s': %w", name, err)
+		return errors.New(a.i18nMgr.GetWithArgs("failed_to_load_connection", name, err))
 	}
 
 	fmt.Printf(a.i18nMgr.Get("connecting_to"), config.Name)
 	conn, err := core.NewConnection(config)
 	if err != nil {
-		return fmt.Errorf("failed to connect: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_connect"), err)
 	}
 
 	if err := conn.Ping(); err != nil {
-		return fmt.Errorf("connection test failed: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("connection_test_failed"), err)
 	}
 
 	if a.connection != nil {
@@ -567,19 +568,19 @@ func (a *App) handleConnect(args []string) error {
 }
 
 func (a *App) interactiveConnect() error {
-	fmt.Println("🔧 Interactive Connection Setup")
+	fmt.Println(a.i18nMgr.Get("interactive_connection_setup"))
 
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Print("📝 Enter connection name: ")
+	fmt.Print(a.i18nMgr.Get("enter_connection_name"))
 	name, _ := reader.ReadString('\n')
 	name = strings.TrimSpace(name)
 
-	fmt.Println("📊 Select database type:")
-	fmt.Println("  1. MySQL")
-	fmt.Println("  2. PostgreSQL")
-	fmt.Println("  3. SQLite")
-	fmt.Print("Enter choice (1-3): ")
+	fmt.Println(a.i18nMgr.Get("select_database_type"))
+	fmt.Println(a.i18nMgr.Get("mysql_option"))
+	fmt.Println(a.i18nMgr.Get("postgresql_option"))
+	fmt.Println(a.i18nMgr.Get("sqlite_option"))
+	fmt.Print(a.i18nMgr.Get("enter_choice"))
 
 	choice, _ := reader.ReadString('\n')
 	choice = strings.TrimSpace(choice)
@@ -593,7 +594,7 @@ func (a *App) interactiveConnect() error {
 	case "3":
 		dbType = core.SQLite
 	default:
-		return fmt.Errorf("invalid choice: %s", choice)
+		return fmt.Errorf(a.i18nMgr.Get("invalid_choice"), choice)
 	}
 
 	config := &core.ConnectionConfig{
@@ -602,7 +603,7 @@ func (a *App) interactiveConnect() error {
 	}
 
 	if dbType != core.SQLite {
-		fmt.Print("📝 Enter host [localhost]: ")
+		fmt.Print(a.i18nMgr.Get("enter_host"))
 		host, _ := reader.ReadString('\n')
 		host = strings.TrimSpace(host)
 		if host == "" {
@@ -610,7 +611,7 @@ func (a *App) interactiveConnect() error {
 		}
 		config.Host = host
 
-		fmt.Printf("📝 Enter port [%d]: ", core.GetDefaultPort(dbType))
+		fmt.Printf(a.i18nMgr.Get("enter_port"), core.GetDefaultPort(dbType))
 		portStr, _ := reader.ReadString('\n')
 		portStr = strings.TrimSpace(portStr)
 		if portStr == "" {
@@ -618,33 +619,33 @@ func (a *App) interactiveConnect() error {
 		} else {
 			port, err := strconv.Atoi(portStr)
 			if err != nil {
-				return fmt.Errorf("invalid port: %s", portStr)
+				return fmt.Errorf(a.i18nMgr.Get("invalid_port"), portStr)
 			}
 			config.Port = port
 		}
 
-		fmt.Print("📝 Enter username: ")
+		fmt.Print(a.i18nMgr.Get("enter_username"))
 		username, _ := reader.ReadString('\n')
 		config.Username = strings.TrimSpace(username)
 
-		fmt.Print("🔐 Enter password: ")
+		fmt.Print(a.i18nMgr.Get("enter_password"))
 		password, _ := reader.ReadString('\n')
 		config.Password = strings.TrimSpace(password)
 	}
 
-	fmt.Print("📝 Enter database name: ")
+	fmt.Print(a.i18nMgr.Get("enter_database_name"))
 	database, _ := reader.ReadString('\n')
 	config.Database = strings.TrimSpace(database)
 
 	// Test connection
-	fmt.Printf("Testing connection to %s...\n", config.Name)
+	fmt.Printf(a.i18nMgr.Get("testing_connection"), config.Name)
 	conn, err := core.NewConnection(config)
 	if err != nil {
-		return fmt.Errorf("failed to connect: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_connect"), err)
 	}
 
 	if err := conn.Ping(); err != nil {
-		return fmt.Errorf("connection test failed: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("connection_test_failed"), err)
 	}
 
 	if a.connection != nil {
@@ -667,15 +668,15 @@ func (a *App) interactiveConnect() error {
 func (a *App) handleListConnections() error {
 	connections, err := a.configMgr.ListConnections()
 	if err != nil {
-		return fmt.Errorf("failed to list connections: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_list_connections"), err)
 	}
 
 	if len(connections) == 0 {
-		fmt.Println("No saved connections found.")
+		fmt.Println(a.i18nMgr.Get("no_saved_connections_found"))
 		return nil
 	}
 
-	fmt.Println("📋 Saved connections:")
+	fmt.Println(a.i18nMgr.Get("saved_connections"))
 	for i, conn := range connections {
 		fmt.Printf("  %d. %s (%s) - %s://%s:%d/%s\n",
 			i+1,
@@ -692,21 +693,21 @@ func (a *App) handleListConnections() error {
 
 func (a *App) handleListTables() error {
 	if a.connection == nil {
-		fmt.Println("No database connection. Use /connect to connect to a database.")
+		fmt.Println(a.i18nMgr.Get("no_database_connection"))
 		return nil
 	}
 
 	tables, err := a.connection.ListTables()
 	if err != nil {
-		return fmt.Errorf("failed to list tables: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_list_tables"), err)
 	}
 
 	if len(tables) == 0 {
-		fmt.Printf("No tables found in database '%s'.\n", a.config.Database)
+		fmt.Printf(a.i18nMgr.Get("no_tables_found"), a.config.Database)
 		return nil
 	}
 
-	fmt.Printf("📋 Tables in %s:\n", a.config.Database)
+	fmt.Printf(a.i18nMgr.Get("tables_in_database"), a.config.Database)
 	for i, table := range tables {
 		fmt.Printf("  %d. %s\n", i+1, table)
 	}
@@ -716,19 +717,19 @@ func (a *App) handleListTables() error {
 
 func (a *App) handleDescribeTable(args []string) error {
 	if len(args) == 0 {
-		fmt.Println("Usage: /describe <table_name>")
+		fmt.Println(a.i18nMgr.Get("usage_describe_table"))
 		return nil
 	}
 
 	if a.connection == nil {
-		fmt.Println("No database connection. Use /connect to connect to a database.")
+		fmt.Println(a.i18nMgr.Get("no_database_connection"))
 		return nil
 	}
 
 	tableName := args[0]
 	tableInfo, err := a.connection.DescribeTable(tableName)
 	if err != nil {
-		return fmt.Errorf("failed to describe table: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_describe_table"), err)
 	}
 
 	// Generate markdown content
@@ -742,22 +743,22 @@ func (a *App) generateTableMarkdown(tableInfo *core.TableInfo) string {
 	var sb strings.Builder
 
 	// Title
-	sb.WriteString(fmt.Sprintf("# 📊 Table: %s\n\n", tableInfo.Name))
+	sb.WriteString(fmt.Sprintf("# 📊 %s: %s\n\n", a.i18nMgr.Get("table_header"), tableInfo.Name))
 
 	// Columns section
-	sb.WriteString("## 📋 Columns\n\n")
-	sb.WriteString("| Column | Type | Nullable | Key | Default |\n")
-	sb.WriteString("|--------|------|----------|-----|----------|\n")
+	sb.WriteString(fmt.Sprintf("## 📋 %s\n\n", a.i18nMgr.Get("columns_header")))
+	sb.WriteString(a.i18nMgr.Get("column_table_header"))
+	sb.WriteString(a.i18nMgr.Get("column_table_separator"))
 
 	for _, col := range tableInfo.Columns {
-		nullable := "❌ NOT NULL"
+		nullable := a.i18nMgr.Get("not_nullable")
 		if col.Nullable {
-			nullable = "✅ NULL"
+			nullable = a.i18nMgr.Get("nullable")
 		}
 
 		key := ""
 		if col.Key != "" {
-			key = fmt.Sprintf("🔑 %s", col.Key)
+			key = fmt.Sprintf(a.i18nMgr.Get("key_format"), col.Key)
 		}
 
 		defaultVal := ""
@@ -771,7 +772,7 @@ func (a *App) generateTableMarkdown(tableInfo *core.TableInfo) string {
 
 	// Primary keys section
 	if len(tableInfo.PrimaryKeys) > 0 {
-		sb.WriteString("\n## 🔑 Primary Keys\n\n")
+		sb.WriteString(fmt.Sprintf("\n## 🔑 %s\n\n", a.i18nMgr.Get("primary_keys_header")))
 		for _, pk := range tableInfo.PrimaryKeys {
 			sb.WriteString(fmt.Sprintf("- **%s**\n", pk))
 		}
@@ -779,12 +780,12 @@ func (a *App) generateTableMarkdown(tableInfo *core.TableInfo) string {
 
 	// Constraints section
 	if len(tableInfo.Constraints) > 0 {
-		sb.WriteString("\n## ⚠️ Constraints\n\n")
+		sb.WriteString(fmt.Sprintf("\n## ⚠️ %s\n\n", a.i18nMgr.Get("constraints_header")))
 		for _, constraint := range tableInfo.Constraints {
 			sb.WriteString(fmt.Sprintf("### %s (%s)\n", constraint.Name, constraint.Type))
-			sb.WriteString(fmt.Sprintf("- **Column:** %s\n", constraint.Column))
+			sb.WriteString(fmt.Sprintf("- **%s:** %s\n", a.i18nMgr.Get("column_header"), constraint.Column))
 			if constraint.Check != "" {
-				sb.WriteString(fmt.Sprintf("- **Check:** `%s`\n", constraint.Check))
+				sb.WriteString(fmt.Sprintf("- **%s:** `%s`\n", a.i18nMgr.Get("check_header"), constraint.Check))
 			}
 			sb.WriteString("\n")
 		}
@@ -792,10 +793,10 @@ func (a *App) generateTableMarkdown(tableInfo *core.TableInfo) string {
 
 	// Foreign keys section
 	if len(tableInfo.ForeignKeys) > 0 {
-		sb.WriteString("\n## 🔗 Foreign Keys\n\n")
+		sb.WriteString(fmt.Sprintf("\n## 🔗 %s\n\n", a.i18nMgr.Get("foreign_keys_header")))
 		for _, fk := range tableInfo.ForeignKeys {
 			sb.WriteString(fmt.Sprintf("### %s\n", fk.Name))
-			sb.WriteString(fmt.Sprintf("- **Column:** %s\n", fk.Column))
+			sb.WriteString(fmt.Sprintf("- **%s:** %s\n", a.i18nMgr.Get("column_header"), fk.Column))
 			sb.WriteString(fmt.Sprintf("- **References:** %s.%s\n", fk.ReferencedTable, fk.ReferencedColumn))
 			if fk.OnDelete != "" {
 				sb.WriteString(fmt.Sprintf("- **On Delete:** %s\n", fk.OnDelete))
@@ -818,17 +819,17 @@ func (a *App) displayMarkdown(markdown string) error {
 
 func (a *App) handleStatus() {
 	if a.connection == nil {
-		fmt.Println("📡 Status: Not connected")
-		fmt.Println("Use /connect to establish a database connection.")
+		fmt.Println(a.i18nMgr.Get("status_not_connected"))
+		fmt.Println(a.i18nMgr.Get("use_connect_to_establish_connection"))
 		return
 	}
 
-	fmt.Printf("📡 Status: Connected to %s\n", a.config.Name)
-	fmt.Printf("   Database: %s\n", a.config.Database)
-	fmt.Printf("   Type: %s\n", a.config.DatabaseType)
+	fmt.Printf(a.i18nMgr.Get("status_connected"), a.config.Name)
+	fmt.Printf(a.i18nMgr.Get("database_info"), a.config.Database)
+	fmt.Printf(a.i18nMgr.Get("type_info"), a.config.DatabaseType)
 	if a.config.DatabaseType != core.SQLite {
-		fmt.Printf("   Host: %s:%d\n", a.config.Host, a.config.Port)
-		fmt.Printf("   Username: %s\n", a.config.Username)
+		fmt.Printf(a.i18nMgr.Get("host_info"), a.config.Host, a.config.Port)
+		fmt.Printf(a.i18nMgr.Get("username_info"), a.config.Username)
 	}
 }
 
@@ -838,7 +839,7 @@ func (a *App) handleExecQuery(args []string) error {
 	}
 
 	if a.connection == nil {
-		fmt.Println("No database connection. Use /connect to connect to a database.")
+		fmt.Println(a.i18nMgr.Get("no_database_connection"))
 		return nil
 	}
 
@@ -862,21 +863,21 @@ func (a *App) handleExecQuery(args []string) error {
 	if err := a.sessionMgr.ViewMarkdown(mdPath); err != nil {
 		fmt.Printf("Warning: %v\n", err)
 	}
-	fmt.Printf("📍 File location: %s\n", mdPath)
+	fmt.Printf("📍 %s: %s\n", a.i18nMgr.Get("file_location"), mdPath)
 	return nil
 }
 
 func (a *App) handleMultilineExec() error {
 	if a.connection == nil {
-		fmt.Println("No database connection. Use /connect to connect to a database.")
+		fmt.Println(a.i18nMgr.Get("no_database_connection"))
 		return nil
 	}
 
-	fmt.Println("📝 Multi-line SQL mode. Enter your query:")
-	fmt.Println("   • Paste multiple lines")
-	fmt.Println("   • End with ; to execute")
-	fmt.Println("   • Or press Ctrl+C to cancel")
-	fmt.Println("   • Use > filename.csv at the end for CSV export")
+	fmt.Println(a.i18nMgr.Get("multi_line_sql_mode"))
+	fmt.Println(a.i18nMgr.Get("multi_line_sql_paste_lines"))
+	fmt.Println(a.i18nMgr.Get("multi_line_sql_end_with_semicolon"))
+	fmt.Println(a.i18nMgr.Get("multi_line_sql_cancel"))
+	fmt.Println(a.i18nMgr.Get("multi_line_sql_csv_export"))
 	fmt.Println()
 
 	var queryLines []string
@@ -894,7 +895,7 @@ func (a *App) handleMultilineExec() error {
 		line, err := a.rl.Readline()
 		if err != nil {
 			// User pressed Ctrl+C or EOF
-			fmt.Println("\n❌ Multi-line input cancelled.")
+			fmt.Println(a.i18nMgr.Get("multi_line_input_cancelled"))
 			a.updatePrompt() // Restore original prompt
 			return nil
 		}
@@ -924,7 +925,7 @@ func (a *App) handleMultilineExec() error {
 	a.updatePrompt()
 
 	if len(queryLines) == 0 {
-		fmt.Println("❌ No query entered.")
+		fmt.Println(a.i18nMgr.Get("no_query_entered"))
 		return nil
 	}
 
@@ -937,8 +938,8 @@ func (a *App) handleMultilineExec() error {
 		fmt.Printf("Warning: failed to save command to history: %v\n", err)
 	}
 
-	fmt.Printf("🔍 Executing query...\n")
-	fmt.Printf("📋 Query: %s\n\n", a.truncateQuery(fullQuery))
+	fmt.Print(a.i18nMgr.Get("executing_query"))
+	fmt.Printf(a.i18nMgr.Get("query_truncated"), a.truncateQuery(fullQuery))
 
 	// Check if it's a CSV export
 	if strings.Contains(fullQuery, " > ") {
@@ -960,29 +961,29 @@ func (a *App) handleMultilineExec() error {
 	if err := a.sessionMgr.ViewMarkdown(mdPath); err != nil {
 		fmt.Printf("Warning: %v\n", err)
 	}
-	fmt.Printf("📍 File location: %s\n", mdPath)
+	fmt.Printf("📍 %s: %s\n", a.i18nMgr.Get("file_location"), mdPath)
 	return nil
 }
 
 func (a *App) processQueryWithCSVExport(line string) error {
 	if a.connection == nil {
-		fmt.Println("No database connection. Use /connect to connect to a database.")
+		fmt.Println(a.i18nMgr.Get("no_database_connection"))
 		return nil
 	}
 
 	parts := strings.SplitN(line, " > ", 2)
 	if len(parts) != 2 {
-		return fmt.Errorf("invalid CSV export syntax. Use: query > filename.csv")
+		return errors.New(a.i18nMgr.Get("invalid_csv_export_syntax"))
 	}
 
 	query := strings.TrimSpace(parts[0])
 	filename := strings.TrimSpace(parts[1])
 
-	fmt.Printf("📊 Executing query and streaming to %s...\n", filename)
+	fmt.Printf(a.i18nMgr.Get("executing_query_streaming"), filename)
 
 	result, err := a.connection.Execute(query)
 	if err != nil {
-		return fmt.Errorf("query execution failed: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("query_execution_failed"), err)
 	}
 
 	rows, err := core.SaveQueryResultAsStreamingCSV(result, filename)
@@ -990,19 +991,19 @@ func (a *App) processQueryWithCSVExport(line string) error {
 		return fmt.Errorf("failed to save CSV: %w", err)
 	}
 
-	fmt.Printf("✅ Exported %d rows to %s\n", rows, filename)
+	fmt.Printf(a.i18nMgr.Get("exported_rows_to_file"), rows, filename)
 	return nil
 }
 
 func (a *App) processFileCommandWithCSVExport(line string) error {
 	if a.connection == nil {
-		fmt.Println("No database connection. Use /connect to connect to a database.")
+		fmt.Println(a.i18nMgr.Get("no_database_connection"))
 		return nil
 	}
 
 	parts := strings.SplitN(line, " > ", 2)
 	if len(parts) != 2 {
-		return fmt.Errorf("invalid CSV export syntax. Use: @filename.sql > output.csv")
+		return errors.New(a.i18nMgr.Get("invalid_csv_export_syntax_file"))
 	}
 
 	fileCmd := strings.TrimSpace(parts[0])
@@ -1040,7 +1041,7 @@ func (a *App) processFileCommandWithCSVExport(line string) error {
 
 func (a *App) executeFileWithCSVExport(filename string, queryRange []int, csvFilename string) error {
 	if a.connection == nil {
-		fmt.Println("No database connection. Use /connect to connect to a database.")
+		fmt.Println(a.i18nMgr.Get("no_database_connection"))
 		return nil
 	}
 
@@ -1051,23 +1052,23 @@ func (a *App) executeFileWithCSVExport(filename string, queryRange []int, csvFil
 	} else if _, err := os.Stat("queries/" + filename); err == nil {
 		filepath = "queries/" + filename
 	} else {
-		return fmt.Errorf("file not found: %s", filename)
+		return fmt.Errorf(a.i18nMgr.Get("file_not_found"), filename)
 	}
 
 	file, err := os.Open(filepath)
 	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_open_file"), err)
 	}
 	defer file.Close()
 
 	content, err := io.ReadAll(file)
 	if err != nil {
-		return fmt.Errorf("failed to read file: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_read_file"), err)
 	}
 
 	queries := a.parseQueries(string(content))
-	fmt.Printf("📁 Executing SQL file: %s\n", filename)
-	fmt.Printf("🔄 Found %d queries in file\n", len(queries))
+	fmt.Printf(a.i18nMgr.Get("executing_sql_file"), filename)
+	fmt.Printf(a.i18nMgr.Get("found_queries_in_file"), len(queries))
 
 	start, end := 1, len(queries)
 	if len(queryRange) == 2 {
@@ -1094,10 +1095,10 @@ func (a *App) executeFileWithCSVExport(filename string, queryRange []int, csvFil
 			continue
 		}
 
-		fmt.Printf("\n📝 Query %d: %s\n", i+1, a.truncateQuery(query))
+		fmt.Printf(a.i18nMgr.Get("query_number_truncated_query"), i+1, a.truncateQuery(query))
 		result, err := a.connection.Execute(query)
 		if err != nil {
-			fmt.Printf("❌ Query failed: %v\n", err)
+			fmt.Printf(a.i18nMgr.Get("query_failed"), err)
 			continue
 		}
 
@@ -1117,26 +1118,26 @@ func (a *App) executeFileWithCSVExport(filename string, queryRange []int, csvFil
 			fmt.Printf("❌ Failed to save CSV: %v\n", err)
 			continue
 		}
-		fmt.Printf("📊 Query executed (%d rows)\n", rows)
+		fmt.Printf(a.i18nMgr.Get("query_executed_rows"), rows)
 
 		exportedFiles = append(exportedFiles, outputPath)
 		totalRowsExported += rows
-		fmt.Printf("✅ Exported %d rows to %s\n", rows, outputPath)
+		fmt.Printf(a.i18nMgr.Get("exported_rows_to_file"), rows, outputPath)
 	}
 
 	// Summary of exported files
 	if len(exportedFiles) > 0 {
 		if len(exportedFiles) == 1 {
-			fmt.Printf("\n📁 Exported to: %s\n", exportedFiles[0])
+			fmt.Printf(a.i18nMgr.Get("exported_to_single_file"), exportedFiles[0])
 		} else {
-			fmt.Printf("\n📁 Exported to %d files:\n", len(exportedFiles))
+			fmt.Printf(a.i18nMgr.Get("exported_to_multiple_files"), len(exportedFiles))
 			for _, file := range exportedFiles {
 				fmt.Printf("   - %s\n", file)
 			}
 		}
-		fmt.Printf("📊 Total: %d rows exported\n", totalRowsExported)
+		fmt.Printf(a.i18nMgr.Get("total_rows_exported"), totalRowsExported)
 	} else {
-		fmt.Printf("⚠️  No results to export to CSV (all queries returned 0 rows)\n")
+		fmt.Println(a.i18nMgr.Get("no_results_to_export"))
 	}
 
 	return nil
@@ -1182,7 +1183,7 @@ func (a *App) processAIChat(message string) error {
 			fmt.Printf("💡 Try simplifying your message or try again later.\n")
 			return nil
 		}
-		return fmt.Errorf("AI chat failed: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("ai_chat_failed"), err)
 	}
 
 	// Format any SQL code blocks in the response
@@ -1210,7 +1211,19 @@ func (a *App) processAIChat(message string) error {
 	// Show AI status after response
 	if a.aiManager != nil && a.aiManager.IsConfigured() {
 		aiConfig := a.aiManager.GetConfig()
-		aiInfo := fmt.Sprintf("🤖 %s | %s", aiConfig.FormatProviderInfo(), aiConfig.FormatUsageStats())
+		// Get usage statistics from AI manager if available
+		usageInfo := "No usage data"
+		if a.aiManager.GetUsageStore() != nil {
+			if summary, err := a.aiManager.GetUsageStore().GetUsageSummary(); err == nil {
+				if todayStats, ok := summary["today"]; ok {
+					if today, ok := todayStats.(map[string]interface{}); ok {
+						usageInfo = fmt.Sprintf("Today: %d req, $%.4f", 
+							int(today["requests"].(int)), today["cost"].(float64))
+					}
+				}
+			}
+		}
+		aiInfo := fmt.Sprintf("🤖 %s | %s", aiConfig.FormatProviderInfo(), usageInfo)
 		fmt.Printf("%s\n", aiInfo)
 	}
 
@@ -1305,7 +1318,26 @@ func (a *App) handleAIConfigStatus() error {
 	fmt.Printf("🤖 AI Configuration:\n")
 	fmt.Printf("   Provider: %s\n", config.AI.Provider)
 	fmt.Printf("   Model: %s\n", config.AI.Model)
-	fmt.Printf("   Usage: %s\n", config.FormatUsageStats())
+	
+	// Show usage statistics from usage store if available
+	if a.aiManager.GetUsageStore() != nil {
+		if summary, err := a.aiManager.GetUsageStore().GetUsageSummary(); err == nil {
+			if todayStats, ok := summary["today"]; ok {
+				if today, ok := todayStats.(map[string]interface{}); ok {
+					fmt.Printf("   Today's Usage: %d requests, $%.6f\n", 
+						int(today["requests"].(int)), today["cost"].(float64))
+				}
+			}
+			if weekStats, ok := summary["last_7_days"]; ok {
+				if week, ok := weekStats.(map[string]interface{}); ok {
+					fmt.Printf("   Last 7 Days: %d requests, $%.6f\n", 
+						int(week["requests"].(int)), week["cost"].(float64))
+				}
+			}
+		}
+	} else {
+		fmt.Printf("   Usage: Not available (no database connection)\n")
+	}
 
 	// Show API key status (masked)
 	for provider, key := range config.AI.APIKeys {
@@ -1332,15 +1364,15 @@ func (a *App) handleAIConfigProvider(args []string) error {
 	}
 
 	if a.aiManager == nil {
-		return fmt.Errorf("AI manager not initialized")
+		return errors.New(a.i18nMgr.Get("ai_manager_not_initialized"))
 	}
 
-	provider := ai.Provider(args[0])
+	provider := config.Provider(args[0])
 	config := a.aiManager.GetConfig()
 	defaultModel := config.GetDefaultModel(provider)
 
 	if err := a.aiManager.SetProvider(provider, defaultModel); err != nil {
-		return fmt.Errorf("failed to set provider: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_set_provider"), err)
 	}
 
 	fmt.Printf("✅ Set AI provider to %s with model %s\n", provider, defaultModel)
@@ -1356,14 +1388,14 @@ func (a *App) handleAIConfigModel(args []string) error {
 	}
 
 	if a.aiManager == nil {
-		return fmt.Errorf("AI manager not initialized")
+		return errors.New(a.i18nMgr.Get("ai_manager_not_initialized"))
 	}
 
 	model := args[0]
 	config := a.aiManager.GetConfig()
 
 	if err := a.aiManager.SetProvider(config.AI.Provider, model); err != nil {
-		return fmt.Errorf("failed to set model: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_set_model"), err)
 	}
 
 	fmt.Printf("✅ Set AI model to %s\n", model)
@@ -1379,14 +1411,14 @@ func (a *App) handleAIConfigAPIKey(args []string) error {
 	}
 
 	if a.aiManager == nil {
-		return fmt.Errorf("AI manager not initialized")
+		return errors.New(a.i18nMgr.Get("ai_manager_not_initialized"))
 	}
 
-	provider := ai.Provider(args[0])
+	provider := config.Provider(args[0])
 	apiKey := args[1]
 
 	if err := a.aiManager.SetAPIKey(provider, apiKey); err != nil {
-		return fmt.Errorf("failed to set API key: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_set_api_key"), err)
 	}
 
 	fmt.Printf("✅ Set API key for %s\n", provider)
@@ -1401,14 +1433,14 @@ func (a *App) handleAIConfigBaseURL(args []string) error {
 	}
 
 	if a.aiManager == nil {
-		return fmt.Errorf("AI manager not initialized")
+		return errors.New(a.i18nMgr.Get("ai_manager_not_initialized"))
 	}
 
-	provider := ai.Provider(args[0])
+	provider := config.Provider(args[0])
 	baseURL := args[1]
 
 	if err := a.aiManager.SetBaseURL(provider, baseURL); err != nil {
-		return fmt.Errorf("failed to set base URL: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_set_base_url"), err)
 	}
 
 	fmt.Printf("✅ Set base URL for %s to %s\n", provider, baseURL)
@@ -1418,7 +1450,7 @@ func (a *App) handleAIConfigBaseURL(args []string) error {
 
 func (a *App) handleConfigLanguage(args []string) error {
 	if a.aiManager == nil {
-		return fmt.Errorf("AI manager not initialized")
+		return errors.New(a.i18nMgr.Get("ai_manager_not_initialized"))
 	}
 
 	if len(args) == 0 {
@@ -1436,22 +1468,15 @@ func (a *App) handleConfigLanguage(args []string) error {
 
 	// Check if language is available
 	availableLanguages := a.i18nMgr.GetAvailableLanguages()
-	isAvailable := false
-	for _, lang := range availableLanguages {
-		if lang == newLanguage {
-			isAvailable = true
-			break
-		}
-	}
+	isAvailable := slices.Contains(availableLanguages, newLanguage)
 
 	if !isAvailable {
-		return fmt.Errorf("language '%s' is not available. Available languages: %s",
-			newLanguage, strings.Join(availableLanguages, ", "))
+		return errors.New(a.i18nMgr.GetWithArgs("language_not_available", newLanguage, strings.Join(availableLanguages, ", ")))
 	}
 
 	// Update language in AI config
 	if err := a.aiManager.SetLanguage(newLanguage); err != nil {
-		return fmt.Errorf("failed to update language: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_update_language"), err)
 	}
 
 	// Update i18n manager
@@ -1469,7 +1494,7 @@ func (a *App) handleConfigLanguage(args []string) error {
 
 func (a *App) handleConfigAIOpenRouter(args []string) error {
 	if a.aiManager == nil {
-		return fmt.Errorf("AI manager not initialized")
+		return errors.New(a.i18nMgr.Get("ai_manager_not_initialized"))
 	}
 
 	if len(args) == 0 {
@@ -1482,23 +1507,23 @@ func (a *App) handleConfigAIOpenRouter(args []string) error {
 	switch subcmd {
 	case "key":
 		if len(args) < 2 {
-			return fmt.Errorf("API key required")
+			return errors.New(a.i18nMgr.Get("api_key_required"))
 		}
 		apiKey := args[1]
 
 		// Set the API key
-		config := a.aiManager.GetConfig()
-		config.SetAPIKey(ai.ProviderOpenRouter, apiKey)
+		aiConfig := a.aiManager.GetConfig()
+		aiConfig.SetAPIKey(config.ProviderOpenRouter, apiKey)
 
 		// Save configuration
-		if err := a.aiManager.SetProvider(ai.ProviderOpenRouter, config.AI.Model); err != nil {
-			return fmt.Errorf("failed to save configuration: %w", err)
+		if err := a.aiManager.SetProvider(config.ProviderOpenRouter, aiConfig.AI.Model); err != nil {
+			return fmt.Errorf(a.i18nMgr.Get("failed_to_save_configuration"), err)
 		}
 
 		fmt.Printf("✅ OpenRouter API key updated\n")
 		return nil
 	default:
-		return fmt.Errorf("unknown OpenRouter subcommand: %s", subcmd)
+		return fmt.Errorf(a.i18nMgr.Get("unknown_openrouter_subcommand"), subcmd)
 	}
 }
 
@@ -1527,7 +1552,7 @@ Examples:
 
 func (a *App) handleAIConfigListModels() error {
 	if a.aiManager == nil {
-		return fmt.Errorf("AI manager not initialized")
+		return errors.New(a.i18nMgr.Get("ai_manager_not_initialized"))
 	}
 
 	fmt.Printf("🔍 Fetching available models...\n")
@@ -1535,7 +1560,7 @@ func (a *App) handleAIConfigListModels() error {
 	ctx := context.Background()
 	models, err := a.aiManager.ListModels(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to list models: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_list_models"), err)
 	}
 
 	if len(models) == 0 {
@@ -1571,20 +1596,20 @@ func (a *App) interactiveAIConfig() error {
 	a.rl.SetPrompt("Enter choice (1-3): ")
 	choice, err := a.rl.Readline()
 	if err != nil {
-		return fmt.Errorf("failed to read input: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_read_input"), err)
 	}
 	choice = strings.TrimSpace(choice)
 
-	var selectedProvider ai.Provider
+	var selectedProvider config.Provider
 	switch choice {
 	case "1":
-		selectedProvider = ai.ProviderOpenRouter
+		selectedProvider = config.ProviderOpenRouter
 	case "2":
-		selectedProvider = ai.ProviderOllama
+		selectedProvider = config.ProviderOllama
 	case "3":
-		selectedProvider = ai.ProviderLMStudio
+		selectedProvider = config.ProviderLMStudio
 	default:
-		return fmt.Errorf("invalid choice: %s", choice)
+		return fmt.Errorf(a.i18nMgr.Get("invalid_choice"), choice)
 	}
 
 	fmt.Printf("✅ Selected provider: %s\n", selectedProvider)
@@ -1593,7 +1618,7 @@ func (a *App) interactiveAIConfig() error {
 	var needsAPIKey bool
 	var apiKey string
 
-	if selectedProvider == ai.ProviderOpenRouter {
+	if selectedProvider == config.ProviderOpenRouter {
 		needsAPIKey = true
 
 		// Check if API key already exists
@@ -1612,7 +1637,7 @@ func (a *App) interactiveAIConfig() error {
 			a.rl.SetPrompt("\n🔐 Enter OpenRouter API key (get one from https://openrouter.ai/keys): ")
 			apiKey, err = a.rl.Readline()
 			if err != nil {
-				return fmt.Errorf("failed to read API key: %w", err)
+				return fmt.Errorf(a.i18nMgr.Get("failed_to_read_api_key"), err)
 			}
 			apiKey = strings.TrimSpace(apiKey)
 
@@ -1624,9 +1649,9 @@ func (a *App) interactiveAIConfig() error {
 
 	// Step 3: Base URL Setup (for local providers)
 	var baseURL string
-	if selectedProvider == ai.ProviderOllama || selectedProvider == ai.ProviderLMStudio {
+	if selectedProvider == config.ProviderOllama || selectedProvider == config.ProviderLMStudio {
 		var defaultURL string
-		if selectedProvider == ai.ProviderOllama {
+		if selectedProvider == config.ProviderOllama {
 			defaultURL = "http://localhost:11434"
 		} else {
 			defaultURL = "http://localhost:1234"
@@ -1635,7 +1660,7 @@ func (a *App) interactiveAIConfig() error {
 		a.rl.SetPrompt(fmt.Sprintf("\n🌐 Enter base URL for %s [%s]: ", selectedProvider, defaultURL))
 		baseURL, err = a.rl.Readline()
 		if err != nil {
-			return fmt.Errorf("failed to read base URL: %w", err)
+			return fmt.Errorf(a.i18nMgr.Get("failed_to_read_base_url"), err)
 		}
 		baseURL = strings.TrimSpace(baseURL)
 		if baseURL == "" {
@@ -1648,14 +1673,14 @@ func (a *App) interactiveAIConfig() error {
 		var err error
 		a.aiManager, err = ai.NewManager(a.configMgr.GetConfigDir())
 		if err != nil {
-			return fmt.Errorf("failed to initialize AI manager: %w", err)
+			return fmt.Errorf(a.i18nMgr.Get("failed_to_initialize_ai_manager"), err)
 		}
 	}
 
 	// Set API key if needed
 	if apiKey != "" {
 		if err := a.aiManager.SetAPIKey(selectedProvider, apiKey); err != nil {
-			return fmt.Errorf("failed to set API key: %w", err)
+			return fmt.Errorf(a.i18nMgr.Get("failed_to_set_api_key"), err)
 		}
 		fmt.Printf("✅ API key configured for %s\n", selectedProvider)
 	}
@@ -1663,7 +1688,7 @@ func (a *App) interactiveAIConfig() error {
 	// Set base URL if needed
 	if baseURL != "" {
 		if err := a.aiManager.SetBaseURL(selectedProvider, baseURL); err != nil {
-			return fmt.Errorf("failed to set base URL: %w", err)
+			return fmt.Errorf(a.i18nMgr.Get("failed_to_set_base_url"), err)
 		}
 		fmt.Printf("✅ Base URL set to %s\n", baseURL)
 	}
@@ -1675,7 +1700,7 @@ func (a *App) interactiveAIConfig() error {
 	tempConfig := a.aiManager.GetConfig()
 
 	if err := a.aiManager.SetProvider(selectedProvider, tempConfig.GetDefaultModel(selectedProvider)); err != nil {
-		return fmt.Errorf("failed to set temporary provider: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_set_temporary_provider"), err)
 	}
 
 	ctx := context.Background()
@@ -1687,7 +1712,7 @@ func (a *App) interactiveAIConfig() error {
 
 		defaultModel := tempConfig.GetDefaultModel(selectedProvider)
 		if err := a.aiManager.SetProvider(selectedProvider, defaultModel); err != nil {
-			return fmt.Errorf("failed to set default model: %w", err)
+			return fmt.Errorf(a.i18nMgr.Get("failed_to_set_default_model"), err)
 		}
 
 		fmt.Printf("✅ AI configured with %s using model %s\n", selectedProvider, defaultModel)
@@ -1699,7 +1724,7 @@ func (a *App) interactiveAIConfig() error {
 		fmt.Printf("⚠️  No models available for %s\n", selectedProvider)
 		defaultModel := tempConfig.GetDefaultModel(selectedProvider)
 		if err := a.aiManager.SetProvider(selectedProvider, defaultModel); err != nil {
-			return fmt.Errorf("failed to set default model: %w", err)
+			return fmt.Errorf(a.i18nMgr.Get("failed_to_set_default_model"), err)
 		}
 		fmt.Printf("✅ Using default model: %s\n", defaultModel)
 		a.updatePrompt()
@@ -1710,7 +1735,7 @@ func (a *App) interactiveAIConfig() error {
 	fmt.Printf("\n🎯 Found %d available models for %s\n", len(models), selectedProvider)
 
 	// Show a few popular examples to help users
-	if selectedProvider == ai.ProviderOpenRouter && len(models) > 3 {
+	if selectedProvider == config.ProviderOpenRouter && len(models) > 3 {
 		fmt.Println("💡 Popular models:")
 		count := 0
 		for _, model := range models {
@@ -1771,7 +1796,7 @@ func (a *App) interactiveAIConfig() error {
 		if err != nil {
 			// Restore original autocompleter before returning
 			a.rl.Config.AutoComplete = originalCompleter
-			return fmt.Errorf("failed to read model choice: %w", err)
+			return fmt.Errorf(a.i18nMgr.Get("failed_to_read_model_choice"), err)
 		}
 		modelChoice = strings.TrimSpace(modelChoice)
 
@@ -1824,12 +1849,12 @@ func (a *App) interactiveAIConfig() error {
 
 	// Step 6: Final Configuration
 	if err := a.aiManager.SetProvider(selectedProvider, selectedModel.ID); err != nil {
-		return fmt.Errorf("failed to set final configuration: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_set_final_configuration"), err)
 	}
 
 	// Ensure the client is properly configured
 	if err := a.aiManager.EnsureConfigured(); err != nil {
-		return fmt.Errorf("failed to initialize AI client: %w", err)
+		return fmt.Errorf(a.i18nMgr.Get("failed_to_initialize_ai_client"), err)
 	}
 
 	fmt.Printf("\n🎉 AI Configuration Complete!\n")
@@ -1839,7 +1864,7 @@ func (a *App) interactiveAIConfig() error {
 		fmt.Printf("   Description: %s\n", selectedModel.Description)
 	}
 
-	if selectedProvider == ai.ProviderOpenRouter && selectedModel.Pricing != nil {
+	if selectedProvider == config.ProviderOpenRouter && selectedModel.Pricing != nil {
 		inputCost := ai.FormatPrice(selectedModel.Pricing.InputCostPerToken * 1000000)
 		outputCost := ai.FormatPrice(selectedModel.Pricing.OutputCostPerToken * 1000000)
 		fmt.Printf("   Pricing: %s input / %s output (per 1M tokens)\n", inputCost, outputCost)
