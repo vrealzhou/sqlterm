@@ -494,7 +494,7 @@ Available commands:
 /exec                    Enter multi-line SQL mode (end with ;)
 /exec [query] > file.csv Export query results to CSV
 /ai-config               Configure AI providers and models
-/show-prompts [count]    Show recent AI prompt history (default: all)
+/show-prompts [count]    Show full conversation history and AI prompts
 /clear-conversation      Clear current AI conversation and start fresh
 /quit, /exit             Exit SQLTerm
 
@@ -1734,11 +1734,62 @@ func (a *App) handleShowPrompts(args []string) error {
 		return nil
 	}
 
+	// Show current conversation first if it exists
+	conversation := a.aiManager.GetCurrentConversation()
+	if conversation != nil {
+		fmt.Printf("📊 Current Conversation (ID: %s)\n", conversation.ID)
+		fmt.Printf("Original Query: %s\n", conversation.OriginalQuery)
+		fmt.Printf("Phase: %s | Tables loaded: %d | Complete: %v\n\n", 
+			conversation.CurrentPhase.String(), len(conversation.LoadedTables), conversation.IsComplete)
+
+		if len(conversation.ConversationHistory) > 0 {
+			fmt.Printf("🔄 Conversation Turns (%d total):\n\n", len(conversation.ConversationHistory))
+			
+			for i, turn := range conversation.ConversationHistory {
+				fmt.Printf("### Turn %d - %s (Phase: %s)\n", i+1, 
+					turn.Timestamp.Format("15:04:05"), turn.Phase.String())
+				
+				// Create markdown for this turn
+				var markdown strings.Builder
+				markdown.WriteString(fmt.Sprintf("**User Message:**\n```\n%s\n```\n\n", turn.UserMessage))
+				markdown.WriteString(fmt.Sprintf("**System Prompt:**\n```\n%s\n```\n\n", turn.SystemPrompt))
+				markdown.WriteString(fmt.Sprintf("**AI Response:**\n%s\n\n", turn.AIResponse))
+				
+				if len(turn.RequestedInfo) > 0 {
+					markdown.WriteString(fmt.Sprintf("**Requested Info:** %v\n\n", turn.RequestedInfo))
+				}
+				
+				// Display using markdown renderer
+				formattedMarkdown := core.FormatSQLInMarkdown(markdown.String())
+				renderer := core.NewMarkdownRenderer()
+				if err := renderer.RenderAndDisplay(formattedMarkdown); err != nil {
+					// Fallback to plain text
+					fmt.Printf("User: %s\n", turn.UserMessage)
+					fmt.Printf("AI: %s\n", turn.AIResponse)
+					if len(turn.RequestedInfo) > 0 {
+						fmt.Printf("Requested: %v\n", turn.RequestedInfo)
+					}
+				}
+				
+				if i < len(conversation.ConversationHistory)-1 {
+					fmt.Println(strings.Repeat("-", 50))
+				}
+				fmt.Println()
+			}
+		}
+		
+		fmt.Println(strings.Repeat("=", 70))
+		fmt.Println()
+	}
+
+	// Then show general prompt history
 	history := a.aiManager.GetPromptHistory()
 	
 	if len(history) == 0 {
-		fmt.Println("📝 No AI prompt history found.")
-		fmt.Println("Start chatting with AI (type messages without / or @ prefixes) to see history here.")
+		if conversation == nil {
+			fmt.Println("📝 No AI prompt history found.")
+			fmt.Println("Start chatting with AI (type messages without / or @ prefixes) to see history here.")
+		}
 		return nil
 	}
 
@@ -1758,7 +1809,7 @@ func (a *App) handleShowPrompts(args []string) error {
 		startIdx = 0
 	}
 
-	fmt.Printf("📝 Showing last %d AI prompt(s):\n\n", count)
+	fmt.Printf("📝 Showing last %d general AI prompt(s):\n\n", count)
 
 	for i := startIdx; i < len(history); i++ {
 		entry := history[i]

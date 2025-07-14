@@ -804,23 +804,35 @@ func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, 
 	// Add to prompt history
 	m.addToPromptHistory(userMessage, systemPrompt, response.Usage.PromptTokens, response.Usage.CompletionTokens, cost)
 
-	// If schemas were loaded and phase advanced, automatically continue with schema analysis
-	if len(requestedInfo) > 0 && m.conversationCtx.CurrentPhase != initialPhase && 
-	   m.conversationCtx.CurrentPhase == PhaseSchemaAnalysis {
-		fmt.Printf("📋 Schemas loaded for %v. Analyzing...\n", requestedInfo)
-		
-		// Generate follow-up message for schema analysis
-		followUpMessage := "Please analyze the provided table schemas and generate the SQL query for my original request."
-		
-		// Make follow-up call with schema information
-		followUpResponse, err := m.ChatWithConversation(ctx, followUpMessage, allTables)
-		if err != nil {
-			fmt.Printf("Warning: failed to continue conversation with schemas: %v\n", err)
-			return aiResponse, nil // Return original response if follow-up fails
+	// If schemas were loaded, automatically continue the conversation
+	if len(requestedInfo) > 0 {
+		// Discovery phase: advance to schema analysis
+		if m.conversationCtx.CurrentPhase != initialPhase && m.conversationCtx.CurrentPhase == PhaseSchemaAnalysis {
+			fmt.Printf("📋 Schemas loaded for %v. Analyzing...\n", requestedInfo)
+			followUpMessage := "Please analyze the provided table schemas and generate the SQL query for my original request."
+			
+			// Make follow-up call with schema information
+			followUpResponse, err := m.ChatWithConversation(ctx, followUpMessage, allTables)
+			if err != nil {
+				fmt.Printf("Warning: failed to continue conversation with schemas: %v\n", err)
+				return aiResponse, nil
+			}
+			return followUpResponse, nil
 		}
 		
-		// Return the follow-up response instead of the schema request
-		return followUpResponse, nil
+		// Schema analysis phase: continue with additional schema requests
+		if m.conversationCtx.CurrentPhase == PhaseSchemaAnalysis {
+			fmt.Printf("📋 Additional schemas loaded for %v. Continuing analysis...\n", requestedInfo)
+			followUpMessage := "Please continue your analysis with the newly provided table schemas."
+			
+			// Make follow-up call with additional schema information
+			followUpResponse, err := m.ChatWithConversation(ctx, followUpMessage, allTables)
+			if err != nil {
+				fmt.Printf("Warning: failed to continue conversation with additional schemas: %v\n", err)
+				return aiResponse, nil
+			}
+			return followUpResponse, nil
+		}
 	}
 
 	return aiResponse, nil
