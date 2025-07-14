@@ -150,9 +150,10 @@ func (m *Manager) Chat(ctx context.Context, message string, systemPrompt string)
 	}
 
 	// Add to prompt history
-	m.addToPromptHistory(message, systemPrompt, response.Usage.PromptTokens, response.Usage.CompletionTokens, cost)
+	aiResponse := response.Choices[0].Message.Content
+	m.addToPromptHistory(message, systemPrompt, aiResponse, response.Usage.PromptTokens, response.Usage.CompletionTokens, cost)
 
-	return response.Choices[0].Message.Content, nil
+	return aiResponse, nil
 }
 
 // calculateCost calculates the cost based on token usage and current model
@@ -309,11 +310,12 @@ func ParseFloat(s string) (float64, error) {
 }
 
 // addToPromptHistory adds a prompt entry to the history
-func (m *Manager) addToPromptHistory(userMessage, systemPrompt string, inputTokens, outputTokens int, cost float64) {
+func (m *Manager) addToPromptHistory(userMessage, systemPrompt, aiResponse string, inputTokens, outputTokens int, cost float64) {
 	entry := PromptEntry{
 		Timestamp:    time.Now(),
 		UserMessage:  userMessage,
 		SystemPrompt: systemPrompt,
+		AIResponse:   aiResponse,
 		Provider:     m.config.Provider,
 		Model:        m.config.Model,
 		InputTokens:  inputTokens,
@@ -802,7 +804,7 @@ func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, 
 	}
 
 	// Add to prompt history
-	m.addToPromptHistory(userMessage, systemPrompt, response.Usage.PromptTokens, response.Usage.CompletionTokens, cost)
+	m.addToPromptHistory(userMessage, systemPrompt, aiResponse, response.Usage.PromptTokens, response.Usage.CompletionTokens, cost)
 
 	// If schemas were loaded, automatically continue the conversation
 	if len(requestedInfo) > 0 {

@@ -92,6 +92,7 @@ type PromptEntry struct {
 	Timestamp     time.Time `json:"timestamp"`
 	UserMessage   string    `json:"user_message"`
 	SystemPrompt  string    `json:"system_prompt"`
+	AIResponse    string    `json:"ai_response"`
 	Provider      Provider  `json:"provider"`
 	Model         string    `json:"model"`
 	InputTokens   int       `json:"input_tokens"`

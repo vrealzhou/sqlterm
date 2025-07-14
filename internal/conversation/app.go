@@ -1789,62 +1789,12 @@ func (a *App) handleShowPrompts(args []string) error {
 		}
 	}
 
-	// Show current conversation first if it exists
-	conversation := a.aiManager.GetCurrentConversation()
-	if conversation != nil {
-		writeOutput(fmt.Sprintf("## Current Conversation (ID: %s)\n\n", conversation.ID))
-		writeOutput(fmt.Sprintf("**Original Query:** %s\n\n", conversation.OriginalQuery))
-		writeOutput(fmt.Sprintf("**Status:** Phase: %s | Tables loaded: %d | Complete: %v\n\n", 
-			conversation.CurrentPhase.String(), len(conversation.LoadedTables), conversation.IsComplete))
-
-		if len(conversation.LoadedTables) > 0 {
-			writeOutput("**Loaded Tables:**\n")
-			for tableName := range conversation.LoadedTables {
-				writeOutput(fmt.Sprintf("- %s\n", tableName))
-			}
-			writeOutput("\n")
-		}
-
-		if len(conversation.ConversationHistory) > 0 {
-			writeOutput(fmt.Sprintf("## Conversation Turns (%d total)\n\n", len(conversation.ConversationHistory)))
-			
-			for i, turn := range conversation.ConversationHistory {
-				writeOutput(fmt.Sprintf("### Turn %d - %s (Phase: %s)\n\n", i+1, 
-					turn.Timestamp.Format("15:04:05"), turn.Phase.String()))
-				
-				writeOutput("**User Message:**\n```\n")
-				writeOutput(turn.UserMessage)
-				writeOutput("\n```\n\n")
-				
-				writeOutput("**System Prompt:**\n```\n")
-				writeOutput(turn.SystemPrompt)
-				writeOutput("\n```\n\n")
-				
-				writeOutput("**AI Response:**\n")
-				writeOutput(turn.AIResponse)
-				writeOutput("\n\n")
-				
-				if len(turn.RequestedInfo) > 0 {
-					writeOutput(fmt.Sprintf("**Requested Info:** %v\n\n", turn.RequestedInfo))
-				}
-				
-				if i < len(conversation.ConversationHistory)-1 {
-					writeOutput("---\n\n")
-				}
-			}
-		}
-		
-		writeOutput(strings.Repeat("=", 70) + "\n\n")
-	}
-
-	// Then show general prompt history
+	// Get AI conversation history from prompt history
 	history := a.aiManager.GetPromptHistory()
 	
 	if len(history) == 0 {
-		if conversation == nil {
-			writeOutput("📝 No AI prompt history found.\n")
-			writeOutput("Start chatting with AI (type messages without / or @ prefixes) to see history here.\n")
-		}
+		writeOutput("📝 No AI conversation history found.\n")
+		writeOutput("Start chatting with AI (type messages without / or @ prefixes) to see history here.\n")
 		if writer != nil {
 			writer.Close()
 			if mdPath != "" {
@@ -1864,13 +1814,13 @@ func (a *App) handleShowPrompts(args []string) error {
 		}
 	}
 
-	// Show the last N prompts
+	// Show the last N conversations
 	startIdx := len(history) - count
 	if startIdx < 0 {
 		startIdx = 0
 	}
 
-	writeOutput(fmt.Sprintf("## General AI Prompt History (last %d)\n\n", count))
+	writeOutput(fmt.Sprintf("# AI Conversation History (last %d)\n\n", count))
 
 	for i := startIdx; i < len(history); i++ {
 		entry := history[i]
@@ -1878,24 +1828,30 @@ func (a *App) handleShowPrompts(args []string) error {
 		// Format timestamp
 		timeStr := entry.Timestamp.Format("2006-01-02 15:04:05")
 		
-		writeOutput(fmt.Sprintf("### Prompt #%d - %s\n\n", i+1, timeStr))
-		writeOutput(fmt.Sprintf("**Provider:** %s | **Model:** %s\n\n", entry.Provider, entry.Model))
+		writeOutput(fmt.Sprintf("## Request #%d - %s\n\n", i+1, timeStr))
+		
+		// Provider, model, tokens, cost info
+		writeOutput(fmt.Sprintf("**Provider:** %s | **Model:** %s | **Tokens:** %d in, %d out", 
+			entry.Provider, entry.Model, entry.InputTokens, entry.OutputTokens))
 		
 		if entry.Cost > 0 {
-			writeOutput(fmt.Sprintf("**Tokens:** %d input, %d output | **Cost:** %s\n\n", 
-				entry.InputTokens, entry.OutputTokens, ai.FormatPrice(entry.Cost)))
+			writeOutput(fmt.Sprintf(" | **Cost:** $%.6f", entry.Cost))
 		} else {
-			writeOutput(fmt.Sprintf("**Tokens:** %d input, %d output | **Cost:** Free\n\n", 
-				entry.InputTokens, entry.OutputTokens))
+			writeOutput(" | **Cost:** Free")
 		}
+		writeOutput("\n\n")
 		
-		writeOutput("**System Prompt:**\n```\n")
-		writeOutput(entry.SystemPrompt)
-		writeOutput("\n```\n\n")
-		
-		writeOutput("**User Message:**\n```\n")
+		writeOutput("### 🧑‍💻 User Request\n```\n")
 		writeOutput(entry.UserMessage)
 		writeOutput("\n```\n\n")
+		
+		writeOutput("### 🤖 AI Response\n")
+		if entry.AIResponse != "" {
+			writeOutput(entry.AIResponse)
+		} else {
+			writeOutput("*AI response not available in this entry*")
+		}
+		writeOutput("\n\n")
 		
 		if i < len(history)-1 {
 			writeOutput("---\n\n")
