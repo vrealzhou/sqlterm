@@ -4,6 +4,9 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
+# Note: i18n files in internal/i18n/*.json are automatically embedded
+# into the binary using Go's embed system (//go:embed directive)
+
 # Build the application for current platform
 build:
 	go build -ldflags="$(LDFLAGS)" -o ./bin/sqlterm ./cmd/sqlterm
