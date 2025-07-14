@@ -148,6 +148,10 @@
     {
       "id": "unknown_command",
       "text": "未知命令：%s。输入 /help 查看可用命令。\n"
+    },
+    {
+      "id": "help_full",
+      "text": "\n可用命令：\n\n/help                    显示此帮助信息\n/connect                 交互式连接设置\n/connect [名称]          连接到已保存的连接（Tab：自动补全名称）\n/list-connections        列出所有已保存的连接\n/tables                  列出当前数据库中的表\n/describe [表名]         显示表结构（Tab：自动补全表名）\n/status                  显示当前连接状态\n/exec [查询]             直接执行查询\n/exec                    进入多行 SQL 模式（以 ; 结束）\n/exec [查询] > 文件.csv  将查询结果导出到 CSV\n/ai-config               配置 AI 提供商和模型\n/last-ai-call [数量]     显示 AI 对话历史及请求/响应详情\n/clear-conversation      清除当前 AI 对话并重新开始\n/quit, /exit             退出 SQLTerm\n\nAI 聊天：\n直接输入不带 / 或 @ 前缀的消息与 AI 聊天。\nAI 使用多轮对话逐步收集表信息。\n使用 /clear-conversation 重新开始或 /ai-config 设置提供商。\n\n文件命令：\n@文件名.sql              执行文件中的所有查询（Tab：自动补全文件）\n@文件名.sql 1            仅执行查询 1\n@文件名.sql 2-5          执行查询 2 到 5\n\nCSV 导出：\nSELECT * FROM table > output.csv    将查询结果导出到 CSV（Tab：自动补全文件名）\n/exec SELECT * FROM table > out.csv 使用 /exec 命令导出\n\nSQL 查询：\n直接输入任何 SQL 查询以执行它。\n结果会自动保存为 markdown 并使用 glamour 显示。\n\n自动补全：\n- 在 /connect 后按 Tab 查看连接名称\n- 在 /describe 后按 Tab 查看表名\n- 在 /ai-config 后按 Tab 查看 AI 子命令和模型\n- 在 @ 后按 Tab 查看 .sql 文件（搜索所有子目录）\n- 在 > 后按 Tab 查看/创建 .csv 文件\n- 排除隐藏文件夹（以 . 开头）和常见构建目录\n\n会话管理：\n- 结果自动保存到 ~/.config/sqlterm/sessions/{连接}/results/\n- 旧结果文件根据保留设置自动清理\n- 在 ~/.config/sqlterm/sessions/{连接}/session.yaml 中配置清理\n- 默认保留期：30 天（cleanup_retention_days: 30）"
     }
   ]
 }

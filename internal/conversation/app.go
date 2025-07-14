@@ -531,55 +531,7 @@ func (a *App) truncateQuery(query string) string {
 }
 
 func (a *App) printHelp() {
-	fmt.Println(`
-Available commands:
-
-/help                    Show this help message
-/connect                 Interactive connection setup
-/connect [name]          Connect to saved connection (Tab: autocomplete names)
-/list-connections        List all saved connections
-/tables                  List tables in current database
-/describe [table]        Show table structure (Tab: autocomplete table names)
-/status                  Show current connection status
-/exec [query]            Execute a query directly
-/exec                    Enter multi-line SQL mode (end with ;)
-/exec [query] > file.csv Export query results to CSV
-/ai-config               Configure AI providers and models
-/last-ai-call [count]    Show AI conversation history with request/response details
-/clear-conversation      Clear current AI conversation and start fresh
-/quit, /exit             Exit SQLTerm
-
-AI Chat:
-Enter any message without / or @ prefix to chat with AI.
-AI uses multi-turn conversations to progressively gather table information.
-Use /clear-conversation to start fresh or /ai-config to set up providers.
-
-File commands:
-@filename.sql            Execute all queries in file (Tab: autocomplete files)
-@filename.sql 1          Execute only query 1
-@filename.sql 2-5        Execute queries 2 through 5
-
-CSV Export:
-SELECT * FROM table > output.csv    Export query results to CSV (Tab: autocomplete filenames)
-/exec SELECT * FROM table > out.csv Export with /exec command
-
-SQL queries:
-Enter any SQL query directly to execute it.
-Results are automatically saved as markdown and displayed with glamour.
-
-Auto-completion:
-- Tab after /connect to see connection names
-- Tab after /describe to see table names
-- Tab after /ai-config to see AI subcommands and models
-- Tab after @ to see .sql files (searches all subdirectories)
-- Tab after > to see/create .csv files
-- Excludes hidden folders (starting with .) and common build directories
-
-Session Management:
-- Results are automatically saved to ~/.config/sqlterm/sessions/{connection}/results/
-- Old result files are automatically cleaned up based on retention settings
-- Configure cleanup in ~/.config/sqlterm/sessions/{connection}/session.yaml
-- Default retention: 30 days (cleanup_retention_days: 30)`)
+	fmt.Println(a.i18nMgr.Get("help_full"))
 }
 
 func (a *App) handleConnect(args []string) error {
