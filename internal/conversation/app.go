@@ -382,6 +382,40 @@ func (a *App) prepareQueryResultMarkdown() (string, *os.File, error) {
 	return filename, writer, err
 }
 
+func (a *App) preparePromptHistoryMarkdown() (string, *os.File, error) {
+	if a.config == nil {
+		return "", nil, fmt.Errorf("no database connection for session directory")
+	}
+	
+	if err := a.sessionMgr.EnsureSessionDir(a.config.Name); err != nil {
+		return "", nil, fmt.Errorf("failed to create session directory: %v", err)
+	}
+	
+	// Generate filename with timestamp
+	configDir := a.configMgr.GetConfigDir()
+	// Create sessions directory structure
+	resultsDir := filepath.Join(configDir, "sessions", a.config.Name, "results")
+	if err := os.MkdirAll(resultsDir, 0755); err != nil {
+		return "", nil, fmt.Errorf("failed to create results directory %s: %w", resultsDir, err)
+	}
+	
+	timestamp := time.Now().Format("20060102_150405")
+	filename := fmt.Sprintf("conversation_history_%s.md", timestamp)
+	filename = filepath.Join(resultsDir, filename)
+	
+	writer, err := os.Create(filename)
+	if err != nil {
+		return filename, nil, err
+	}
+	
+	var content strings.Builder
+	content.WriteString(fmt.Sprintf("# AI Conversation History - %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
+	content.WriteString(fmt.Sprintf("**Connection:** %s\n\n", a.config.Name))
+	writer.Write([]byte(content.String()))
+	
+	return filename, writer, err
+}
+
 func (a *App) executeFile(filename string, queryRange []int) error {
 	if a.connection == nil {
 		fmt.Println("No database connection. Use /connect to connect to a database.")
@@ -1734,52 +1768,73 @@ func (a *App) handleShowPrompts(args []string) error {
 		return nil
 	}
 
+	// Prepare markdown file for output
+	var mdPath string
+	var writer *os.File
+	var err error
+	
+	if a.config != nil {
+		mdPath, writer, err = a.preparePromptHistoryMarkdown()
+		if err != nil {
+			fmt.Printf("Warning: failed to create markdown file: %v\n", err)
+			writer = nil
+		}
+	}
+
+	// Helper function to write to both console and file
+	writeOutput := func(content string) {
+		fmt.Print(content)
+		if writer != nil {
+			writer.WriteString(content)
+		}
+	}
+
 	// Show current conversation first if it exists
 	conversation := a.aiManager.GetCurrentConversation()
 	if conversation != nil {
-		fmt.Printf("📊 Current Conversation (ID: %s)\n", conversation.ID)
-		fmt.Printf("Original Query: %s\n", conversation.OriginalQuery)
-		fmt.Printf("Phase: %s | Tables loaded: %d | Complete: %v\n\n", 
-			conversation.CurrentPhase.String(), len(conversation.LoadedTables), conversation.IsComplete)
+		writeOutput(fmt.Sprintf("## Current Conversation (ID: %s)\n\n", conversation.ID))
+		writeOutput(fmt.Sprintf("**Original Query:** %s\n\n", conversation.OriginalQuery))
+		writeOutput(fmt.Sprintf("**Status:** Phase: %s | Tables loaded: %d | Complete: %v\n\n", 
+			conversation.CurrentPhase.String(), len(conversation.LoadedTables), conversation.IsComplete))
+
+		if len(conversation.LoadedTables) > 0 {
+			writeOutput("**Loaded Tables:**\n")
+			for tableName := range conversation.LoadedTables {
+				writeOutput(fmt.Sprintf("- %s\n", tableName))
+			}
+			writeOutput("\n")
+		}
 
 		if len(conversation.ConversationHistory) > 0 {
-			fmt.Printf("🔄 Conversation Turns (%d total):\n\n", len(conversation.ConversationHistory))
+			writeOutput(fmt.Sprintf("## Conversation Turns (%d total)\n\n", len(conversation.ConversationHistory)))
 			
 			for i, turn := range conversation.ConversationHistory {
-				fmt.Printf("### Turn %d - %s (Phase: %s)\n", i+1, 
-					turn.Timestamp.Format("15:04:05"), turn.Phase.String())
+				writeOutput(fmt.Sprintf("### Turn %d - %s (Phase: %s)\n\n", i+1, 
+					turn.Timestamp.Format("15:04:05"), turn.Phase.String()))
 				
-				// Create markdown for this turn
-				var markdown strings.Builder
-				markdown.WriteString(fmt.Sprintf("**User Message:**\n```\n%s\n```\n\n", turn.UserMessage))
-				markdown.WriteString(fmt.Sprintf("**System Prompt:**\n```\n%s\n```\n\n", turn.SystemPrompt))
-				markdown.WriteString(fmt.Sprintf("**AI Response:**\n%s\n\n", turn.AIResponse))
+				writeOutput("**User Message:**\n```\n")
+				writeOutput(turn.UserMessage)
+				writeOutput("\n```\n\n")
+				
+				writeOutput("**System Prompt:**\n```\n")
+				writeOutput(turn.SystemPrompt)
+				writeOutput("\n```\n\n")
+				
+				writeOutput("**AI Response:**\n")
+				writeOutput(turn.AIResponse)
+				writeOutput("\n\n")
 				
 				if len(turn.RequestedInfo) > 0 {
-					markdown.WriteString(fmt.Sprintf("**Requested Info:** %v\n\n", turn.RequestedInfo))
-				}
-				
-				// Display using markdown renderer
-				formattedMarkdown := core.FormatSQLInMarkdown(markdown.String())
-				renderer := core.NewMarkdownRenderer()
-				if err := renderer.RenderAndDisplay(formattedMarkdown); err != nil {
-					// Fallback to plain text
-					fmt.Printf("User: %s\n", turn.UserMessage)
-					fmt.Printf("AI: %s\n", turn.AIResponse)
-					if len(turn.RequestedInfo) > 0 {
-						fmt.Printf("Requested: %v\n", turn.RequestedInfo)
-					}
+					writeOutput(fmt.Sprintf("**Requested Info:** %v\n\n", turn.RequestedInfo))
 				}
 				
 				if i < len(conversation.ConversationHistory)-1 {
-					fmt.Println(strings.Repeat("-", 50))
+					writeOutput("---\n\n")
 				}
-				fmt.Println()
 			}
 		}
 		
-		fmt.Println(strings.Repeat("=", 70))
-		fmt.Println()
+		writeOutput(strings.Repeat("=", 70) + "\n\n")
 	}
 
 	// Then show general prompt history
@@ -1787,8 +1842,14 @@ func (a *App) handleShowPrompts(args []string) error {
 	
 	if len(history) == 0 {
 		if conversation == nil {
-			fmt.Println("📝 No AI prompt history found.")
-			fmt.Println("Start chatting with AI (type messages without / or @ prefixes) to see history here.")
+			writeOutput("📝 No AI prompt history found.\n")
+			writeOutput("Start chatting with AI (type messages without / or @ prefixes) to see history here.\n")
+		}
+		if writer != nil {
+			writer.Close()
+			if mdPath != "" {
+				fmt.Printf("📍 Conversation history saved to: %s\n", mdPath)
+			}
 		}
 		return nil
 	}
@@ -1809,7 +1870,7 @@ func (a *App) handleShowPrompts(args []string) error {
 		startIdx = 0
 	}
 
-	fmt.Printf("📝 Showing last %d general AI prompt(s):\n\n", count)
+	writeOutput(fmt.Sprintf("## General AI Prompt History (last %d)\n\n", count))
 
 	for i := startIdx; i < len(history); i++ {
 		entry := history[i]
@@ -1817,52 +1878,39 @@ func (a *App) handleShowPrompts(args []string) error {
 		// Format timestamp
 		timeStr := entry.Timestamp.Format("2006-01-02 15:04:05")
 		
-		// Create markdown content for this prompt entry
-		var markdown strings.Builder
-		markdown.WriteString(fmt.Sprintf("## 🤖 Prompt #%d - %s\n\n", i+1, timeStr))
-		markdown.WriteString(fmt.Sprintf("**Provider:** %s | **Model:** %s\n\n", entry.Provider, entry.Model))
+		writeOutput(fmt.Sprintf("### Prompt #%d - %s\n\n", i+1, timeStr))
+		writeOutput(fmt.Sprintf("**Provider:** %s | **Model:** %s\n\n", entry.Provider, entry.Model))
 		
 		if entry.Cost > 0 {
-			markdown.WriteString(fmt.Sprintf("**Tokens:** %d input, %d output | **Cost:** %s\n\n", 
+			writeOutput(fmt.Sprintf("**Tokens:** %d input, %d output | **Cost:** %s\n\n", 
 				entry.InputTokens, entry.OutputTokens, ai.FormatPrice(entry.Cost)))
 		} else {
-			markdown.WriteString(fmt.Sprintf("**Tokens:** %d input, %d output | **Cost:** Free\n\n", 
+			writeOutput(fmt.Sprintf("**Tokens:** %d input, %d output | **Cost:** Free\n\n", 
 				entry.InputTokens, entry.OutputTokens))
 		}
 		
-		markdown.WriteString("### 📋 System Prompt\n")
-		markdown.WriteString("```\n")
-		markdown.WriteString(entry.SystemPrompt)
-		markdown.WriteString("\n```\n\n")
+		writeOutput("**System Prompt:**\n```\n")
+		writeOutput(entry.SystemPrompt)
+		writeOutput("\n```\n\n")
 		
-		markdown.WriteString("### 💬 User Message\n")
-		markdown.WriteString("```\n")
-		markdown.WriteString(entry.UserMessage)
-		markdown.WriteString("\n```\n\n")
+		writeOutput("**User Message:**\n```\n")
+		writeOutput(entry.UserMessage)
+		writeOutput("\n```\n\n")
 		
 		if i < len(history)-1 {
-			markdown.WriteString("---\n\n")
+			writeOutput("---\n\n")
 		}
-		
-		// Format any SQL in the markdown and display using markdown renderer
-		formattedMarkdown := core.FormatSQLInMarkdown(markdown.String())
-		renderer := core.NewMarkdownRenderer()
-		if err := renderer.RenderAndDisplay(formattedMarkdown); err != nil {
-			// Fallback to plain text
-			fmt.Printf("Prompt #%d - %s\n", i+1, timeStr)
-			fmt.Printf("Provider: %s | Model: %s\n", entry.Provider, entry.Model)
-			if entry.Cost > 0 {
-				fmt.Printf("Tokens: %d input, %d output | Cost: %s\n", 
-					entry.InputTokens, entry.OutputTokens, ai.FormatPrice(entry.Cost))
-			} else {
-				fmt.Printf("Tokens: %d input, %d output | Cost: Free\n", 
-					entry.InputTokens, entry.OutputTokens)
+	}
+
+	// Close file and show location
+	if writer != nil {
+		writer.Close()
+		if mdPath != "" {
+			// Display the markdown file using the same method as query results
+			if err := a.sessionMgr.ViewMarkdown(mdPath); err != nil {
+				fmt.Printf("Warning: %v\n", err)
 			}
-			fmt.Printf("\nSystem Prompt:\n%s\n", entry.SystemPrompt)
-			fmt.Printf("\nUser Message:\n%s\n", entry.UserMessage)
-			if i < len(history)-1 {
-				fmt.Println("\n" + strings.Repeat("-", 50) + "\n")
-			}
+			fmt.Printf("📍 Conversation history saved to: %s\n", mdPath)
 		}
 	}
 
