@@ -7,15 +7,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sqlterm/internal/i18n"
 	"time"
 )
 
 type LMStudioClient struct {
 	baseURL string
 	client  *http.Client
+	i18nMgr *i18n.Manager
 }
 
-func NewLMStudioClient(baseURL string) *LMStudioClient {
+func NewLMStudioClient(baseURL string, i18nMgr *i18n.Manager) *LMStudioClient {
 	if baseURL == "" {
 		baseURL = "http://localhost:1234"
 	}
@@ -25,6 +27,7 @@ func NewLMStudioClient(baseURL string) *LMStudioClient {
 		client: &http.Client{
 			Timeout: 120 * time.Second, // Increased for complex queries
 		},
+		i18nMgr: i18nMgr,
 	}
 }
 
@@ -33,30 +36,30 @@ func (c *LMStudioClient) Chat(ctx context.Context, request ChatRequest) (*ChatRe
 
 	jsonData, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf(i18nMgr.Get("failed_to_marshal_request"), err)
+		return nil, fmt.Errorf(c.i18nMgr.Get("failed_to_marshal_request"), err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf(i18nMgr.Get("failed_to_create_request"), err)
+		return nil, fmt.Errorf(c.i18nMgr.Get("failed_to_create_request"), err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf(i18nMgr.Get("request_failed"), err)
+		return nil, fmt.Errorf(c.i18nMgr.Get("request_failed"), err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf(i18nMgr.Get("api_request_failed"), resp.StatusCode, string(body))
+		return nil, fmt.Errorf(c.i18nMgr.Get("api_request_failed"), resp.StatusCode, string(body))
 	}
 
 	var response ChatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf(i18nMgr.Get("failed_to_decode_response"), err)
+		return nil, fmt.Errorf(c.i18nMgr.Get("failed_to_decode_response"), err)
 	}
 
 	return &response, nil
@@ -67,18 +70,18 @@ func (c *LMStudioClient) ListModels(ctx context.Context) ([]ModelInfo, error) {
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf(i18nMgr.Get("failed_to_create_request"), err)
+		return nil, fmt.Errorf(c.i18nMgr.Get("failed_to_create_request"), err)
 	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf(i18nMgr.Get("request_failed"), err)
+		return nil, fmt.Errorf(c.i18nMgr.Get("request_failed"), err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf(i18nMgr.Get("api_request_failed"), resp.StatusCode, string(body))
+		return nil, fmt.Errorf(c.i18nMgr.Get("api_request_failed"), resp.StatusCode, string(body))
 	}
 
 	var response struct {
@@ -92,7 +95,7 @@ func (c *LMStudioClient) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf(i18nMgr.Get("failed_to_decode_response"), err)
+		return nil, fmt.Errorf(c.i18nMgr.Get("failed_to_decode_response"), err)
 	}
 
 	models := make([]ModelInfo, len(response.Data))
@@ -120,7 +123,7 @@ func (c *LMStudioClient) GetModelInfo(ctx context.Context, modelID string) (*Mod
 		}
 	}
 
-	return nil, fmt.Errorf("model %s not found", modelID)
+	return nil, fmt.Errorf(c.i18nMgr.Get("model_not_found"), modelID)
 }
 
 func (c *LMStudioClient) Close() error {

@@ -70,7 +70,7 @@
       "text": "✅ Vector database ready in session folder: ~/.config/sqlterm/sessions/%s/\n"
     },
     {
-      "id": "vector_db_init_failed",
+      "id": "vector_db_init_warning",
       "text": "Warning: failed to initialize vector store: %v\n"
     },
     {
@@ -207,7 +207,7 @@
     },
     {
       "id": "help_full",
-      "text": "\nAvailable commands:\n\n/help                    Show this help message\n/connect                 Interactive connection setup\n/connect [name]          Connect to saved connection (Tab: autocomplete names)\n/list-connections        List all saved connections\n/tables                  List tables in current database\n/describe [table]        Show table structure (Tab: autocomplete table names)\n/status                  Show current connection status\n/exec [query]            Execute a query directly\n/exec                    Enter multi-line SQL mode (end with ;)\n/exec [query] > file.csv Export query results to CSV\n/config                  Configure application settings\n/config ai               Configure AI providers and models\n/config language <lang>  Set interface language (en_au, zh_cn)\n/last-ai-call [count]    Show AI conversation history with request/response details\n/clear-conversation      Clear current AI conversation and start fresh\n/quit, /exit             Exit SQLTerm\n\nAI Chat:\nEnter any message without / or @ prefix to chat with AI.\nAI uses multi-turn conversations to progressively gather table information.\nUse /clear-conversation to start fresh or /config ai to set up providers.\n\nFile commands:\n@filename.sql            Execute all queries in file (Tab: autocomplete files)\n@filename.sql 1          Execute only query 1\n@filename.sql 2-5        Execute queries 2 through 5\n\nCSV Export:\nSELECT * FROM table > output.csv    Export query results to CSV (Tab: autocomplete filenames)\n/exec SELECT * FROM table > out.csv Export with /exec command\n\nSQL queries:\nEnter any SQL query directly to execute it.\nResults are automatically saved as markdown and displayed with glamour.\n\nAuto-completion:\n- Tab after /connect to see connection names\n- Tab after /describe to see table names\n- Tab after /config to see configuration sections and options\n- Tab after @ to see .sql files (searches all subdirectories)\n- Tab after > to see/create .csv files\n- Excludes hidden folders (starting with .) and common build directories\n\nSession Management:\n- Results are automatically saved to ~/.config/sqlterm/sessions/{connection}/results/\n- Old result files are automatically cleaned up based on retention settings\n- Configure cleanup in ~/.config/sqlterm/sessions/{connection}/session.yaml\n- Default retention: 30 days (cleanup_retention_days: 30)"
+      "text": "\nAvailable commands:\n\n/help                    Show this help message\n/connect                 Interactive connection setup\n/connect [name]          Connect to saved connection (Tab: autocomplete names)\n/list-connections        List all saved connections\n/tables                  List tables in current database\n/describe [table]        Show table structure (Tab: autocomplete table names)\n/status                  Show current connection status\n/exec [query]            Execute a query directly\n/exec                    Enter multi-line SQL mode (end with ;)\n/exec [query] > file.csv Export query results to CSV\n/config                  Configure application settings\n/config ai               Configure AI providers and models\n/config language <lang>  Set interface language (en_au, zh_cn)\n/last-ai-call [count]    Show AI conversation history with request/response details\n/clear-conversation      Clear current AI conversation and start fresh\n/quit, /exit             Exit SQLTerm\n\nAI Chat:\nEnter any message without / or @ prefix to chat with AI.\nAI uses multi-turn conversations to progressively gather table information.\nUse /clear-conversation to start fresh or /config ai to set up providers.\n\nFile commands:\n@filename.sql            Execute all queries in file (Tab: autocomplete files)\n@filename.sql 1          Execute only query 1\n@filename.sql 2-5        Execute queries 2 through 5\n\nCSV Export:\nSELECT * FROM table > output.csv    Export query results to CSV (Tab: autocomplete filenames)\n/exec SELECT * FROM table > out.csv Export with /exec command\n\nSQL queries:\nEnter any SQL query directly to execute it.\nResults are automatically saved as markdown and displayed with glamour.\n\nAuto-completion:\n- Tab after /connect to see connection names\n- Tab after /describe to see table names\n- Tab after /config to see configuration sections and options\n- Tab after @ to see .sql files (searches all subdirectories)\n- Tab after > to see... [truncated]\n"
     },
     {
       "id": "connection_saved",
@@ -304,6 +304,442 @@
     {
       "id": "connected_successfully",
       "text": "✓ Connected successfully to %s\n"
+    },
+    {
+      "id": "file_location",
+      "text": "File location"
+    },
+    {
+      "id": "failed_to_create_sessions_dir",
+      "text": "failed to create sessions directory: %w"
+    },
+    {
+      "id": "failed_to_create_readline",
+      "text": "failed to create readline: %w"
+    },
+    {
+      "id": "failed_to_create_readline_session_history",
+      "text": "failed to create readline with session history: %w"
+    },
+    {
+      "id": "failed_to_read_legacy_history",
+      "text": "failed to read legacy history: %w"
+    },
+    {
+      "id": "failed_to_write_session_history",
+      "text": "failed to write session history: %w"
+    },
+    {
+      "id": "failed_to_create_readline_global_history",
+      "text": "failed to create readline with global history: %w"
+    },
+    {
+      "id": "query_execution_failed",
+      "text": "query execution failed: %w"
+    },
+    {
+      "id": "file_not_found",
+      "text": "file not found: %s"
+    },
+    {
+      "id": "failed_to_open_file",
+      "text": "failed to open file: %w"
+    },
+    {
+      "id": "failed_to_read_file",
+      "text": "failed to read file: %w"
+    },
+    {
+      "id": "failed_to_load_connection",
+      "text": "failed to load connection '%s': %w"
+    },
+    {
+      "id": "failed_to_connect",
+      "text": "failed to connect: %w"
+    },
+    {
+      "id": "connection_test_failed",
+      "text": "connection test failed: %w"
+    },
+    {
+      "id": "invalid_choice",
+      "text": "invalid choice: %s"
+    },
+    {
+      "id": "invalid_port",
+      "text": "invalid port: %s"
+    },
+    {
+      "id": "failed_to_list_connections",
+      "text": "failed to list connections: %w"
+    },
+    {
+      "id": "failed_to_list_tables",
+      "text": "failed to list tables: %w"
+    },
+    {
+      "id": "failed_to_describe_table",
+      "text": "failed to describe table: %w"
+    },
+    {
+      "id": "invalid_csv_export_syntax",
+      "text": "invalid CSV export syntax. Use: query > filename.csv"
+    },
+    {
+      "id": "invalid_csv_export_syntax_file",
+      "text": "invalid CSV export syntax. Use: @filename.sql > output.csv"
+    },
+    {
+      "id": "ai_chat_failed",
+      "text": "AI chat failed: %w"
+    },
+    {
+      "id": "ai_manager_not_initialized",
+      "text": "AI manager not initialized"
+    },
+    {
+      "id": "failed_to_set_provider",
+      "text": "failed to set provider: %w"
+    },
+    {
+      "id": "failed_to_set_model",
+      "text": "failed to set model: %w"
+    },
+    {
+      "id": "failed_to_set_api_key",
+      "text": "failed to set API key: %w"
+    },
+    {
+      "id": "failed_to_set_base_url",
+      "text": "failed to set base URL: %w"
+    },
+    {
+      "id": "language_not_available",
+      "text": "language '%s' is not available. Available languages: %s"
+    },
+    {
+      "id": "failed_to_update_language",
+      "text": "failed to update language: %w"
+    },
+    {
+      "id": "api_key_required",
+      "text": "API key required"
+    },
+    {
+      "id": "failed_to_save_configuration",
+      "text": "failed to save configuration: %w"
+    },
+    {
+      "id": "unknown_openrouter_subcommand",
+      "text": "unknown OpenRouter subcommand: %s"
+    },
+    {
+      "id": "failed_to_list_models",
+      "text": "failed to list models: %w"
+    },
+    {
+      "id": "failed_to_read_input",
+      "text": "failed to read input: %w"
+    },
+    {
+      "id": "failed_to_read_api_key",
+      "text": "failed to read API key: %w"
+    },
+    {
+      "id": "failed_to_read_base_url",
+      "text": "failed to read base URL: %w"
+    },
+    {
+      "id": "failed_to_initialize_ai_manager",
+      "text": "failed to initialize AI manager: %w"
+    },
+    {
+      "id": "failed_to_set_temporary_provider",
+      "text": "failed to set temporary provider: %w"
+    },
+    {
+      "id": "failed_to_set_default_model",
+      "text": "failed to set default model: %w"
+    },
+    {
+      "id": "failed_to_read_model_choice",
+      "text": "failed to read model choice: %w"
+    },
+    {
+      "id": "failed_to_set_final_configuration",
+      "text": "failed to set final configuration: %w"
+    },
+    {
+      "id": "failed_to_initialize_ai_client",
+      "text": "failed to initialize AI client: %w"
+    },
+    {
+      "id": "failed_to_marshal_request",
+      "text": "failed to marshal request: %w"
+    },
+    {
+      "id": "failed_to_create_request",
+      "text": "failed to create request: %w"
+    },
+    {
+      "id": "request_failed",
+      "text": "request failed: %w"
+    },
+    {
+      "id": "api_request_failed",
+      "text": "API request failed with status %d: %s"
+    },
+    {
+      "id": "failed_to_decode_response",
+      "text": "failed to decode response: %w"
+    },
+    {
+      "id": "model_not_found",
+      "text": "model %s not found"
+    },
+    {
+      "id": "sqlterm_conversation_mode",
+      "text": "🗄️  SQLTerm - Conversation Mode"
+    },
+    {
+      "id": "no_database_connection",
+      "text": "No database connection. Use /connect to connect to a database."
+    },
+    {
+      "id": "interactive_connection_setup",
+      "text": "🔧 Interactive Connection Setup"
+    },
+    {
+      "id": "enter_connection_name",
+      "text": "📝 Enter connection name: "
+    },
+    {
+      "id": "select_database_type",
+      "text": "📊 Select database type:"
+    },
+    {
+      "id": "mysql_option",
+      "text": "  1. MySQL"
+    },
+    {
+      "id": "postgresql_option",
+      "text": "  2. PostgreSQL"
+    },
+    {
+      "id": "sqlite_option",
+      "text": "  3. SQLite"
+    },
+    {
+      "id": "enter_choice",
+      "text": "Enter choice (1-3): "
+    },
+    {
+      "id": "enter_host",
+      "text": "📝 Enter host [localhost]: "
+    },
+    {
+      "id": "enter_port",
+      "text": "📝 Enter port [%d]: "
+    },
+    {
+      "id": "enter_username",
+      "text": "📝 Enter username: "
+    },
+    {
+      "id": "enter_password",
+      "text": "🔐 Enter password: "
+    },
+    {
+      "id": "enter_database_name",
+      "text": "📝 Enter database name: "
+    },
+    {
+      "id": "testing_connection",
+      "text": "Testing connection to %s...\n"
+    },
+    {
+      "id": "no_saved_connections_found",
+      "text": "No saved connections found."
+    },
+    {
+      "id": "saved_connections",
+      "text": "📋 Saved connections:"
+    },
+    {
+      "id": "no_tables_found",
+      "text": "No tables found in database '%s'."
+    },
+    {
+      "id": "tables_in_database",
+      "text": "📋 Tables in %s:"
+    },
+    {
+      "id": "usage_describe_table",
+      "text": "Usage: /describe <table_name>"
+    },
+    {
+      "id": "table_header",
+      "text": "Table"
+    },
+    {
+      "id": "columns_header",
+      "text": "Columns"
+    },
+    {
+      "id": "column_table_header",
+      "text": "| Column | Type | Nullable | Key | Default |\n"
+    },
+    {
+      "id": "column_table_separator",
+      "text": "|--------|------|----------|-----|----------|\n"
+    },
+    {
+      "id": "not_nullable",
+      "text": "❌ NOT NULL"
+    },
+    {
+      "id": "nullable",
+      "text": "✅ NULL"
+    },
+    {
+      "id": "key_format",
+      "text": "🔑 %s"
+    },
+    {
+      "id": "primary_keys_header",
+      "text": "Primary Keys"
+    },
+    {
+      "id": "constraints_header",
+      "text": "Constraints"
+    },
+    {
+      "id": "check_header",
+      "text": "Check"
+    },
+    {
+      "id": "foreign_keys_header",
+      "text": "Foreign Keys"
+    },
+    {
+      "id": "references_header",
+      "text": "References"
+    },
+    {
+      "id": "on_delete_header",
+      "text": "On Delete"
+    },
+    {
+      "id": "on_update_header",
+      "text": "On Update"
+    },
+    {
+      "id": "status_not_connected",
+      "text": "📡 Status: Not connected"
+    },
+    {
+      "id": "use_connect_to_establish_connection",
+      "text": "Use /connect to establish a database connection."
+    },
+    {
+      "id": "status_connected",
+      "text": "📡 Status: Connected to %s"
+    },
+    {
+      "id": "database_info",
+      "text": "   Database: %s"
+    },
+    {
+      "id": "type_info",
+      "text": "   Type: %s"
+    },
+    {
+      "id": "host_info",
+      "text": "   Host: %s:%d"
+    },
+    {
+      "id": "username_info",
+      "text": "   Username: %s"
+    },
+    {
+      "id": "multi_line_sql_mode",
+      "text": "📝 Multi-line SQL mode. Enter your query:"
+    },
+    {
+      "id": "multi_line_sql_paste_lines",
+      "text": "   • Paste multiple lines"
+    },
+    {
+      "id": "multi_line_sql_end_with_semicolon",
+      "text": "   • End with ; to execute"
+    },
+    {
+      "id": "multi_line_sql_cancel",
+      "text": "   • Or press Ctrl+C to cancel"
+    },
+    {
+      "id": "multi_line_sql_csv_export",
+      "text": "   • Use > filename.csv at the end for CSV export"
+    },
+    {
+      "id": "multi_line_input_cancelled",
+      "text": "\n❌ Multi-line input cancelled."
+    },
+    {
+      "id": "no_query_entered",
+      "text": "❌ No query entered."
+    },
+    {
+      "id": "executing_query",
+      "text": "🔍 Executing query...\n"
+    },
+    {
+      "id": "query_truncated",
+      "text": "📋 Query: %s\n\n"
+    },
+    {
+      "id": "executing_query_streaming",
+      "text": "📊 Executing query and streaming to %s...\n"
+    },
+    {
+      "id": "exported_rows_to_file",
+      "text": "✅ Exported %d rows to %s\n"
+    },
+    {
+      "id": "executing_sql_file",
+      "text": "📁 Executing SQL file: %s\n"
+    },
+    {
+      "id": "found_queries_in_file",
+      "text": "🔄 Found %d queries in file\n"
+    },
+    {
+      "id": "query_number_truncated_query",
+      "text": "\n📝 Query %d: %s\n"
+    },
+    {
+      "id": "query_failed",
+      "text": "❌ Query failed: %v\n"
+    },
+    {
+      "id": "query_executed_rows",
+      "text": "📊 Query executed (%d rows)\n"
+    },
+    {
+      "id": "exported_to_single_file",
+      "text": "\n📁 Exported to: %s\n"
+    },
+    {
+      "id": "exported_to_multiple_files",
+      "text": "\n📁 Exported to %d files:\n"
+    },
+    {
+      "id": "total_rows_exported",
+      "text": "📊 Total: %d rows exported\n"
+    },
+    {
+      "id": "no_results_to_export",
+      "text": "⚠️  No results to export to CSV (all queries returned 0 rows)"
     }
   ]
 }

@@ -70,7 +70,7 @@
       "text": "✅ 向量数据库已就绪，位于会话文件夹：~/.config/sqlterm/sessions/%s/\n"
     },
     {
-      "id": "vector_db_init_failed",
+      "id": "vector_db_init_warning",
       "text": "警告：初始化向量存储失败：%v\n"
     },
     {
@@ -304,6 +304,442 @@
     {
       "id": "connected_successfully",
       "text": "✓ 已成功连接到 %s\n"
+    },
+    {
+      "id": "file_location",
+      "text": "文件位置"
+    },
+    {
+      "id": "failed_to_create_sessions_dir",
+      "text": "创建会话目录失败：%w"
+    },
+    {
+      "id": "failed_to_create_readline",
+      "text": "创建 readline 失败：%w"
+    },
+    {
+      "id": "failed_to_create_readline_session_history",
+      "text": "创建带会话历史的 readline 失败：%w"
+    },
+    {
+      "id": "failed_to_read_legacy_history",
+      "text": "读取旧历史记录失败：%w"
+    },
+    {
+      "id": "failed_to_write_session_history",
+      "text": "写入会话历史失败：%w"
+    },
+    {
+      "id": "failed_to_create_readline_global_history",
+      "text": "创建带全局历史的 readline 失败：%w"
+    },
+    {
+      "id": "query_execution_failed",
+      "text": "查询执行失败：%w"
+    },
+    {
+      "id": "file_not_found",
+      "text": "文件未找到：%s"
+    },
+    {
+      "id": "failed_to_open_file",
+      "text": "打开文件失败：%w"
+    },
+    {
+      "id": "failed_to_read_file",
+      "text": "读取文件失败：%w"
+    },
+    {
+      "id": "failed_to_load_connection",
+      "text": "加载连接 '%s' 失败：%w"
+    },
+    {
+      "id": "failed_to_connect",
+      "text": "连接失败：%w"
+    },
+    {
+      "id": "connection_test_failed",
+      "text": "连接测试失败：%w"
+    },
+    {
+      "id": "invalid_choice",
+      "text": "无效选择：%s"
+    },
+    {
+      "id": "invalid_port",
+      "text": "无效端口：%s"
+    },
+    {
+      "id": "failed_to_list_connections",
+      "text": "列出连接失败：%w"
+    },
+    {
+      "id": "failed_to_list_tables",
+      "text": "列出表失败：%w"
+    },
+    {
+      "id": "failed_to_describe_table",
+      "text": "描述表失败：%w"
+    },
+    {
+      "id": "invalid_csv_export_syntax",
+      "text": "无效的 CSV 导出语法。使用：query > filename.csv"
+    },
+    {
+      "id": "invalid_csv_export_syntax_file",
+      "text": "无效的 CSV 导出语法。使用：@filename.sql > output.csv"
+    },
+    {
+      "id": "ai_chat_failed",
+      "text": "AI 聊天失败：%w"
+    },
+    {
+      "id": "ai_manager_not_initialized",
+      "text": "AI 管理器未初始化"
+    },
+    {
+      "id": "failed_to_set_provider",
+      "text": "设置提供商失败：%w"
+    },
+    {
+      "id": "failed_to_set_model",
+      "text": "设置模型失败：%w"
+    },
+    {
+      "id": "failed_to_set_api_key",
+      "text": "设置 API 密钥失败：%w"
+    },
+    {
+      "id": "failed_to_set_base_url",
+      "text": "设置基本 URL 失败：%w"
+    },
+    {
+      "id": "language_not_available",
+      "text": "语言 '%s' 不可用。可用语言：%s"
+    },
+    {
+      "id": "failed_to_update_language",
+      "text": "更新语言失败：%w"
+    },
+    {
+      "id": "api_key_required",
+      "text": "需要 API 密钥"
+    },
+    {
+      "id": "failed_to_save_configuration",
+      "text": "保存配置失败：%w"
+    },
+    {
+      "id": "unknown_openrouter_subcommand",
+      "text": "未知 OpenRouter 子命令：%s"
+    },
+    {
+      "id": "failed_to_list_models",
+      "text": "列出模型失败：%w"
+    },
+    {
+      "id": "failed_to_read_input",
+      "text": "读取输入失败：%w"
+    },
+    {
+      "id": "failed_to_read_api_key",
+      "text": "读取 API 密钥失败：%w"
+    },
+    {
+      "id": "failed_to_read_base_url",
+      "text": "读取基本 URL 失败：%w"
+    },
+    {
+      "id": "failed_to_initialize_ai_manager",
+      "text": "初始化 AI 管理器失败：%w"
+    },
+    {
+      "id": "failed_to_set_temporary_provider",
+      "text": "设置临时提供商失败：%w"
+    },
+    {
+      "id": "failed_to_set_default_model",
+      "text": "设置默认模型失败：%w"
+    },
+    {
+      "id": "failed_to_read_model_choice",
+      "text": "读取模型选择失败：%w"
+    },
+    {
+      "id": "failed_to_set_final_configuration",
+      "text": "设置最终配置失败：%w"
+    },
+    {
+      "id": "failed_to_initialize_ai_client",
+      "text": "初始化 AI 客户端失败：%w"
+    },
+    {
+      "id": "failed_to_marshal_request",
+      "text": "序列化请求失败：%w"
+    },
+    {
+      "id": "failed_to_create_request",
+      "text": "创建请求失败：%w"
+    },
+    {
+      "id": "request_failed",
+      "text": "请求失败：%w"
+    },
+    {
+      "id": "api_request_failed",
+      "text": "API 请求失败，状态：%d：%s"
+    },
+    {
+      "id": "failed_to_decode_response",
+      "text": "解码响应失败：%w"
+    },
+    {
+      "id": "model_not_found",
+      "text": "未找到模型：%s"
+    },
+    {
+      "id": "sqlterm_conversation_mode",
+      "text": "🗄️  SQLTerm - 对话模式"
+    },
+    {
+      "id": "no_database_connection",
+      "text": "未连接数据库。使用 /connect 连接数据库。"
+    },
+    {
+      "id": "interactive_connection_setup",
+      "text": "🔧 交互式连接设置"
+    },
+    {
+      "id": "enter_connection_name",
+      "text": "📝 输入连接名称："
+    },
+    {
+      "id": "select_database_type",
+      "text": "📊 选择数据库类型："
+    },
+    {
+      "id": "mysql_option",
+      "text": "  1. MySQL"
+    },
+    {
+      "id": "postgresql_option",
+      "text": "  2. PostgreSQL"
+    },
+    {
+      "id": "sqlite_option",
+      "text": "  3. SQLite"
+    },
+    {
+      "id": "enter_choice",
+      "text": "输入选择 (1-3)："
+    },
+    {
+      "id": "enter_host",
+      "text": "📝 输入主机 [localhost]："
+    },
+    {
+      "id": "enter_port",
+      "text": "📝 输入端口 [%d]："
+    },
+    {
+      "id": "enter_username",
+      "text": "📝 输入用户名："
+    },
+    {
+      "id": "enter_password",
+      "text": "🔐 输入密码："
+    },
+    {
+      "id": "enter_database_name",
+      "text": "📝 输入数据库名称："
+    },
+    {
+      "id": "testing_connection",
+      "text": "正在测试连接到 %s...\n"
+    },
+    {
+      "id": "no_saved_connections_found",
+      "text": "未找到已保存的连接。"
+    },
+    {
+      "id": "saved_connections",
+      "text": "📋 已保存的连接："
+    },
+    {
+      "id": "no_tables_found",
+      "text": "在数据库 '%s' 中未找到表。"
+    },
+    {
+      "id": "tables_in_database",
+      "text": "📋 数据库 %s 中的表："
+    },
+    {
+      "id": "usage_describe_table",
+      "text": "用法：/describe <表名>"
+    },
+    {
+      "id": "table_header",
+      "text": "表"
+    },
+    {
+      "id": "columns_header",
+      "text": "列"
+    },
+    {
+      "id": "column_table_header",
+      "text": "| 列 | 类型 | 可空 | 键 | 默认值 |\n"
+    },
+    {
+      "id": "column_table_separator",
+      "text": "|--------|------|----------|-----|----------|\n"
+    },
+    {
+      "id": "not_nullable",
+      "text": "❌ 非空"
+    },
+    {
+      "id": "nullable",
+      "text": "✅ 可空"
+    },
+    {
+      "id": "key_format",
+      "text": "🔑 %s"
+    },
+    {
+      "id": "primary_keys_header",
+      "text": "主键"
+    },
+    {
+      "id": "constraints_header",
+      "text": "约束"
+    },
+    {
+      "id": "check_header",
+      "text": "检查"
+    },
+    {
+      "id": "foreign_keys_header",
+      "text": "外键"
+    },
+    {
+      "id": "references_header",
+      "text": "引用"
+    },
+    {
+      "id": "on_delete_header",
+      "text": "删除时"
+    },
+    {
+      "id": "on_update_header",
+      "text": "更新时"
+    },
+    {
+      "id": "status_not_connected",
+      "text": "📡 状态：未连接"
+    },
+    {
+      "id": "use_connect_to_establish_connection",
+      "text": "使用 /connect 建立数据库连接。"
+    },
+    {
+      "id": "status_connected",
+      "text": "📡 状态：已连接到 %s"
+    },
+    {
+      "id": "database_info",
+      "text": "   数据库：%s"
+    },
+    {
+      "id": "type_info",
+      "text": "   类型：%s"
+    },
+    {
+      "id": "host_info",
+      "text": "   主机：%s:%d"
+    },
+    {
+      "id": "username_info",
+      "text": "   用户名：%s"
+    },
+    {
+      "id": "multi_line_sql_mode",
+      "text": "📝 多行 SQL 模式。输入您的查询："
+    },
+    {
+      "id": "multi_line_sql_paste_lines",
+      "text": "   • 粘贴多行"
+    },
+    {
+      "id": "multi_line_sql_end_with_semicolon",
+      "text": "   • 以 ; 结束执行"
+    },
+    {
+      "id": "multi_line_sql_cancel",
+      "text": "   • 或按 Ctrl+C 取消"
+    },
+    {
+      "id": "multi_line_sql_csv_export",
+      "text": "   • 在末尾使用 > filename.csv 进行 CSV 导出"
+    },
+    {
+      "id": "multi_line_input_cancelled",
+      "text": "\n❌ 多行输入已取消。"
+    },
+    {
+      "id": "no_query_entered",
+      "text": "❌ 未输入查询。"
+    },
+    {
+      "id": "executing_query",
+      "text": "🔍 正在执行查询...\n"
+    },
+    {
+      "id": "query_truncated",
+      "text": "📋 查询：%s\n\n"
+    },
+    {
+      "id": "executing_query_streaming",
+      "text": "📊 正在执行查询并流式传输到 %s...\n"
+    },
+    {
+      "id": "exported_rows_to_file",
+      "text": "✅ 已导出 %d 行到 %s\n"
+    },
+    {
+      "id": "executing_sql_file",
+      "text": "📁 正在执行 SQL 文件：%s\n"
+    },
+    {
+      "id": "found_queries_in_file",
+      "text": "🔄 在文件中找到 %d 个查询\n"
+    },
+    {
+      "id": "query_number_truncated_query",
+      "text": "\n📝 查询 %d：%s\n"
+    },
+    {
+      "id": "query_failed",
+      "text": "❌ 查询失败：%v\n"
+    },
+    {
+      "id": "query_executed_rows",
+      "text": "📊 查询已执行（%d 行）\n"
+    },
+    {
+      "id": "exported_to_single_file",
+      "text": "\n📁 已导出到：%s\n"
+    },
+    {
+      "id": "exported_to_multiple_files",
+      "text": "\n📁 已导出到 %d 个文件：\n"
+    },
+    {
+      "id": "total_rows_exported",
+      "text": "📊 总计：已导出 %d 行\n"
+    },
+    {
+      "id": "no_results_to_export",
+      "text": "⚠️  没有结果可导出到 CSV（所有查询返回 0 行）"
     }
   ]
 }
