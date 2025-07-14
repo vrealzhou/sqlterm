@@ -1,0 +1,153 @@
+{
+  "language": "en_au",
+  "messages": [
+    {
+      "id": "ai_not_configured",
+      "text": "🤖 AI is not configured. Use /ai-config to set up AI providers."
+    },
+    {
+      "id": "ai_conversation_history",
+      "text": "# AI Conversation History (last %d)\n\n"
+    },
+    {
+      "id": "no_ai_history",
+      "text": "📝 No AI conversation history found.\nStart chatting with AI (type messages without / or @ prefixes) to see history here.\n"
+    },
+    {
+      "id": "conversation_history_saved",
+      "text": "📍 Conversation history saved to: %s\n"
+    },
+    {
+      "id": "ai_not_configured_short",
+      "text": "🤖 AI is not configured."
+    },
+    {
+      "id": "no_active_conversation",
+      "text": "📝 No active conversation to clear."
+    },
+    {
+      "id": "clearing_conversation",
+      "text": "📊 Clearing conversation (Phase: %s, Tables loaded: %d)\n"
+    },
+    {
+      "id": "conversation_cleared",
+      "text": "✅ Conversation cleared. Ready for new queries.\n"
+    },
+    {
+      "id": "provider_info",
+      "text": "**Provider:** %s | **Model:** %s | **Tokens:** %d in, %d out"
+    },
+    {
+      "id": "cost_paid",
+      "text": " | **Cost:** $%.6f"
+    },
+    {
+      "id": "cost_free",
+      "text": " | **Cost:** Free"
+    },
+    {
+      "id": "user_request",
+      "text": "### 🧑‍💻 User Request\n```\n"
+    },
+    {
+      "id": "ai_response",
+      "text": "### 🤖 AI Response\n"
+    },
+    {
+      "id": "ai_response_unavailable",
+      "text": "*AI response not available in this entry*"
+    },
+    {
+      "id": "request_number",
+      "text": "## Request #%d - %s\n\n"
+    },
+    {
+      "id": "initializing_vector_db",
+      "text": "🔍 Initializing AI vector database for %s...\n"
+    },
+    {
+      "id": "vector_db_ready",
+      "text": "✅ Vector database ready in session folder: ~/.config/sqlterm/sessions/%s/\n"
+    },
+    {
+      "id": "vector_db_init_failed",
+      "text": "Warning: failed to initialize vector store: %v\n"
+    },
+    {
+      "id": "config_migrated",
+      "text": "📦 Migrated configuration from ai.yaml to config.yaml\n"
+    },
+    {
+      "id": "vector_db_migrated",
+      "text": "📦 Migrated vector database for %s to session folder\n"
+    },
+    {
+      "id": "schemas_loaded_analyzing",
+      "text": "📋 Schemas loaded for %v. Analyzing...\n"
+    },
+    {
+      "id": "help_header",
+      "text": "SQLTerm - Interactive SQL Terminal with AI Assistant\n\nCommands:\n"
+    },
+    {
+      "id": "help_connect",
+      "text": "/connect [name]          Connect to a database connection"
+    },
+    {
+      "id": "help_list_connections",
+      "text": "/list-connections        List all available database connections"
+    },
+    {
+      "id": "help_tables",
+      "text": "/tables                  List all tables in the current database"
+    },
+    {
+      "id": "help_describe",
+      "text": "/describe [table]        Describe table structure"
+    },
+    {
+      "id": "help_status",
+      "text": "/status                  Show connection status"
+    },
+    {
+      "id": "help_exec",
+      "text": "/exec [query]            Execute a query directly"
+    },
+    {
+      "id": "help_exec_multiline",
+      "text": "/exec                    Enter multi-line SQL mode (end with ;)"
+    },
+    {
+      "id": "help_exec_csv",
+      "text": "/exec [query] > file.csv Export query results to CSV"
+    },
+    {
+      "id": "help_ai_config",
+      "text": "/ai-config               Configure AI providers and models"
+    },
+    {
+      "id": "help_last_ai_call",
+      "text": "/last-ai-call [count]    Show AI conversation history with request/response details"
+    },
+    {
+      "id": "help_clear_conversation",
+      "text": "/clear-conversation      Clear current AI conversation and start fresh"
+    },
+    {
+      "id": "help_quit",
+      "text": "/quit, /exit             Exit SQLTerm"
+    },
+    {
+      "id": "help_ai_chat",
+      "text": "AI Chat:\nType your question directly (without / or @ prefixes) to chat with AI about your database.\nExample: \"Show me all users who registered last month\"\n"
+    },
+    {
+      "id": "help_file_execution",
+      "text": "File Execution:\nUse @filename.sql to execute SQL files\nExample: @queries/report.sql\n"
+    },
+    {
+      "id": "unknown_command",
+      "text": "Unknown command: %s. Type /help for available commands.\n"
+    }
+  ]
+}

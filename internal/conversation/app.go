@@ -14,6 +14,7 @@ import (
 	"sqlterm/internal/ai"
 	"sqlterm/internal/config"
 	"sqlterm/internal/core"
+	"sqlterm/internal/i18n"
 	"sqlterm/internal/session"
 
 	"github.com/chzyer/readline"
@@ -26,6 +27,7 @@ type App struct {
 	configMgr  *config.Manager
 	sessionMgr *session.Manager
 	aiManager  *ai.Manager
+	i18nMgr    *i18n.Manager
 }
 
 func NewApp() (*App, error) {
@@ -39,10 +41,25 @@ func NewApp() (*App, error) {
 		aiManager = nil
 	}
 
+	// Initialize i18n manager
+	language := "en_au" // Default language
+	if aiManager != nil {
+		if config := aiManager.GetConfig(); config != nil {
+			language = config.Language
+		}
+	}
+	
+	i18nMgr, err := i18n.NewManager(language)
+	if err != nil {
+		// Fallback to default language if i18n fails
+		i18nMgr, _ = i18n.NewManager("en_au")
+	}
+
 	app := &App{
 		configMgr:  configMgr,
 		sessionMgr: sessionMgr,
 		aiManager:  aiManager,
+		i18nMgr:    i18nMgr,
 	}
 
 	// Ensure sessions directory exists for history file
@@ -290,7 +307,7 @@ func (a *App) processCommand(line string) error {
 	case "/clear-conversation":
 		return a.handleClearConversation()
 	default:
-		fmt.Printf("Unknown command: %s. Type /help for available commands.\n", command)
+		fmt.Printf(a.i18nMgr.Get("unknown_command"), command)
 	}
 
 	return nil
@@ -1764,7 +1781,7 @@ func (a *App) interactiveAIConfig() error {
 
 func (a *App) handleShowPrompts(args []string) error {
 	if a.aiManager == nil {
-		fmt.Println("🤖 AI is not configured. Use /ai-config to set up AI providers.")
+		fmt.Println(a.i18nMgr.Get("ai_not_configured"))
 		return nil
 	}
 
@@ -1793,12 +1810,11 @@ func (a *App) handleShowPrompts(args []string) error {
 	history := a.aiManager.GetPromptHistory()
 	
 	if len(history) == 0 {
-		writeOutput("📝 No AI conversation history found.\n")
-		writeOutput("Start chatting with AI (type messages without / or @ prefixes) to see history here.\n")
+		writeOutput(a.i18nMgr.Get("no_ai_history"))
 		if writer != nil {
 			writer.Close()
 			if mdPath != "" {
-				fmt.Printf("📍 Conversation history saved to: %s\n", mdPath)
+				fmt.Printf(a.i18nMgr.Get("conversation_history_saved"), mdPath)
 			}
 		}
 		return nil
@@ -1820,7 +1836,7 @@ func (a *App) handleShowPrompts(args []string) error {
 		startIdx = 0
 	}
 
-	writeOutput(fmt.Sprintf("# AI Conversation History (last %d)\n\n", count))
+	writeOutput(a.i18nMgr.GetWithArgs("ai_conversation_history", count))
 
 	for i := startIdx; i < len(history); i++ {
 		entry := history[i]
@@ -1828,28 +1844,27 @@ func (a *App) handleShowPrompts(args []string) error {
 		// Format timestamp
 		timeStr := entry.Timestamp.Format("2006-01-02 15:04:05")
 		
-		writeOutput(fmt.Sprintf("## Request #%d - %s\n\n", i+1, timeStr))
+		writeOutput(a.i18nMgr.GetWithArgs("request_number", i+1, timeStr))
 		
 		// Provider, model, tokens, cost info
-		writeOutput(fmt.Sprintf("**Provider:** %s | **Model:** %s | **Tokens:** %d in, %d out", 
-			entry.Provider, entry.Model, entry.InputTokens, entry.OutputTokens))
+		writeOutput(a.i18nMgr.GetWithArgs("provider_info", entry.Provider, entry.Model, entry.InputTokens, entry.OutputTokens))
 		
 		if entry.Cost > 0 {
-			writeOutput(fmt.Sprintf(" | **Cost:** $%.6f", entry.Cost))
+			writeOutput(a.i18nMgr.GetWithArgs("cost_paid", entry.Cost))
 		} else {
-			writeOutput(" | **Cost:** Free")
+			writeOutput(a.i18nMgr.Get("cost_free"))
 		}
 		writeOutput("\n\n")
 		
-		writeOutput("### 🧑‍💻 User Request\n```\n")
+		writeOutput(a.i18nMgr.Get("user_request"))
 		writeOutput(entry.UserMessage)
 		writeOutput("\n```\n\n")
 		
-		writeOutput("### 🤖 AI Response\n")
+		writeOutput(a.i18nMgr.Get("ai_response"))
 		if entry.AIResponse != "" {
 			writeOutput(entry.AIResponse)
 		} else {
-			writeOutput("*AI response not available in this entry*")
+			writeOutput(a.i18nMgr.Get("ai_response_unavailable"))
 		}
 		writeOutput("\n\n")
 		
@@ -1866,7 +1881,7 @@ func (a *App) handleShowPrompts(args []string) error {
 			if err := a.sessionMgr.ViewMarkdown(mdPath); err != nil {
 				fmt.Printf("Warning: %v\n", err)
 			}
-			fmt.Printf("📍 Conversation history saved to: %s\n", mdPath)
+			fmt.Printf(a.i18nMgr.Get("conversation_history_saved"), mdPath)
 		}
 	}
 
@@ -1875,23 +1890,23 @@ func (a *App) handleShowPrompts(args []string) error {
 
 func (a *App) handleClearConversation() error {
 	if a.aiManager == nil {
-		fmt.Println("🤖 AI is not configured.")
+		fmt.Println(a.i18nMgr.Get("ai_not_configured_short"))
 		return nil
 	}
 
 	conversation := a.aiManager.GetCurrentConversation()
 	if conversation == nil {
-		fmt.Println("📝 No active conversation to clear.")
+		fmt.Println(a.i18nMgr.Get("no_active_conversation"))
 		return nil
 	}
 
 	// Show conversation summary before clearing
-	fmt.Printf("📊 Clearing conversation (Phase: %s, Tables loaded: %d)\n", 
+	fmt.Printf(a.i18nMgr.Get("clearing_conversation"), 
 		conversation.CurrentPhase.String(), len(conversation.LoadedTables))
 	
 	// Clear the conversation
 	a.aiManager.ClearConversation()
-	fmt.Println("✅ Conversation cleared. Next message will start a new conversation.")
+	fmt.Println(a.i18nMgr.Get("conversation_cleared"))
 	
 	return nil
 }

@@ -1,0 +1,153 @@
+{
+  "language": "zh_cn",
+  "messages": [
+    {
+      "id": "ai_not_configured",
+      "text": "🤖 AI 未配置。使用 /ai-config 设置 AI 提供商。"
+    },
+    {
+      "id": "ai_conversation_history",
+      "text": "# AI 对话历史 (最近 %d 条)\n\n"
+    },
+    {
+      "id": "no_ai_history",
+      "text": "📝 未找到 AI 对话历史。\n开始与 AI 聊天（输入不带 / 或 @ 前缀的消息）以查看历史记录。\n"
+    },
+    {
+      "id": "conversation_history_saved",
+      "text": "📍 对话历史已保存至：%s\n"
+    },
+    {
+      "id": "ai_not_configured_short",
+      "text": "🤖 AI 未配置。"
+    },
+    {
+      "id": "no_active_conversation",
+      "text": "📝 没有活跃的对话可清除。"
+    },
+    {
+      "id": "clearing_conversation",
+      "text": "📊 正在清除对话（阶段：%s，已加载表：%d）\n"
+    },
+    {
+      "id": "conversation_cleared",
+      "text": "✅ 对话已清除。准备接受新查询。\n"
+    },
+    {
+      "id": "provider_info",
+      "text": "**提供商：** %s | **模型：** %s | **令牌：** %d 输入，%d 输出"
+    },
+    {
+      "id": "cost_paid",
+      "text": " | **费用：** $%.6f"
+    },
+    {
+      "id": "cost_free",
+      "text": " | **费用：** 免费"
+    },
+    {
+      "id": "user_request",
+      "text": "### 🧑‍💻 用户请求\n```\n"
+    },
+    {
+      "id": "ai_response",
+      "text": "### 🤖 AI 响应\n"
+    },
+    {
+      "id": "ai_response_unavailable",
+      "text": "*此条目中 AI 响应不可用*"
+    },
+    {
+      "id": "request_number",
+      "text": "## 请求 #%d - %s\n\n"
+    },
+    {
+      "id": "initializing_vector_db",
+      "text": "🔍 正在为 %s 初始化 AI 向量数据库...\n"
+    },
+    {
+      "id": "vector_db_ready",
+      "text": "✅ 向量数据库已就绪，位于会话文件夹：~/.config/sqlterm/sessions/%s/\n"
+    },
+    {
+      "id": "vector_db_init_failed",
+      "text": "警告：初始化向量存储失败：%v\n"
+    },
+    {
+      "id": "config_migrated",
+      "text": "📦 已从 ai.yaml 迁移配置到 config.yaml\n"
+    },
+    {
+      "id": "vector_db_migrated",
+      "text": "📦 已将 %s 的向量数据库迁移到会话文件夹\n"
+    },
+    {
+      "id": "schemas_loaded_analyzing",
+      "text": "📋 已为 %v 加载架构。正在分析...\n"
+    },
+    {
+      "id": "help_header",
+      "text": "SQLTerm - 带 AI 助手的交互式 SQL 终端\n\n命令：\n"
+    },
+    {
+      "id": "help_connect",
+      "text": "/connect [名称]          连接到数据库连接"
+    },
+    {
+      "id": "help_list_connections",
+      "text": "/list-connections        列出所有可用的数据库连接"
+    },
+    {
+      "id": "help_tables",
+      "text": "/tables                  列出当前数据库中的所有表"
+    },
+    {
+      "id": "help_describe",
+      "text": "/describe [表名]         描述表结构"
+    },
+    {
+      "id": "help_status",
+      "text": "/status                  显示连接状态"
+    },
+    {
+      "id": "help_exec",
+      "text": "/exec [查询]             直接执行查询"
+    },
+    {
+      "id": "help_exec_multiline",
+      "text": "/exec                    进入多行 SQL 模式（以 ; 结束）"
+    },
+    {
+      "id": "help_exec_csv",
+      "text": "/exec [查询] > 文件.csv  将查询结果导出到 CSV"
+    },
+    {
+      "id": "help_ai_config",
+      "text": "/ai-config               配置 AI 提供商和模型"
+    },
+    {
+      "id": "help_last_ai_call",
+      "text": "/last-ai-call [数量]     显示 AI 对话历史及请求/响应详情"
+    },
+    {
+      "id": "help_clear_conversation",
+      "text": "/clear-conversation      清除当前 AI 对话并重新开始"
+    },
+    {
+      "id": "help_quit",
+      "text": "/quit, /exit             退出 SQLTerm"
+    },
+    {
+      "id": "help_ai_chat",
+      "text": "AI 聊天：\n直接输入您的问题（不带 / 或 @ 前缀）与 AI 讨论您的数据库。\n示例：\"显示所有上个月注册的用户\"\n"
+    },
+    {
+      "id": "help_file_execution",
+      "text": "文件执行：\n使用 @文件名.sql 执行 SQL 文件\n示例：@queries/report.sql\n"
+    },
+    {
+      "id": "unknown_command",
+      "text": "未知命令：%s。输入 /help 查看可用命令。\n"
+    }
+  ]
+}
