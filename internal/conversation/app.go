@@ -1145,16 +1145,16 @@ func (a *App) executeFileWithCSVExport(filename string, queryRange []int, csvFil
 
 func (a *App) processAIChat(message string) error {
 	if a.aiManager == nil || !a.aiManager.IsConfigured() {
-		fmt.Println("🤖 AI is not configured. Use /ai-config to set up AI providers.")
+		fmt.Println(a.i18nMgr.Get("ai_not_configured"))
 		return nil
 	}
 
 	// Get current conversation or show thinking message
 	conversation := a.aiManager.GetCurrentConversation()
 	if conversation == nil {
-		fmt.Printf("🤖 Starting new conversation... (this may take up to 2 minutes for complex queries)\n")
+		fmt.Printf(a.i18nMgr.Get("ai_starting_new_conversation"))
 	} else {
-		fmt.Printf("🤖 Processing conversation (Phase: %s)... \n", conversation.CurrentPhase.String())
+		fmt.Printf(a.i18nMgr.Get("ai_processing_conversation"), conversation.CurrentPhase.String())
 	}
 
 	// Get database tables for context
@@ -1193,7 +1193,7 @@ func (a *App) processAIChat(message string) error {
 	renderer := core.NewMarkdownRenderer()
 	if err := renderer.RenderAndDisplay(formattedResponse); err != nil {
 		// Fallback to plain text if markdown rendering fails
-		fmt.Println("🤖 AI Response:")
+		fmt.Println(a.i18nMgr.Get("ai_response_header"))
 		fmt.Println(formattedResponse)
 	}
 
@@ -1212,12 +1212,12 @@ func (a *App) processAIChat(message string) error {
 	if a.aiManager != nil && a.aiManager.IsConfigured() {
 		aiConfig := a.aiManager.GetConfig()
 		// Get usage statistics from AI manager if available
-		usageInfo := "No usage data"
+		usageInfo := a.i18nMgr.Get("usage_data_unavailable")
 		if a.aiManager.GetUsageStore() != nil {
 			if summary, err := a.aiManager.GetUsageStore().GetUsageSummary(); err == nil {
 				if todayStats, ok := summary["today"]; ok {
 					if today, ok := todayStats.(map[string]interface{}); ok {
-						usageInfo = fmt.Sprintf("Today: %d req, $%.4f", 
+						usageInfo = fmt.Sprintf(a.i18nMgr.Get("usage_today_summary"), 
 							int(today["requests"].(int)), today["cost"].(float64))
 					}
 				}
@@ -1242,7 +1242,7 @@ func (a *App) handleConfig(args []string) error {
 	case "language":
 		return a.handleConfigLanguage(args[1:])
 	default:
-		fmt.Printf("Unknown config section: %s\n", section)
+		fmt.Printf(a.i18nMgr.Get("unknown_config_section"), section)
 		a.printConfigHelp()
 		return nil
 	}
@@ -1270,7 +1270,7 @@ func (a *App) handleConfigAI(args []string) error {
 	case "openrouter":
 		return a.handleConfigAIOpenRouter(args[1:])
 	default:
-		fmt.Printf("Unknown AI subcommand: %s\n", subcmd)
+		fmt.Printf(a.i18nMgr.Get("unknown_ai_subcommand"), subcmd)
 		a.printAIConfigHelp()
 		return nil
 	}
@@ -1324,19 +1324,19 @@ func (a *App) handleAIConfigStatus() error {
 		if summary, err := a.aiManager.GetUsageStore().GetUsageSummary(); err == nil {
 			if todayStats, ok := summary["today"]; ok {
 				if today, ok := todayStats.(map[string]interface{}); ok {
-					fmt.Printf("   Today's Usage: %d requests, $%.6f\n", 
+					fmt.Printf(a.i18nMgr.Get("todays_usage_display"), 
 						int(today["requests"].(int)), today["cost"].(float64))
 				}
 			}
 			if weekStats, ok := summary["last_7_days"]; ok {
 				if week, ok := weekStats.(map[string]interface{}); ok {
-					fmt.Printf("   Last 7 Days: %d requests, $%.6f\n", 
+					fmt.Printf(a.i18nMgr.Get("last_7_days_display"), 
 						int(week["requests"].(int)), week["cost"].(float64))
 				}
 			}
 		}
 	} else {
-		fmt.Printf("   Usage: Not available (no database connection)\n")
+		fmt.Printf("   Usage: %s\n", a.i18nMgr.Get("usage_not_available_no_db"))
 	}
 
 	// Show API key status (masked)
@@ -1359,7 +1359,7 @@ func (a *App) handleAIConfigStatus() error {
 
 func (a *App) handleAIConfigProvider(args []string) error {
 	if len(args) == 0 {
-		fmt.Println("Usage: /ai-config provider <openrouter|ollama|lmstudio>")
+		fmt.Println(a.i18nMgr.Get("usage_ai_config_provider"))
 		return nil
 	}
 
