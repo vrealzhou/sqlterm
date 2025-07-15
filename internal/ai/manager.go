@@ -347,7 +347,7 @@ func (m *Manager) addToPromptHistory(userMessage, systemPrompt, aiResponse strin
 	// Record usage statistics in the database
 	if m.usageStore != nil {
 		err := m.usageStore.RecordUsage(m.sessionID, m.config.AI.Provider, m.config.AI.Model, 
-			inputTokens, outputTokens, cost, userMessage, aiResponse)
+			inputTokens, outputTokens, cost, userMessage, aiResponse, systemPrompt)
 		if err != nil {
 			fmt.Printf("Warning: failed to record usage: %v\n", err)
 		}

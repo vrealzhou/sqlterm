@@ -20,6 +20,7 @@ type UsageDetails struct {
 	RequestTime  time.Time       `json:"request_time"`
 	UserMessage  string          `json:"user_message"`
 	AIResponse   string          `json:"ai_response"`
+	SystemPrompt string          `json:"system_prompt"`
 }
 
 // DailyUsageStats represents aggregated daily statistics per provider/model
@@ -73,6 +74,7 @@ func (us *UsageStore) initializeUsageSchema() error {
 			request_time DATETIME NOT NULL,
 			user_message TEXT,
 			ai_response TEXT,
+			system_prompt TEXT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
 
@@ -100,6 +102,11 @@ func (us *UsageStore) initializeUsageSchema() error {
 		if _, err := us.db.Exec(query); err != nil {
 			return fmt.Errorf("failed to execute usage schema query: %w", err)
 		}
+	}
+
+	// Add system_prompt column to existing tables if it doesn't exist
+	if err := us.migrateSystemPromptColumn(); err != nil {
+		return fmt.Errorf("failed to migrate system_prompt column: %w", err)
 	}
 
 	return nil
@@ -134,14 +141,14 @@ func (us *UsageStore) handleDayChange() error {
 
 // RecordUsage records a new usage entry
 func (us *UsageStore) RecordUsage(sessionID string, provider config.Provider, model string, 
-	inputTokens, outputTokens int, cost float64, userMessage, aiResponse string) error {
+	inputTokens, outputTokens int, cost float64, userMessage, aiResponse, systemPrompt string) error {
 	
 	query := `INSERT INTO usage_details 
-		(session_id, provider, model, input_tokens, output_tokens, cost, request_time, user_message, ai_response)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		(session_id, provider, model, input_tokens, output_tokens, cost, request_time, user_message, ai_response, system_prompt)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	_, err := us.db.Exec(query, sessionID, string(provider), model, inputTokens, outputTokens, 
-		cost, time.Now(), userMessage, aiResponse)
+		cost, time.Now(), userMessage, aiResponse, systemPrompt)
 
 	if err != nil {
 		return fmt.Errorf("failed to record usage: %w", err)
@@ -191,7 +198,7 @@ func (us *UsageStore) GetTodayUsage() ([]UsageDetails, error) {
 	currentDate := time.Now().Format("2006-01-02")
 	
 	query := `SELECT id, session_id, provider, model, input_tokens, output_tokens, 
-		cost, request_time, user_message, ai_response
+		cost, request_time, user_message, ai_response, system_prompt
 		FROM usage_details 
 		WHERE date(request_time) = ?
 		ORDER BY request_time DESC`
@@ -208,7 +215,7 @@ func (us *UsageStore) GetTodayUsage() ([]UsageDetails, error) {
 		var provider string
 		err := rows.Scan(&usage.ID, &usage.SessionID, &provider, &usage.Model,
 			&usage.InputTokens, &usage.OutputTokens, &usage.Cost, &usage.RequestTime,
-			&usage.UserMessage, &usage.AIResponse)
+			&usage.UserMessage, &usage.AIResponse, &usage.SystemPrompt)
 		if err != nil {
 			continue
 		}
@@ -439,4 +446,40 @@ func (us *UsageStore) GetProviderModelStats(days int) (map[string]map[string]int
 	}
 
 	return result, nil
+}
+
+// migrateSystemPromptColumn adds the system_prompt column to existing usage_details tables
+func (us *UsageStore) migrateSystemPromptColumn() error {
+	// Check if system_prompt column already exists
+	var columnExists bool
+	checkQuery := `PRAGMA table_info(usage_details)`
+	rows, err := us.db.Query(checkQuery)
+	if err != nil {
+		return fmt.Errorf("failed to check table schema: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name, dataType string
+		var notNull, dfltValue, pk interface{}
+		err := rows.Scan(&cid, &name, &dataType, &notNull, &dfltValue, &pk)
+		if err != nil {
+			continue
+		}
+		if name == "system_prompt" {
+			columnExists = true
+			break
+		}
+	}
+
+	// Add column if it doesn't exist
+	if !columnExists {
+		alterQuery := `ALTER TABLE usage_details ADD COLUMN system_prompt TEXT`
+		if _, err := us.db.Exec(alterQuery); err != nil {
+			return fmt.Errorf("failed to add system_prompt column: %w", err)
+		}
+	}
+
+	return nil
 }

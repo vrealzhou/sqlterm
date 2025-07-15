@@ -936,6 +936,10 @@
     {
       "id": "warning_failed_to_record_usage",
       "text": "警告：记录使用情况失败：%v"
+    },
+    {
+      "id": "system_prompt_header",
+      "text": "**系统提示：**\n"
     }
   ]
 }

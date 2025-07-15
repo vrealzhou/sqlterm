@@ -1959,6 +1959,14 @@ func (a *App) handleShowPrompts(args []string) error {
 		writeOutput(entry.UserMessage)
 		writeOutput("\n```\n\n")
 
+		// System prompt section
+		if entry.SystemPrompt != "" {
+			writeOutput(a.i18nMgr.Get("system_prompt_header"))
+			writeOutput("```\n")
+			writeOutput(entry.SystemPrompt)
+			writeOutput("\n```\n\n")
+		}
+
 		writeOutput(a.i18nMgr.Get("ai_response"))
 		if entry.AIResponse != "" {
 			writeOutput(entry.AIResponse)
