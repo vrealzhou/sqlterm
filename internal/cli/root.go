@@ -15,9 +15,21 @@ import (
 )
 
 var (
-	cfgFile string
-	verbose bool
+	cfgFile   string
+	verbose   bool
+	
+	// Version information (set from main)
+	Version   string = "dev"
+	BuildTime string = "unknown"
+	GitCommit string = "unknown"
 )
+
+// SetVersionInfo sets the version information
+func SetVersionInfo(version, buildTime, gitCommit string) {
+	Version = version
+	BuildTime = buildTime
+	GitCommit = gitCommit
+}
 
 var rootCmd = &cobra.Command{
 	Use:   "sqlterm",
@@ -57,6 +69,7 @@ func init() {
 	rootCmd.AddCommand(connectCmd)
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(addCmd)
+	rootCmd.AddCommand(versionCmd)
 }
 
 // getI18nString safely gets an i18n string with fallback
@@ -171,6 +184,17 @@ var addCmd = &cobra.Command{
 		}
 
 		return addConnection(config)
+	},
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Show version information",
+	Long:  "Display version, build time, and git commit information",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Printf("SQLTerm %s\n", Version)
+		fmt.Printf("Build time: %s\n", BuildTime)
+		fmt.Printf("Git commit: %s\n", GitCommit)
 	},
 }
 

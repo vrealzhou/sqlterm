@@ -87,17 +87,40 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           mkdir -p dist
+          
+          # Extract version from tag
+          VERSION=${GITHUB_REF#refs/tags/}
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF" ]; then
+            VERSION="dev-$(git rev-parse --short HEAD)"
+          fi
+          
+          # Set binary name with platform info
           BINARY_NAME="sqlterm"
+          PLATFORM_NAME="${GOOS}-${GOARCH}"
+          
           if [ "$GOOS" = "windows" ]; then
             BINARY_NAME="sqlterm.exe"
           fi
-          go build -ldflags="-s -w" -o dist/${BINARY_NAME} ./cmd/sqlterm
+          
+          # Build with version information embedded
+          go build \
+            -ldflags="-s -w -X main.version=${VERSION} -X main.buildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X main.gitCommit=$(git rev-parse HEAD)" \
+            -o dist/${BINARY_NAME} \
+            ./cmd/sqlterm
+          
+          # Create platform-specific archive
+          cd dist
+          if [ "$GOOS" = "windows" ]; then
+            zip "sqlterm-${VERSION}-${PLATFORM_NAME}.zip" ${BINARY_NAME}
+          else
+            tar -czf "sqlterm-${VERSION}-${PLATFORM_NAME}.tar.gz" ${BINARY_NAME}
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sqlterm-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: dist/sqlterm*
+          path: dist/sqlterm-*
           retention-days: 30
 
   release:
@@ -107,6 +130,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
+      discussions: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -118,47 +142,82 @@ jobs:
         with:
           path: artifacts
 
-      - name: Create release archives
+      - name: Prepare release assets
         run: |
           mkdir -p release
-
-          # Create archives for each platform
-          for dir in artifacts/sqlterm-*; do
-            platform=$(basename "$dir")
-            cd "$dir"
-
-            if [[ "$platform" == *windows* ]]; then
-              zip -r "../../release/${platform}.zip" .
-            else
-              tar -czf "../../release/${platform}.tar.gz" .
-            fi
-
-            cd ../..
+          
+          # Copy all archives from artifacts to release directory
+          find artifacts -name "sqlterm-*.tar.gz" -o -name "sqlterm-*.zip" | while read file; do
+            cp "$file" release/
           done
+          
+          # Generate checksums
+          cd release
+          for file in sqlterm-*; do
+            sha256sum "$file" >> checksums.txt
+          done
+          
+          echo "Release assets created:"
+          ls -la
 
       - name: Generate release notes
         run: |
-          echo "## What's Changed" > release_notes.md
+          VERSION=${GITHUB_REF#refs/tags/}
+          
+          echo "# SQLTerm $VERSION" > release_notes.md
+          echo "" >> release_notes.md
+          echo "A modern, AI-powered terminal-based SQL database management tool built in Go." >> release_notes.md
           echo "" >> release_notes.md
 
           # Get commits since last tag
           last_tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           if [ -n "$last_tag" ]; then
-            echo "Changes since $last_tag:" >> release_notes.md
+            echo "## 🚀 What's Changed" >> release_notes.md
+            echo "" >> release_notes.md
             git log --pretty=format:"- %s" "$last_tag"..HEAD >> release_notes.md
+            echo "" >> release_notes.md
           else
-            echo "Initial release" >> release_notes.md
+            echo "## 🎉 Initial Release" >> release_notes.md
+            echo "" >> release_notes.md
+            echo "This is the first release of SQLTerm with the following features:" >> release_notes.md
+            echo "- Multi-database support (MySQL, PostgreSQL, SQLite)" >> release_notes.md
+            echo "- AI-powered query assistance" >> release_notes.md
+            echo "- Conversation-style interface" >> release_notes.md
+            echo "- Cross-platform support" >> release_notes.md
+            echo "" >> release_notes.md
           fi
 
+          echo "## 📦 Downloads" >> release_notes.md
           echo "" >> release_notes.md
-          echo "## Downloads" >> release_notes.md
+          echo "Choose the appropriate binary for your platform:" >> release_notes.md
           echo "" >> release_notes.md
 
-          # List available binaries
-          for file in release/*; do
+          # List available binaries with better formatting
+          for file in release/sqlterm-*; do
             filename=$(basename "$file")
-            echo "- \`$filename\`" >> release_notes.md
+            if [[ "$filename" == *"linux-amd64"* ]]; then
+              echo "- **Linux x64**: \`$filename\`" >> release_notes.md
+            elif [[ "$filename" == *"linux-arm64"* ]]; then
+              echo "- **Linux ARM64**: \`$filename\`" >> release_notes.md
+            elif [[ "$filename" == *"darwin-amd64"* ]]; then
+              echo "- **macOS Intel**: \`$filename\`" >> release_notes.md
+            elif [[ "$filename" == *"darwin-arm64"* ]]; then
+              echo "- **macOS Apple Silicon**: \`$filename\`" >> release_notes.md
+            elif [[ "$filename" == *"windows-amd64"* ]]; then
+              echo "- **Windows x64**: \`$filename\`" >> release_notes.md
+            elif [[ "$filename" == "checksums.txt" ]]; then
+              echo "- **Checksums**: \`$filename\`" >> release_notes.md
+            fi
           done
+          
+          echo "" >> release_notes.md
+          echo "## 🔐 Verification" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "You can verify the integrity of downloaded files using the checksums:" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "\`\`\`bash" >> release_notes.md
+          echo "sha256sum -c checksums.txt" >> release_notes.md
+          echo "\`\`\`" >> release_notes.md
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -170,6 +229,14 @@ jobs:
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Release Summary
+        run: |
+          echo "🎉 Successfully released SQLTerm ${{ github.ref_name }}"
+          echo "📦 Release assets:"
+          ls -la release/
+          echo ""
+          echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
 
   docker:
     name: Docker Build
