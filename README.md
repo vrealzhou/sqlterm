@@ -18,6 +18,7 @@ A modern, AI-powered terminal-based SQL database management tool built in Go. SQ
 - 📈 **CSV Export**: Export complete results to CSV with `> filename.csv`
 - 🎯 **Auto-completion**: Tab completion for commands and files
 - 💻 **Session Management**: Organized per-connection storage in `~/.config/sqlterm/sessions/{connection}/`
+- 🌐 **Internationalization**: Full i18n support with English and Chinese localizations (780+ translated strings)
 
 ## Installation
 
@@ -81,9 +82,9 @@ SQLTerm uses a conversation-style interface with the following command types:
 
 # AI Commands (when configured)
 <question>           # Ask AI about your database or SQL
-/ai-config               # Configure AI providers and settings
-/ai-usage                # Show AI usage statistics
-/show-prompts              # View recent AI prompt history
+/config                  # Configure AI providers and settings
+/usage                   # Show AI usage statistics
+/prompts                 # View recent AI prompt history
 ```
 
 #### `@` File References - Execute SQL Files
@@ -194,7 +195,7 @@ SQLTerm supports multiple AI providers for intelligent database assistance:
 Set up AI providers with the interactive configuration:
 
 ```bash
-sqlterm > /ai-config
+sqlterm > /config
 🤖 AI Configuration
 📊 Select provider:
   1. OpenRouter (Cloud)
@@ -232,6 +233,17 @@ WHERE o.customer_id IS NULL;
 
 This query joins the customers table with orders and filters for customers where no matching order exists.
 ```
+
+### Language Support
+
+SQLTerm supports multiple languages with automatic detection based on system locale:
+
+- **English (en_AU)**: Full feature support with comprehensive help text
+- **Chinese (zh_CN)**: Complete translation of all user interface elements
+- **Automatic Detection**: Uses system locale to determine display language
+- **Fallback System**: Gracefully falls back to English if translations are missing
+
+780+ interface strings are fully internationalized, including CLI help, error messages, status updates, and AI responses.
 
 ## Key Features
 
@@ -315,8 +327,8 @@ SQLTerm stores configuration in your system's config directory:
     │   ├── vectors.db     # Vector database for AI context
     │   ├── history.txt    # Command history for this connection
     │   ├── session.yaml   # Session configuration
-    │   ├── query_result_20241201_143022.md
-    │   └── query_result_20241201_143105.md
+    │   ├── query_result_20250715_143022.md
+    │   └── query_result_20250715_143105.md
     └── production/        # Session data for "production" connection
         ├── vectors.db
         ├── history.txt
@@ -349,12 +361,18 @@ sqlterm/
 │   │   └── types.go      # AI types and interfaces
 │   ├── cli/              # Command line interface
 │   ├── config/           # Configuration management
+│   │   ├── config.go     # Configuration utilities
+│   │   └── types.go      # Configuration types
 │   ├── conversation/     # Interactive conversation mode
 │   ├── core/             # Core database functionality
 │   │   ├── connection.go # Database connections
 │   │   ├── export.go     # Result export (CSV/Markdown)
 │   │   ├── sqlformatter.go # SQL formatting engine
 │   │   └── types.go      # Core types
+│   ├── i18n/             # Internationalization system
+│   │   ├── messages.go   # i18n manager and message loading
+│   │   ├── en_au.json    # English translations
+│   │   └── zh_cn.json    # Chinese translations
 │   └── session/          # Session management
 ├── data/                 # Sample data files
 ├── queries/              # Sample SQL query files
