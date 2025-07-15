@@ -1,0 +1,941 @@
+{
+  "language": "zh_cn",
+  "messages": [
+    {
+      "id": "ai_not_configured",
+      "text": "🤖 AI 未配置。使用 /ai-config 设置 AI 提供商。"
+    },
+    {
+      "id": "ai_conversation_history",
+      "text": "# AI 对话历史 (最近 %d 条)\n\n"
+    },
+    {
+      "id": "no_ai_history",
+      "text": "📝 未找到 AI 对话历史。\n开始与 AI 聊天（输入不带 / 或 @ 前缀的消息）以查看历史记录。\n"
+    },
+    {
+      "id": "conversation_history_saved",
+      "text": "📍 对话历史已保存至：%s\n"
+    },
+    {
+      "id": "ai_not_configured_short",
+      "text": "🤖 AI 未配置。"
+    },
+    {
+      "id": "no_active_conversation",
+      "text": "📝 没有活跃的对话可清除。"
+    },
+    {
+      "id": "clearing_conversation",
+      "text": "📊 正在清除对话（阶段：%s，已加载表：%d）\n"
+    },
+    {
+      "id": "conversation_cleared",
+      "text": "✅ 对话已清除。准备接受新查询。\n"
+    },
+    {
+      "id": "provider_info",
+      "text": "**提供商：** %s | **模型：** %s | **令牌：** %d 输入，%d 输出"
+    },
+    {
+      "id": "cost_paid",
+      "text": " | **费用：** $%.6f"
+    },
+    {
+      "id": "cost_free",
+      "text": " | **费用：** 免费"
+    },
+    {
+      "id": "user_request",
+      "text": "### 🧑‍💻 用户请求\n```\n"
+    },
+    {
+      "id": "ai_response",
+      "text": "### 🤖 AI 响应\n"
+    },
+    {
+      "id": "ai_response_unavailable",
+      "text": "*此条目中 AI 响应不可用*"
+    },
+    {
+      "id": "request_number",
+      "text": "## 请求 #%d - %s\n\n"
+    },
+    {
+      "id": "initializing_vector_db",
+      "text": "🔍 正在为 %s 初始化 AI 向量数据库...\n"
+    },
+    {
+      "id": "vector_db_ready",
+      "text": "✅ 向量数据库已就绪，位于会话文件夹：~/.config/sqlterm/sessions/%s/\n"
+    },
+    {
+      "id": "vector_db_init_warning",
+      "text": "警告：初始化向量存储失败：%v\n"
+    },
+    {
+      "id": "config_migrated",
+      "text": "📦 已从 ai.yaml 迁移配置到 config.yaml\n"
+    },
+    {
+      "id": "vector_db_migrated",
+      "text": "📦 已将 %s 的向量数据库迁移到会话文件夹\n"
+    },
+    {
+      "id": "schemas_loaded_analyzing",
+      "text": "📋 已为 %v 加载架构。正在分析...\n"
+    },
+    {
+      "id": "help_header",
+      "text": "SQLTerm - 带 AI 助手的交互式 SQL 终端\n\n命令：\n"
+    },
+    {
+      "id": "help_connect",
+      "text": "/connect [名称]          连接到数据库连接"
+    },
+    {
+      "id": "help_list_connections",
+      "text": "/list-connections        列出所有可用的数据库连接"
+    },
+    {
+      "id": "help_tables",
+      "text": "/tables                  列出当前数据库中的所有表"
+    },
+    {
+      "id": "help_describe",
+      "text": "/describe [表名]         描述表结构"
+    },
+    {
+      "id": "help_status",
+      "text": "/status                  显示连接状态"
+    },
+    {
+      "id": "help_exec",
+      "text": "/exec [查询]             直接执行查询"
+    },
+    {
+      "id": "help_exec_multiline",
+      "text": "/exec                    进入多行 SQL 模式（以 ; 结束）"
+    },
+    {
+      "id": "help_exec_csv",
+      "text": "/exec [查询] > 文件.csv  将查询结果导出到 CSV"
+    },
+    {
+      "id": "help_ai_config",
+      "text": "/config                  配置应用程序设置"
+    },
+    {
+      "id": "help_last_ai_call",
+      "text": "/last-ai-call [数量]     显示 AI 对话历史及请求/响应详情"
+    },
+    {
+      "id": "help_clear_conversation",
+      "text": "/clear-conversation      清除当前 AI 对话并重新开始"
+    },
+    {
+      "id": "help_quit",
+      "text": "/quit, /exit             退出 SQLTerm"
+    },
+    {
+      "id": "help_ai_chat",
+      "text": "AI 聊天：\n直接输入您的问题（不带 / 或 @ 前缀）与 AI 讨论您的数据库。\n示例：\"显示所有上个月注册的用户\"\n"
+    },
+    {
+      "id": "help_file_execution",
+      "text": "文件执行：\n使用 @文件名.sql 执行 SQL 文件\n示例：@queries/report.sql\n"
+    },
+    {
+      "id": "unknown_command",
+      "text": "未知命令：%s。输入 /help 查看可用命令。\n"
+    },
+    {
+      "id": "connecting_to",
+      "text": "正在连接到 %s...\n"
+    },
+    {
+      "id": "connected_to",
+      "text": "✅ 已连接到 %s (%s)\n"
+    },
+    {
+      "id": "connection_failed",
+      "text": "❌ 连接失败：%v\n"
+    },
+    {
+      "id": "session_init_warning",
+      "text": "警告：初始化会话目录失败：%v\n"
+    },
+    {
+      "id": "session_history_warning",
+      "text": "警告：切换到会话历史失败：%v\n"
+    },
+    {
+      "id": "vector_db_init_warning",
+      "text": "警告：初始化向量存储失败：%v\n"
+    },
+    {
+      "id": "usage_update_warning",
+      "text": "警告：更新使用统计失败：%v\n"
+    },
+    {
+      "id": "conversation_continue_warning",
+      "text": "警告：继续架构对话失败：%v\n"
+    },
+    {
+      "id": "conversation_continue_additional_warning",
+      "text": "警告：继续附加架构对话失败：%v\n"
+    },
+    {
+      "id": "conversation_turn_warning",
+      "text": "警告：处理对话回合失败：%v\n"
+    },
+    {
+      "id": "markdown_view_warning",
+      "text": "警告：%v\n"
+    },
+    {
+      "id": "markdown_export_warning",
+      "text": "警告：创建 markdown 文件失败：%v\n"
+    },
+    {
+      "id": "prompt_welcome",
+      "text": "输入 /help 查看可用命令，或直接输入 SQL 查询。\n"
+    },
+    {
+      "id": "example_message",
+      "text": "示例：'显示所有表' 或 '帮我写一个查询来找用户'\n"
+    },
+    {
+      "id": "help_full",
+      "text": "\n可用命令：\n\n/help                    显示此帮助信息\n/connect                 交互式连接设置\n/connect [名称]          连接到已保存的连接（Tab：自动补全名称）\n/list-connections        列出所有已保存的连接\n/tables                  列出当前数据库中的表\n/describe [表名]         显示表结构（Tab：自动补全表名）\n/status                  显示当前连接状态\n/exec [查询]             直接执行查询\n/exec                    进入多行 SQL 模式（以 ; 结束）\n/exec [查询] > 文件.csv  将查询结果导出到 CSV\n/config                  配置应用程序设置\n/config ai               配置 AI 提供商和模型\n/config language <语言>  设置界面语言（en_au, zh_cn）\n/last-ai-call [数量]     显示 AI 对话历史及请求/响应详情\n/clear-conversation      清除当前 AI 对话并重新开始\n/quit, /exit             退出 SQLTerm\n\nAI 聊天：\n直接输入不带 / 或 @ 前缀的消息与 AI 聊天。\nAI 使用多轮对话逐步收集表信息。\n使用 /clear-conversation 重新开始或 /config ai 设置提供商。\n\n文件命令：\n@文件名.sql              执行文件中的所有查询（Tab：自动补全文件）\n@文件名.sql 1            仅执行查询 1\n@文件名.sql 2-5          执行查询 2 到 5\n\nCSV 导出：\nSELECT * FROM table > output.csv    将查询结果导出到 CSV（Tab：自动补全文件名）\n/exec SELECT * FROM table > out.csv 使用 /exec 命令导出\n\nSQL 查询：\n直接输入任何 SQL 查询以执行它。\n结果会自动保存为 markdown 并使用 glamour 显示。\n\n自动补全：\n- 在 /connect 后按 Tab 查看连接名称\n- 在 /describe 后按 Tab 查看表名\n- 在 /config 后按 Tab 查看配置部分和选项\n- 在 @ 后按 Tab 查看 .sql 文件（搜索所有子目录）\n- 在 > 后按 Tab 查看/创建 .csv 文件\n- 排除隐藏文件夹（以 . 开头）和常见构建目录\n\n会话管理：\n- 结果自动保存到 ~/.config/sqlterm/sessions/{连接}/results/\n- 旧结果文件根据保留设置自动清理\n- 在 ~/.config/sqlterm/sessions/{连接}/session.yaml 中配置清理\n- 默认保留期：30 天（cleanup_retention_days: 30）"
+    },
+    {
+      "id": "connection_saved",
+      "text": "💾 连接已保存！\n"
+    },
+    {
+      "id": "starting_conversation_mode",
+      "text": "启动对话模式...\n"
+    },
+    {
+      "id": "markdown_truncation_note",
+      "text": "*注意：仅显示前 %d 行。使用 CSV 导出可获取完整结果。*"
+    },
+    {
+      "id": "query_error",
+      "text": "查询错误"
+    },
+    {
+      "id": "markdown_query_header",
+      "text": "**查询：**"
+    },
+    {
+      "id": "failed_to_write_markdown",
+      "text": "写入 markdown 文件失败：%w"
+    },
+    {
+      "id": "failed_to_create_session_dir",
+      "text": "创建会话目录失败：%w"
+    },
+    {
+      "id": "file_query_results_header",
+      "text": "文件查询结果"
+    },
+    {
+      "id": "connection_header",
+      "text": "连接"
+    },
+    {
+      "id": "source_file_header",
+      "text": "源文件"
+    },
+    {
+      "id": "total_queries_header",
+      "text": "总查询数"
+    },
+    {
+      "id": "query_header",
+      "text": "查询"
+    },
+    {
+      "id": "failed_to_create_results_dir",
+      "text": "创建结果目录 %s 失败：%w"
+    },
+    {
+      "id": "query_results_header",
+      "text": "查询结果"
+    },
+    {
+      "id": "no_connection_for_session_dir",
+      "text": "没有用于会话目录的数据库连接"
+    },
+    {
+      "id": "failed_to_migrate_config",
+      "text": "无法将配置从 ai.yaml 迁移到 config.yaml: %w"
+    },
+    {
+      "id": "failed_to_create_default_config",
+      "text": "创建默认配置失败: %w"
+    },
+    {
+      "id": "failed_to_read_config_file",
+      "text": "读取配置文件失败: %w"
+    },
+    {
+      "id": "failed_to_parse_config_file",
+      "text": "解析配置文件失败: %w"
+    },
+    {
+      "id": "failed_to_create_config_dir",
+      "text": "创建配置目录失败: %w"
+    },
+    {
+      "id": "failed_to_marshal_config",
+      "text": "序列化配置失败: %w"
+    },
+    {
+      "id": "failed_to_write_config_file",
+      "text": "写入配置文件失败: %w"
+    },
+    {
+      "id": "ai_conversation_history_header",
+      "text": "AI 对话历史"
+    },
+    {
+      "id": "connected_successfully",
+      "text": "✓ 已成功连接到 %s\n"
+    },
+    {
+      "id": "file_location",
+      "text": "文件位置"
+    },
+    {
+      "id": "failed_to_create_sessions_dir",
+      "text": "创建会话目录失败：%w"
+    },
+    {
+      "id": "failed_to_create_readline",
+      "text": "创建 readline 失败：%w"
+    },
+    {
+      "id": "failed_to_create_readline_session_history",
+      "text": "创建带会话历史的 readline 失败：%w"
+    },
+    {
+      "id": "failed_to_read_legacy_history",
+      "text": "读取旧历史记录失败：%w"
+    },
+    {
+      "id": "failed_to_write_session_history",
+      "text": "写入会话历史失败：%w"
+    },
+    {
+      "id": "failed_to_create_readline_global_history",
+      "text": "创建带全局历史的 readline 失败：%w"
+    },
+    {
+      "id": "query_execution_failed",
+      "text": "查询执行失败：%w"
+    },
+    {
+      "id": "file_not_found",
+      "text": "文件未找到：%s"
+    },
+    {
+      "id": "failed_to_open_file",
+      "text": "打开文件失败：%w"
+    },
+    {
+      "id": "failed_to_read_file",
+      "text": "读取文件失败：%w"
+    },
+    {
+      "id": "failed_to_load_connection",
+      "text": "加载连接 '%s' 失败：%w"
+    },
+    {
+      "id": "failed_to_connect",
+      "text": "连接失败：%w"
+    },
+    {
+      "id": "connection_test_failed",
+      "text": "连接测试失败：%w"
+    },
+    {
+      "id": "invalid_choice",
+      "text": "无效选择：%s"
+    },
+    {
+      "id": "invalid_port",
+      "text": "无效端口：%s"
+    },
+    {
+      "id": "failed_to_list_connections",
+      "text": "列出连接失败：%w"
+    },
+    {
+      "id": "failed_to_list_tables",
+      "text": "列出表失败：%w"
+    },
+    {
+      "id": "failed_to_describe_table",
+      "text": "描述表失败：%w"
+    },
+    {
+      "id": "invalid_csv_export_syntax",
+      "text": "无效的 CSV 导出语法。使用：query > filename.csv"
+    },
+    {
+      "id": "invalid_csv_export_syntax_file",
+      "text": "无效的 CSV 导出语法。使用：@filename.sql > output.csv"
+    },
+    {
+      "id": "ai_chat_failed",
+      "text": "AI 聊天失败：%w"
+    },
+    {
+      "id": "ai_manager_not_initialized",
+      "text": "AI 管理器未初始化"
+    },
+    {
+      "id": "failed_to_set_provider",
+      "text": "设置提供商失败：%w"
+    },
+    {
+      "id": "failed_to_set_model",
+      "text": "设置模型失败：%w"
+    },
+    {
+      "id": "failed_to_set_api_key",
+      "text": "设置 API 密钥失败：%w"
+    },
+    {
+      "id": "failed_to_set_base_url",
+      "text": "设置基本 URL 失败：%w"
+    },
+    {
+      "id": "language_not_available",
+      "text": "语言 '%s' 不可用。可用语言：%s"
+    },
+    {
+      "id": "failed_to_update_language",
+      "text": "更新语言失败：%w"
+    },
+    {
+      "id": "api_key_required",
+      "text": "需要 API 密钥"
+    },
+    {
+      "id": "failed_to_save_configuration",
+      "text": "保存配置失败：%w"
+    },
+    {
+      "id": "unknown_openrouter_subcommand",
+      "text": "未知 OpenRouter 子命令：%s"
+    },
+    {
+      "id": "failed_to_list_models",
+      "text": "列出模型失败：%w"
+    },
+    {
+      "id": "failed_to_read_input",
+      "text": "读取输入失败：%w"
+    },
+    {
+      "id": "failed_to_read_api_key",
+      "text": "读取 API 密钥失败：%w"
+    },
+    {
+      "id": "failed_to_read_base_url",
+      "text": "读取基本 URL 失败：%w"
+    },
+    {
+      "id": "failed_to_initialize_ai_manager",
+      "text": "初始化 AI 管理器失败：%w"
+    },
+    {
+      "id": "failed_to_set_temporary_provider",
+      "text": "设置临时提供商失败：%w"
+    },
+    {
+      "id": "failed_to_set_default_model",
+      "text": "设置默认模型失败：%w"
+    },
+    {
+      "id": "failed_to_read_model_choice",
+      "text": "读取模型选择失败：%w"
+    },
+    {
+      "id": "failed_to_set_final_configuration",
+      "text": "设置最终配置失败：%w"
+    },
+    {
+      "id": "failed_to_initialize_ai_client",
+      "text": "初始化 AI 客户端失败：%w"
+    },
+    {
+      "id": "failed_to_marshal_request",
+      "text": "序列化请求失败：%w"
+    },
+    {
+      "id": "failed_to_create_request",
+      "text": "创建请求失败：%w"
+    },
+    {
+      "id": "request_failed",
+      "text": "请求失败：%w"
+    },
+    {
+      "id": "api_request_failed",
+      "text": "API 请求失败，状态：%d：%s"
+    },
+    {
+      "id": "failed_to_decode_response",
+      "text": "解码响应失败：%w"
+    },
+    {
+      "id": "model_not_found",
+      "text": "未找到模型：%s"
+    },
+    {
+      "id": "sqlterm_conversation_mode",
+      "text": "🗄️  SQLTerm - 对话模式"
+    },
+    {
+      "id": "no_database_connection",
+      "text": "未连接数据库。使用 /connect 连接数据库。"
+    },
+    {
+      "id": "interactive_connection_setup",
+      "text": "🔧 交互式连接设置"
+    },
+    {
+      "id": "enter_connection_name",
+      "text": "📝 输入连接名称："
+    },
+    {
+      "id": "select_database_type",
+      "text": "📊 选择数据库类型："
+    },
+    {
+      "id": "mysql_option",
+      "text": "  1. MySQL"
+    },
+    {
+      "id": "postgresql_option",
+      "text": "  2. PostgreSQL"
+    },
+    {
+      "id": "sqlite_option",
+      "text": "  3. SQLite"
+    },
+    {
+      "id": "enter_choice",
+      "text": "输入选择 (1-3)："
+    },
+    {
+      "id": "enter_host",
+      "text": "📝 输入主机 [localhost]："
+    },
+    {
+      "id": "enter_port",
+      "text": "📝 输入端口 [%d]："
+    },
+    {
+      "id": "enter_username",
+      "text": "📝 输入用户名："
+    },
+    {
+      "id": "enter_password",
+      "text": "🔐 输入密码："
+    },
+    {
+      "id": "enter_database_name",
+      "text": "📝 输入数据库名称："
+    },
+    {
+      "id": "testing_connection",
+      "text": "正在测试连接到 %s...\n"
+    },
+    {
+      "id": "no_saved_connections_found",
+      "text": "未找到已保存的连接。"
+    },
+    {
+      "id": "saved_connections",
+      "text": "📋 已保存的连接："
+    },
+    {
+      "id": "no_tables_found",
+      "text": "在数据库 '%s' 中未找到表。"
+    },
+    {
+      "id": "tables_in_database",
+      "text": "📋 数据库 %s 中的表："
+    },
+    {
+      "id": "usage_describe_table",
+      "text": "用法：/describe <表名>"
+    },
+    {
+      "id": "table_header",
+      "text": "表"
+    },
+    {
+      "id": "columns_header",
+      "text": "列"
+    },
+    {
+      "id": "column_table_header",
+      "text": "| 列 | 类型 | 可空 | 键 | 默认值 |\n"
+    },
+    {
+      "id": "column_table_separator",
+      "text": "|--------|------|----------|-----|----------|\n"
+    },
+    {
+      "id": "not_nullable",
+      "text": "❌ 非空"
+    },
+    {
+      "id": "nullable",
+      "text": "✅ 可空"
+    },
+    {
+      "id": "key_format",
+      "text": "🔑 %s"
+    },
+    {
+      "id": "primary_keys_header",
+      "text": "主键"
+    },
+    {
+      "id": "constraints_header",
+      "text": "约束"
+    },
+    {
+      "id": "check_header",
+      "text": "检查"
+    },
+    {
+      "id": "foreign_keys_header",
+      "text": "外键"
+    },
+    {
+      "id": "references_header",
+      "text": "引用"
+    },
+    {
+      "id": "on_delete_header",
+      "text": "删除时"
+    },
+    {
+      "id": "on_update_header",
+      "text": "更新时"
+    },
+    {
+      "id": "status_not_connected",
+      "text": "📡 状态：未连接"
+    },
+    {
+      "id": "use_connect_to_establish_connection",
+      "text": "使用 /connect 建立数据库连接。"
+    },
+    {
+      "id": "status_connected",
+      "text": "📡 状态：已连接到 %s"
+    },
+    {
+      "id": "database_info",
+      "text": "   数据库：%s"
+    },
+    {
+      "id": "type_info",
+      "text": "   类型：%s"
+    },
+    {
+      "id": "host_info",
+      "text": "   主机：%s:%d"
+    },
+    {
+      "id": "username_info",
+      "text": "   用户名：%s"
+    },
+    {
+      "id": "multi_line_sql_mode",
+      "text": "📝 多行 SQL 模式。输入您的查询："
+    },
+    {
+      "id": "multi_line_sql_paste_lines",
+      "text": "   • 粘贴多行"
+    },
+    {
+      "id": "multi_line_sql_end_with_semicolon",
+      "text": "   • 以 ; 结束执行"
+    },
+    {
+      "id": "multi_line_sql_cancel",
+      "text": "   • 或按 Ctrl+C 取消"
+    },
+    {
+      "id": "multi_line_sql_csv_export",
+      "text": "   • 在末尾使用 > filename.csv 进行 CSV 导出"
+    },
+    {
+      "id": "multi_line_input_cancelled",
+      "text": "\n❌ 多行输入已取消。"
+    },
+    {
+      "id": "no_query_entered",
+      "text": "❌ 未输入查询。"
+    },
+    {
+      "id": "executing_query",
+      "text": "🔍 正在执行查询...\n"
+    },
+    {
+      "id": "query_truncated",
+      "text": "📋 查询：%s\n\n"
+    },
+    {
+      "id": "executing_query_streaming",
+      "text": "📊 正在执行查询并流式传输到 %s...\n"
+    },
+    {
+      "id": "exported_rows_to_file",
+      "text": "✅ 已导出 %d 行到 %s\n"
+    },
+    {
+      "id": "executing_sql_file",
+      "text": "📁 正在执行 SQL 文件：%s\n"
+    },
+    {
+      "id": "found_queries_in_file",
+      "text": "🔄 在文件中找到 %d 个查询\n"
+    },
+    {
+      "id": "query_number_truncated_query",
+      "text": "\n📝 查询 %d：%s\n"
+    },
+    {
+      "id": "query_failed",
+      "text": "❌ 查询失败：%v\n"
+    },
+    {
+      "id": "query_executed_rows",
+      "text": "📊 查询已执行（%d 行）\n"
+    },
+    {
+      "id": "exported_to_single_file",
+      "text": "\n📁 已导出到：%s\n"
+    },
+    {
+      "id": "exported_to_multiple_files",
+      "text": "\n📁 已导出到 %d 个文件：\n"
+    },
+    {
+      "id": "total_rows_exported",
+      "text": "📊 总计：已导出 %d 行\n"
+    },
+    {
+      "id": "no_results_to_export",
+      "text": "⚠️  没有结果可导出到 CSV（所有查询返回 0 行）"
+    },
+    {
+      "id": "app_short_description",
+      "text": "基于终端的 SQL 数据库工具"
+    },
+    {
+      "id": "app_long_description", 
+      "text": "SQLTerm 提供直观的对话式界面，用于管理数据库连接和执行跨 MySQL、PostgreSQL 和 SQLite 的查询。"
+    },
+    {
+      "id": "config_file_flag",
+      "text": "配置文件（默认为 $HOME/.sqlterm.yaml）"
+    },
+    {
+      "id": "verbose_output_flag",
+      "text": "详细输出"
+    },
+    {
+      "id": "connect_command_short",
+      "text": "直接连接到数据库"
+    },
+    {
+      "id": "list_command_short",
+      "text": "列出已保存的连接"
+    },
+    {
+      "id": "add_command_short",
+      "text": "添加新连接"
+    },
+    {
+      "id": "no_saved_connections_cli",
+      "text": "未找到已保存的连接。"
+    },
+    {
+      "id": "add_connection_instruction",
+      "text": "使用以下命令添加连接：sqlterm add <名称> --db-type <类型> --host <主机> --database <数据库> --username <用户>"
+    },
+    {
+      "id": "saved_connections_cli",
+      "text": "已保存的连接："
+    },
+    {
+      "id": "testing_connection_cli",
+      "text": "正在测试连接到 %s..."
+    },
+    {
+      "id": "connection_test_successful",
+      "text": "✓ 连接测试成功"
+    },
+    {
+      "id": "connection_saved_cli",
+      "text": "✓ 连接 '%s' 已保存"
+    },
+    {
+      "id": "use_list_instruction",
+      "text": "使用 'sqlterm list' 查看所有连接"
+    },
+    {
+      "id": "use_sqlterm_instruction",
+      "text": "使用 'sqlterm' 启动对话界面"
+    },
+    {
+      "id": "config_migrated_cli",
+      "text": "📦 已从 ai.yaml 迁移配置到 config.yaml"
+    },
+    {
+      "id": "session_migrated_toml_to_yaml",
+      "text": "📁 已将 %s 的 session.toml 迁移到 session.yaml"
+    },
+    {
+      "id": "session_yaml_created",
+      "text": "📁 已为 %s 创建 session.yaml（清理保留天数：%d）"
+    },
+    {
+      "id": "ai_starting_new_conversation",
+      "text": "🤖 开始新对话...（复杂查询可能需要 2 分钟）"
+    },
+    {
+      "id": "ai_processing_conversation",
+      "text": "🤖 正在处理对话（阶段：%s）... "
+    },
+    {
+      "id": "ai_response_header",
+      "text": "🤖 AI 响应："
+    },
+    {
+      "id": "usage_data_unavailable",
+      "text": "无使用数据"
+    },
+    {
+      "id": "usage_today_summary",
+      "text": "今日：%d 请求，$%.4f"
+    },
+    {
+      "id": "unknown_config_section",
+      "text": "未知配置部分：%s"
+    },
+    {
+      "id": "unknown_ai_subcommand",
+      "text": "未知 AI 子命令：%s"
+    },
+    {
+      "id": "usage_ai_config_provider",
+      "text": "用法：/ai-config provider <openrouter|ollama|lmstudio>"
+    },
+    {
+      "id": "usage_ai_config_model",
+      "text": "用法：/ai-config model <模型名称>"
+    },
+    {
+      "id": "usage_ai_config_api_key",
+      "text": "用法：/ai-config api-key <提供商> <API密钥>"
+    },
+    {
+      "id": "usage_ai_config_base_url",
+      "text": "用法：/ai-config base-url <提供商> <URL>"
+    },
+    {
+      "id": "current_language_display",
+      "text": "当前语言：%s"
+    },
+    {
+      "id": "available_languages_display",
+      "text": "可用语言：%s"
+    },
+    {
+      "id": "available_openrouter_commands",
+      "text": "可用的 OpenRouter 命令："
+    },
+    {
+      "id": "enter_choice_prompt",
+      "text": "输入选择 (1-3)："
+    },
+    {
+      "id": "enter_openrouter_api_key",
+      "text": "🔐 输入 OpenRouter API 密钥（从 https://openrouter.ai/keys 获取）："
+    },
+    {
+      "id": "enter_base_url_for_provider",
+      "text": "🌐 输入 %s 的基本 URL [%s]："
+    },
+    {
+      "id": "enter_model_name_autocomplete",
+      "text": "🤖 输入模型名称（Tab 自动补全）："
+    },
+    {
+      "id": "using_default_model",
+      "text": "使用提供商的默认模型。"
+    },
+    {
+      "id": "please_enter_model_name",
+      "text": "请输入模型名称。"
+    },
+    {
+      "id": "be_more_specific_model",
+      "text": "请更具体或复制粘贴确切的模型名称。"
+    },
+    {
+      "id": "csv_export_header",
+      "text": "日期,提供商,模型,总请求数,输入令牌,输出令牌,总费用"
+    },
+    {
+      "id": "usage_tracking_not_available",
+      "text": "使用跟踪不可用 - 无数据库连接"
+    },
+    {
+      "id": "usage_statistics_header",
+      "text": "📊 使用统计："
+    },
+    {
+      "id": "session_id_display",
+      "text": "会话 ID：%s"
+    },
+    {
+      "id": "today_usage_stats",
+      "text": "今日：%d 请求，%d 输入令牌，%d 输出令牌，$%.6f"
+    },
+    {
+      "id": "last_7_days_usage_stats",
+      "text": "过去 7 天：%d 请求，%d 输入令牌，%d 输出令牌，$%.6f"
+    },
+    {
+      "id": "usage_not_available_no_db",
+      "text": "不可用（无数据库连接）"
+    },
+    {
+      "id": "todays_usage_display",
+      "text": "今日使用：%d 请求，$%.6f"
+    },
+    {
+      "id": "last_7_days_display",
+      "text": "过去 7 天：%d 请求，$%.6f"
+    },
+    {
+      "id": "warning_failed_to_record_usage",
+      "text": "警告：记录使用情况失败：%v"
+    }
+  ]
+}
