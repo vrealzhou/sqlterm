@@ -3,6 +3,7 @@ module sqlterm
 go 1.24
 
 require (
+	github.com/bwmarrin/snowflake v0.3.0
 	github.com/charmbracelet/glamour v0.6.0
 	github.com/chzyer/readline v1.5.1
 	github.com/go-sql-driver/mysql v1.7.1

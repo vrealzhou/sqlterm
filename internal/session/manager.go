@@ -1,14 +1,14 @@
 package session
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
 	"sqlterm/internal/core"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -31,6 +31,9 @@ func (m *Manager) GetSessionDir(connectionName string) string {
 }
 
 func (m *Manager) EnsureSessionDir(connectionName string) error {
+	if connectionName == "" {
+		return errors.New("connectionName can not be empty")
+	}
 	sessionDir := m.GetSessionDir(connectionName)
 	if err := os.MkdirAll(sessionDir, 0755); err != nil {
 		return err
@@ -151,17 +154,6 @@ func (m *Manager) ensureSessionConfig(connectionName string) error {
 		return nil // Config already exists
 	}
 
-	// Check for old TOML config and migrate if exists
-	oldTomlPath := filepath.Join(m.GetSessionDir(connectionName), "session.toml")
-	if _, err := os.Stat(oldTomlPath); err == nil {
-		if migrateErr := m.migrateTOMLToYAML(connectionName, oldTomlPath, configPath); migrateErr != nil {
-			fmt.Printf("Warning: failed to migrate TOML config: %v\n", migrateErr)
-		} else {
-			fmt.Printf("📁 Migrated session.toml to session.yaml for %s\n", connectionName)
-			return nil
-		}
-	}
-
 	// Create default config
 	defaultConfig := &SessionConfig{
 		CleanupRetentionDays: 30,
@@ -172,46 +164,6 @@ func (m *Manager) ensureSessionConfig(connectionName string) error {
 	}
 
 	fmt.Printf("📁 Created session.yaml for %s (cleanup_retention_days: %d)\n", connectionName, defaultConfig.CleanupRetentionDays)
-	return nil
-}
-
-func (m *Manager) migrateTOMLToYAML(connectionName, oldPath, newPath string) error {
-	// Read old TOML file (we'll do basic text parsing since we only care about cleanup_retention_days)
-	data, err := os.ReadFile(oldPath)
-	if err != nil {
-		return fmt.Errorf("failed to read TOML file: %w", err)
-	}
-
-	// Simple parsing for cleanup_retention_days
-	config := &SessionConfig{
-		CleanupRetentionDays: 30, // Default
-	}
-
-	// Basic parsing - look for cleanup_retention_days = value
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "cleanup_retention_days") {
-			parts := strings.Split(line, "=")
-			if len(parts) == 2 {
-				value := strings.TrimSpace(parts[1])
-				if retentionDays, parseErr := strconv.Atoi(value); parseErr == nil && retentionDays > 0 {
-					config.CleanupRetentionDays = retentionDays
-				}
-			}
-		}
-	}
-
-	// Save as YAML
-	if err := m.saveSessionConfig(connectionName, config); err != nil {
-		return fmt.Errorf("failed to save migrated config: %w", err)
-	}
-
-	// Remove old TOML file
-	if err := os.Remove(oldPath); err != nil {
-		fmt.Printf("Warning: failed to remove old TOML file %s: %v\n", oldPath, err)
-	}
-
 	return nil
 }
 

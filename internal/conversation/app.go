@@ -120,7 +120,9 @@ func (a *App) updatePrompt() {
 		prompt = "sqlterm > "
 	}
 
-	a.rl.SetPrompt(prompt)
+	if a.rl != nil {
+		a.rl.SetPrompt(prompt)
+	}
 }
 
 // switchToSessionHistory changes the readline history file to be session-specific
@@ -142,6 +144,10 @@ func (a *App) switchToSessionHistory(connectionName string) error {
 	// Update the readline config with the new history file
 	// Note: The chzyer/readline library doesn't support changing history file after creation,
 	// so we need to manage this manually by closing and recreating the instance
+	if a.rl == nil {
+		// If there's no readline instance, we can't switch history
+		return nil
+	}
 	oldConfig := a.rl.Config
 	a.rl.Close()
 
@@ -211,6 +217,10 @@ func (a *App) switchToGlobalHistory() error {
 	globalHistoryFile := filepath.Join(a.configMgr.GetConfigDir(), "sessions", "global_history.txt")
 
 	// Update the readline config with the global history file
+	if a.rl == nil {
+		// If there's no readline instance, we can't switch history
+		return nil
+	}
 	oldConfig := a.rl.Config
 	a.rl.Close()
 
@@ -1184,7 +1194,7 @@ func (a *App) processAIChat(message string) error {
 	// Get current conversation or show thinking message
 	conversation := a.aiManager.GetCurrentConversation()
 	if conversation == nil {
-		fmt.Printf(a.i18nMgr.Get("ai_starting_new_conversation"))
+		fmt.Print(a.i18nMgr.Get("ai_starting_new_conversation"))
 	} else {
 		fmt.Printf(a.i18nMgr.Get("ai_processing_conversation"), conversation.CurrentPhase.String())
 	}

@@ -59,7 +59,8 @@ func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int)
 func (ac *AutoCompleter) getCommands() [][]rune {
 	commands := []string{
 		"/help", "/quit", "/exit", "/connect", "/list-connections",
-		"/tables", "/describe", "/status", "/exec", "/config", "/last-ai-call",
+		"/tables", "/describe", "/status", "/exec", "/config", 
+		"/prompts", "/clear-conversation",
 	}
 
 	result := make([][]rune, len(commands))
@@ -142,7 +143,8 @@ func (ac *AutoCompleter) findCommonPrefix(candidates []string) string {
 func (ac *AutoCompleter) getCommandCandidates(partial string) []string {
 	commands := []string{
 		"/help", "/quit", "/exit", "/connect", "/list-connections",
-		"/tables", "/describe", "/status", "/exec", "/config", "/last-ai-call",
+		"/tables", "/describe", "/status", "/exec", "/config", 
+		"/prompts", "/clear-conversation",
 	}
 
 	var candidates []string
@@ -566,7 +568,7 @@ func (ac *AutoCompleter) getConfigCandidates(words []string, line string) []stri
 
 func (ac *AutoCompleter) getAvailableModels() []string {
 	if ac.app.aiManager == nil {
-		return nil
+		return []string{}
 	}
 
 	// Get current provider's models

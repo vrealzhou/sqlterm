@@ -30,6 +30,10 @@ type Manager struct {
 
 // NewManager creates a new i18n manager
 func NewManager(language string) (*Manager, error) {
+	if language == "" {
+		return nil, fmt.Errorf("language cannot be empty")
+	}
+	
 	manager := &Manager{
 		currentLanguage: language,
 		messages:        make(map[string]map[string]string),
@@ -37,6 +41,11 @@ func NewManager(language string) (*Manager, error) {
 	
 	if err := manager.loadMessages(); err != nil {
 		return nil, fmt.Errorf("failed to load messages: %w", err)
+	}
+	
+	// Validate that the requested language exists
+	if _, exists := manager.messages[language]; !exists {
+		return nil, fmt.Errorf("language '%s' not supported", language)
 	}
 	
 	return manager, nil
@@ -106,8 +115,17 @@ func (m *Manager) GetWithArgs(messageID string, args ...interface{}) string {
 }
 
 // SetLanguage changes the current language
-func (m *Manager) SetLanguage(language string) {
+func (m *Manager) SetLanguage(language string) error {
+	if language == "" {
+		return fmt.Errorf("language cannot be empty")
+	}
+	
+	if _, exists := m.messages[language]; !exists {
+		return fmt.Errorf("language '%s' not supported", language)
+	}
+	
 	m.currentLanguage = language
+	return nil
 }
 
 // GetCurrentLanguage returns the current language

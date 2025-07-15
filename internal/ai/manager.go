@@ -12,6 +12,7 @@ import (
 	"sqlterm/internal/config"
 	"sqlterm/internal/core"
 	"sqlterm/internal/i18n"
+	"sqlterm/internal/utils"
 )
 
 // Manager manages AI clients and configuration
@@ -27,6 +28,7 @@ type Manager struct {
 	i18nMgr         *i18n.Manager        // Internationalization manager
 	usageStore      *UsageStore          // Usage tracking store
 	sessionID       string               // Current session ID for usage tracking
+	idGen           *utils.IDGen
 }
 
 // NewManager creates a new AI manager
@@ -34,6 +36,11 @@ func NewManager(configDir string) (*Manager, error) {
 	i18nMgr, config, err := config.LoadConfig(configDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AI config: %w", err)
+	}
+
+	idGen, err := utils.NewIDGen()
+	if err != nil {
+		return nil, err
 	}
 
 	manager := &Manager{
@@ -46,8 +53,9 @@ func NewManager(configDir string) (*Manager, error) {
 		recentTables: make([]string, 0),
 		maxTables:    15, // Limit context to 15 most relevant tables
 		i18nMgr:      i18nMgr,
-		sessionID:    generateSessionID(),
+		idGen:        idGen,
 	}
+	manager.sessionID = manager.generateSessionID()
 
 	// Try to initialize client, but don't fail if it's not possible
 	// This allows the manager to be created even if API keys aren't configured yet
@@ -73,8 +81,8 @@ func NewManagerWithValidation(configDir string) (*Manager, error) {
 		recentTables: make([]string, 0),
 		maxTables:    15, // Limit context to 15 most relevant tables
 		i18nMgr:      i18nMgr,
-		sessionID:    generateSessionID(),
 	}
+	manager.sessionID = manager.generateSessionID()
 
 	// Initialize client - this will fail if configuration is invalid
 	if err := manager.initializeClient(); err != nil {
@@ -289,33 +297,35 @@ func (m *Manager) GenerateSystemPrompt(tables []string, currentTable string) str
 	return prompt.String()
 }
 
-// ParseModelString parses a model string in format "provider/model"
+// ParseModelString parses a model string and determines the provider
 func ParseModelString(modelStr string) (config.Provider, string, error) {
-	parts := strings.SplitN(modelStr, "/", 2)
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid model format, expected 'provider/model'")
+	if modelStr == "" {
+		return "", "", fmt.Errorf("model string cannot be empty")
 	}
 
-	provider := config.Provider(parts[0])
-	model := parts[1]
-
-	switch provider {
-	case config.ProviderOpenRouter, config.ProviderOllama, config.ProviderLMStudio:
-		return provider, model, nil
-	default:
-		return "", "", fmt.Errorf("unsupported provider: %s", provider)
+	// If it contains a slash, it's an OpenRouter model
+	if strings.Contains(modelStr, "/") {
+		return config.ProviderOpenRouter, modelStr, nil
 	}
+
+	// If it contains a colon, it's an Ollama model
+	if strings.Contains(modelStr, ":") {
+		return config.ProviderOllama, modelStr, nil
+	}
+
+	// Otherwise, it's an LMStudio model
+	return config.ProviderLMStudio, modelStr, nil
 }
 
 // FormatPrice formats a price for display
 func FormatPrice(price float64) string {
-	if price == 0 {
+	if price <= 0 {
 		return "Free"
 	}
-	if price < 0.001 {
+	if price < 0.01 {
 		return fmt.Sprintf("$%.6f", price)
 	}
-	return fmt.Sprintf("$%.4f", price)
+	return fmt.Sprintf("$%.2f", price)
 }
 
 // ParseFloat safely parses a float from string
@@ -346,7 +356,7 @@ func (m *Manager) addToPromptHistory(userMessage, systemPrompt, aiResponse strin
 
 	// Record usage statistics in the database
 	if m.usageStore != nil {
-		err := m.usageStore.RecordUsage(m.sessionID, m.config.AI.Provider, m.config.AI.Model, 
+		err := m.usageStore.RecordUsage(m.sessionID, m.config.AI.Provider, m.config.AI.Model,
 			inputTokens, outputTokens, cost, userMessage, aiResponse, systemPrompt)
 		if err != nil {
 			fmt.Printf("Warning: failed to record usage: %v\n", err)
@@ -1176,12 +1186,6 @@ func (m *Manager) addRelatedTableSuggestions(prompt *strings.Builder, convCtx *C
 	}
 }
 
-// generateSessionID creates a unique session ID
-func generateSessionID() string {
-	return fmt.Sprintf("session_%d_%s", time.Now().Unix(), randomString(8))
-}
-
-
 // GetUsageStore returns the usage store for accessing usage statistics
 func (m *Manager) GetUsageStore() *UsageStore {
 	return m.usageStore
@@ -1192,7 +1196,11 @@ func (m *Manager) GetSessionID() string {
 	return m.sessionID
 }
 
+func (m *Manager) generateSessionID() string {
+	return fmt.Sprintf("session_%s", m.idGen.GenerateString())
+}
+
 // NewSession starts a new session with a new session ID
 func (m *Manager) NewSession() {
-	m.sessionID = generateSessionID()
+	m.sessionID = m.generateSessionID()
 }

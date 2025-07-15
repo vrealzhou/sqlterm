@@ -35,7 +35,7 @@ func ParseDatabaseType(s string) (DatabaseType, error) {
 		return MySQL, nil
 	case "postgres", "postgresql":
 		return PostgreSQL, nil
-	case "sqlite":
+	case "sqlite", "sqlite3":
 		return SQLite, nil
 	default:
 		return 0, fmt.Errorf("unsupported database type: %s. Supported types: mysql, postgres, sqlite", s)
@@ -73,56 +73,72 @@ type Value interface {
 
 type StringValue struct {
 	Value string
+	Null  bool
 }
 
 func (s StringValue) String() string {
+	if s.Null {
+		return ""
+	}
 	return s.Value
 }
 
 func (s StringValue) IsNull() bool {
-	return false
+	return s.Null
 }
 
 type IntValue struct {
 	Value int64
+	Null  bool
 }
 
 func (i IntValue) String() string {
+	if i.Null {
+		return ""
+	}
 	return fmt.Sprintf("%d", i.Value)
 }
 
 func (i IntValue) IsNull() bool {
-	return false
+	return i.Null
 }
 
 type FloatValue struct {
 	Value float64
+	Null  bool
 }
 
 func (f FloatValue) String() string {
+	if f.Null {
+		return ""
+	}
 	return fmt.Sprintf("%g", f.Value)
 }
 
 func (f FloatValue) IsNull() bool {
-	return false
+	return f.Null
 }
 
 type BoolValue struct {
 	Value bool
+	Null  bool
 }
 
 func (b BoolValue) String() string {
+	if b.Null {
+		return ""
+	}
 	return fmt.Sprintf("%t", b.Value)
 }
 
 func (b BoolValue) IsNull() bool {
-	return false
+	return b.Null
 }
 
 type NullValue struct{}
 
 func (n NullValue) String() string {
-	return "NULL"
+	return ""
 }
 
 func (n NullValue) IsNull() bool {
