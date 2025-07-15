@@ -74,79 +74,79 @@ func (m *mockConnection) GetConnectionName() string {
 
 func createTestApp(t *testing.T) *App {
 	tmpDir := t.TempDir()
-	
+
 	configMgr := config.NewManager()
-	
+
 	// Initialize i18n manager for testing
 	i18nMgr, err := i18n.NewManager("en_au")
 	if err != nil {
 		t.Fatalf("Failed to create i18n manager: %v", err)
 	}
-	
+
 	sessionMgr := session.NewManager(tmpDir, i18nMgr)
-	
+
 	// Create a mock AI manager
 	aiManager, err := ai.NewManager(tmpDir)
 	if err != nil {
 		// It's okay if AI manager fails to initialize for tests
 		aiManager = nil
 	}
-	
+
 	// Create i18n manager
 	i18nMgr, i18nErr := i18n.NewManager("en_au")
 	if i18nErr != nil {
 		t.Fatalf("Failed to create i18n manager: %v", i18nErr)
 	}
-	
+
 	app := &App{
 		configMgr:  configMgr,
 		sessionMgr: sessionMgr,
 		aiManager:  aiManager,
 		i18nMgr:    i18nMgr,
 	}
-	
+
 	return app
 }
 
 func TestNewApp(t *testing.T) {
 	app, err := NewApp()
-	
+
 	if err != nil {
 		t.Fatalf("NewApp() failed: %v", err)
 	}
-	
+
 	if app == nil {
 		t.Fatal("NewApp() returned nil")
 	}
-	
+
 	if app.configMgr == nil {
 		t.Error("App should have configMgr")
 	}
-	
+
 	if app.sessionMgr == nil {
 		t.Error("App should have sessionMgr")
 	}
-	
+
 	if app.i18nMgr == nil {
 		t.Error("App should have i18nMgr")
 	}
-	
+
 	// AI manager might be nil if configuration is not set up
 	// This is acceptable in tests
 }
 
 func TestApp_SetConnection(t *testing.T) {
 	app := createTestApp(t)
-	
+
 	// Disable AI manager to avoid vector database initialization issues
 	app.aiManager = nil
-	
+
 	mockConn := &mockConnection{
 		dbType: core.PostgreSQL,
 		name:   "test-db",
 		tables: []string{"users", "posts"},
 	}
-	
+
 	config := &core.ConnectionConfig{
 		Name:     "test-db",
 		Host:     "localhost",
@@ -154,13 +154,13 @@ func TestApp_SetConnection(t *testing.T) {
 		Database: "testdb",
 		Username: "testuser",
 	}
-	
+
 	app.SetConnection(mockConn, config)
-	
+
 	if app.connection == nil {
 		t.Error("Connection should be set")
 	}
-	
+
 	if app.config != config {
 		t.Error("Config should be set")
 	}
@@ -168,31 +168,31 @@ func TestApp_SetConnection(t *testing.T) {
 
 func TestApp_ClearConnection(t *testing.T) {
 	app := createTestApp(t)
-	
+
 	// Disable AI manager to avoid vector database initialization issues
 	app.aiManager = nil
-	
+
 	mockConn := &mockConnection{
-		dbType: core.PostgreSQL,
-		name:   "test-db",
+		dbType:    core.PostgreSQL,
+		name:      "test-db",
 		connected: true,
 	}
-	
+
 	config := &core.ConnectionConfig{
 		Name: "test-db",
 	}
-	
+
 	app.SetConnection(mockConn, config)
-	
+
 	err := app.ClearConnection()
 	if err != nil {
 		t.Errorf("ClearConnection() failed: %v", err)
 	}
-	
+
 	if app.connection != nil {
 		t.Error("Connection should be cleared")
 	}
-	
+
 	if app.config != nil {
 		t.Error("Config should be cleared")
 	}
@@ -200,7 +200,7 @@ func TestApp_ClearConnection(t *testing.T) {
 
 func TestApp_processCommand(t *testing.T) {
 	app := createTestApp(t)
-	
+
 	testCases := []struct {
 		name        string
 		command     string
@@ -212,7 +212,7 @@ func TestApp_processCommand(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "Status command", 
+			name:        "Status command",
 			command:     "/status",
 			expectError: false,
 		},
@@ -232,11 +232,11 @@ func TestApp_processCommand(t *testing.T) {
 			expectError: false, // processCommand prints message but doesn't return error
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := app.processCommand(tc.command)
-			
+
 			if tc.expectError {
 				if err == nil {
 					t.Errorf("Expected error for command '%s', but got none", tc.command)
@@ -252,7 +252,7 @@ func TestApp_processCommand(t *testing.T) {
 
 func TestApp_parseQueries(t *testing.T) {
 	app := createTestApp(t)
-	
+
 	testCases := []struct {
 		name     string
 		content  string
@@ -289,16 +289,16 @@ func TestApp_parseQueries(t *testing.T) {
 			expected: []string{"SELECT * FROM users"},
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := app.parseQueries(tc.content)
-			
+
 			if len(result) != len(tc.expected) {
 				t.Errorf("Expected %d queries, got %d", len(tc.expected), len(result))
 				return
 			}
-			
+
 			for i, expected := range tc.expected {
 				if strings.TrimSpace(result[i]) != strings.TrimSpace(expected) {
 					t.Errorf("Query %d: expected '%s', got '%s'", i, expected, result[i])
@@ -310,7 +310,7 @@ func TestApp_parseQueries(t *testing.T) {
 
 func TestApp_truncateQuery(t *testing.T) {
 	app := createTestApp(t)
-	
+
 	testCases := []struct {
 		name     string
 		query    string
@@ -337,15 +337,15 @@ func TestApp_truncateQuery(t *testing.T) {
 			expected: strings.Repeat("a", 47) + "...",
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := app.truncateQuery(tc.query)
-			
+
 			if result != tc.expected {
 				t.Errorf("Expected '%s', got '%s'", tc.expected, result)
 			}
-			
+
 			// Ensure result is never longer than 100 characters
 			if len(result) > 100 {
 				t.Errorf("Truncated query should not exceed 100 characters, got %d", len(result))
@@ -356,7 +356,7 @@ func TestApp_truncateQuery(t *testing.T) {
 
 func TestApp_generateTableMarkdown(t *testing.T) {
 	app := createTestApp(t)
-	
+
 	tableInfo := &core.TableInfo{
 		Name: "users",
 		Columns: []core.ColumnInfo{
@@ -379,26 +379,26 @@ func TestApp_generateTableMarkdown(t *testing.T) {
 			},
 		},
 	}
-	
+
 	markdown := app.generateTableMarkdown(tableInfo)
-	
+
 	// Check that markdown contains expected elements
 	if !strings.Contains(markdown, "# 📊 Table: users") {
 		t.Error("Markdown should contain table name as header")
 	}
-	
+
 	if !strings.Contains(markdown, "| Column | Type | Nullable | Key | Default |") {
 		t.Error("Markdown should contain table header")
 	}
-	
+
 	if !strings.Contains(markdown, "| **id** | `INTEGER` | ❌ NOT NULL | 🔑 PRI |") {
 		t.Error("Markdown should contain primary key column info")
 	}
-	
+
 	if !strings.Contains(markdown, "| **name** | `VARCHAR(255)` | ✅ NULL |") {
 		t.Error("Markdown should contain nullable column info")
 	}
-	
+
 	if !strings.Contains(markdown, "| **email** | `VARCHAR(255)` | ❌ NOT NULL | 🔑 UNI |") {
 		t.Error("Markdown should contain unique column info")
 	}
@@ -406,11 +406,11 @@ func TestApp_generateTableMarkdown(t *testing.T) {
 
 func TestApp_handleConnect_WithArgs(t *testing.T) {
 	app := createTestApp(t)
-	
+
 	// Create a test connection configuration
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "connections.yaml")
-	
+
 	configContent := `connections:
   - name: "test-db"
     type: "postgresql"
@@ -420,18 +420,18 @@ func TestApp_handleConnect_WithArgs(t *testing.T) {
     username: "testuser"
     password: "testpass"
 `
-	
+
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create test config: %v", err)
 	}
-	
+
 	// Test with non-existent connection
 	err = app.handleConnect([]string{"nonexistent"})
 	if err == nil {
 		t.Error("Expected error for non-existent connection")
 	}
-	
+
 	// Test with empty args (should trigger interactive mode, but we can't test that easily)
 	// We'll test that it doesn't panic
 	err = app.handleConnect([]string{})
@@ -440,7 +440,7 @@ func TestApp_handleConnect_WithArgs(t *testing.T) {
 
 func TestApp_handleListTables_NoConnection(t *testing.T) {
 	app := createTestApp(t)
-	
+
 	err := app.handleListTables()
 	if err != nil {
 		t.Errorf("handleListTables() should not return error without connection, got: %v", err)
@@ -449,23 +449,23 @@ func TestApp_handleListTables_NoConnection(t *testing.T) {
 
 func TestApp_handleListTables_WithConnection(t *testing.T) {
 	app := createTestApp(t)
-	
+
 	// Disable AI manager to avoid vector database initialization issues
 	app.aiManager = nil
-	
+
 	mockConn := &mockConnection{
-		tables: []string{"users", "posts", "comments"},
+		tables:    []string{"users", "posts", "comments"},
 		connected: true,
-		dbType: core.PostgreSQL,
-		name:   "test-db",
+		dbType:    core.PostgreSQL,
+		name:      "test-db",
 	}
-	
+
 	config := &core.ConnectionConfig{
 		Name: "test-db",
 	}
-	
+
 	app.SetConnection(mockConn, config)
-	
+
 	err := app.handleListTables()
 	if err != nil {
 		t.Errorf("handleListTables() failed: %v", err)
@@ -474,36 +474,36 @@ func TestApp_handleListTables_WithConnection(t *testing.T) {
 
 func TestApp_handleDescribeTable(t *testing.T) {
 	app := createTestApp(t)
-	
+
 	// Test without connection
 	err := app.handleDescribeTable([]string{"users"})
 	if err != nil {
 		t.Errorf("handleDescribeTable() should not return error without connection, got: %v", err)
 	}
-	
+
 	// Test with connection
 	// Disable AI manager to avoid vector database initialization issues
 	app.aiManager = nil
-	
+
 	mockConn := &mockConnection{
-		tables: []string{"users", "posts"},
+		tables:    []string{"users", "posts"},
 		connected: true,
-		dbType: core.PostgreSQL,
-		name:   "test-db",
+		dbType:    core.PostgreSQL,
+		name:      "test-db",
 	}
-	
+
 	config := &core.ConnectionConfig{
 		Name: "test-db",
 	}
-	
+
 	app.SetConnection(mockConn, config)
-	
+
 	// Test with valid table
 	err = app.handleDescribeTable([]string{"users"})
 	if err != nil {
 		t.Errorf("handleDescribeTable() failed: %v", err)
 	}
-	
+
 	// Test with no args
 	err = app.handleDescribeTable([]string{})
 	if err != nil {
@@ -514,9 +514,9 @@ func TestApp_handleDescribeTable(t *testing.T) {
 // Benchmark tests
 func BenchmarkApp_parseQueries(b *testing.B) {
 	app := createTestApp(&testing.T{})
-	
+
 	content := "SELECT * FROM users; SELECT * FROM posts; SELECT COUNT(*) FROM comments;"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		app.parseQueries(content)
@@ -525,9 +525,9 @@ func BenchmarkApp_parseQueries(b *testing.B) {
 
 func BenchmarkApp_truncateQuery(b *testing.B) {
 	app := createTestApp(&testing.T{})
-	
+
 	query := strings.Repeat("SELECT * FROM users WHERE id = 1 AND ", 10) + "name = 'test'"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		app.truncateQuery(query)
@@ -536,7 +536,7 @@ func BenchmarkApp_truncateQuery(b *testing.B) {
 
 func BenchmarkApp_generateTableMarkdown(b *testing.B) {
 	app := createTestApp(&testing.T{})
-	
+
 	tableInfo := &core.TableInfo{
 		Name: "users",
 		Columns: []core.ColumnInfo{
@@ -545,7 +545,7 @@ func BenchmarkApp_generateTableMarkdown(b *testing.B) {
 			{Name: "email", Type: "VARCHAR(255)", Key: "UNI"},
 		},
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		app.generateTableMarkdown(tableInfo)

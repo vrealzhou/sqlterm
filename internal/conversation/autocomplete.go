@@ -59,7 +59,7 @@ func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int)
 func (ac *AutoCompleter) getCommands() [][]rune {
 	commands := []string{
 		"/help", "/quit", "/exit", "/connect", "/list-connections",
-		"/tables", "/describe", "/status", "/exec", "/config", 
+		"/tables", "/describe", "/status", "/exec", "/config",
 		"/prompts", "/clear-conversation",
 	}
 
@@ -138,12 +138,11 @@ func (ac *AutoCompleter) findCommonPrefix(candidates []string) string {
 	return commonPrefix.String()
 }
 
-
 // New candidate-getting functions that return full matches for intelligent processing
 func (ac *AutoCompleter) getCommandCandidates(partial string) []string {
 	commands := []string{
 		"/help", "/quit", "/exit", "/connect", "/list-connections",
-		"/tables", "/describe", "/status", "/exec", "/config", 
+		"/tables", "/describe", "/status", "/exec", "/config",
 		"/prompts", "/clear-conversation",
 	}
 
@@ -287,12 +286,6 @@ func (ac *AutoCompleter) getCSVCandidates(words []string, line string) []string 
 	return candidates
 }
 
-
-
-
-
-
-
 func (ac *AutoCompleter) shouldSkipDirectory(name string) bool {
 	// Skip common directories that are unlikely to contain SQL files
 	skipDirs := []string{
@@ -310,8 +303,6 @@ func (ac *AutoCompleter) shouldSkipDirectory(name string) bool {
 
 	return false
 }
-
-
 
 // New candidate-based helper functions for intelligent completion
 func (ac *AutoCompleter) addFileCandidates(candidates *[]string, dir, baseName, prefix string) {
@@ -499,7 +490,7 @@ func (ac *AutoCompleter) getConfigCandidates(words []string, line string) []stri
 			}
 			return candidates
 		}
-		
+
 		// Handle AI subcommand completions
 		if len(words) >= 4 {
 			subcmd := words[2]

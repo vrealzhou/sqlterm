@@ -29,7 +29,7 @@ func NewOpenRouterClient(apiKey string) *OpenRouterClient {
 
 func (c *OpenRouterClient) Chat(ctx context.Context, request ChatRequest) (*ChatResponse, error) {
 	url := fmt.Sprintf("%s/chat/completions", c.baseURL)
-	
+
 	jsonData, err := json.Marshal(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
@@ -66,7 +66,7 @@ func (c *OpenRouterClient) Chat(ctx context.Context, request ChatRequest) (*Chat
 
 func (c *OpenRouterClient) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	url := fmt.Sprintf("%s/models", c.baseURL)
-	
+
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -87,11 +87,11 @@ func (c *OpenRouterClient) ListModels(ctx context.Context) ([]ModelInfo, error) 
 
 	var response struct {
 		Data []struct {
-			ID      string `json:"id"`
-			Name    string `json:"name"`
-			Created int64  `json:"created"`
+			ID          string `json:"id"`
+			Name        string `json:"name"`
+			Created     int64  `json:"created"`
 			Description string `json:"description"`
-			Pricing *struct {
+			Pricing     *struct {
 				Prompt     string `json:"prompt"`
 				Completion string `json:"completion"`
 			} `json:"pricing"`
@@ -110,21 +110,21 @@ func (c *OpenRouterClient) ListModels(ctx context.Context) ([]ModelInfo, error) 
 			Description: model.Description,
 			Provider:    "openrouter",
 		}
-		
+
 		// Parse pricing if available
 		if model.Pricing != nil {
 			pricing := &Pricing{}
-			
+
 			// Parse prompt pricing (input tokens)
 			if promptPrice, err := strconv.ParseFloat(model.Pricing.Prompt, 64); err == nil {
 				pricing.InputCostPerToken = promptPrice
 			}
-			
+
 			// Parse completion pricing (output tokens)
 			if completionPrice, err := strconv.ParseFloat(model.Pricing.Completion, 64); err == nil {
 				pricing.OutputCostPerToken = completionPrice
 			}
-			
+
 			models[i].Pricing = pricing
 		}
 	}

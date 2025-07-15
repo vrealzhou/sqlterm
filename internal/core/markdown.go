@@ -68,10 +68,10 @@ func (mr *MarkdownRenderer) displayWithFormatting(content string) {
 	// Print a header
 	fmt.Println(mr.i18nMgr.Get("query_results_plain_header"))
 	fmt.Println(strings.Repeat("─", min(mr.width, 80)))
-	
+
 	// Display the rendered markdown
 	fmt.Print(content)
-	
+
 	// Print a footer
 	fmt.Println(strings.Repeat("─", min(mr.width, 80)))
 	fmt.Println()

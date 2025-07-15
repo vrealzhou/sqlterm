@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	cfgFile   string
-	verbose   bool
-	
+	cfgFile string
+	verbose bool
+
 	// Version information (set from main)
 	Version   string = "dev"
 	BuildTime string = "unknown"
@@ -56,14 +56,14 @@ func init() {
 	} else {
 		rootCmd.Short = i18nMgr.Get("app_short_description")
 		rootCmd.Long = i18nMgr.Get("app_long_description")
-		
+
 		// Update command descriptions
 		connectCmd.Short = i18nMgr.Get("connect_command_short")
 		listCmd.Short = i18nMgr.Get("list_command_short")
 		addCmd.Short = i18nMgr.Get("add_command_short")
 		versionCmd.Short = i18nMgr.Get("version_command_short")
 		versionCmd.Long = i18nMgr.Get("version_command_long")
-		
+
 		// Update flag descriptions
 		updateFlagDescriptions(i18nMgr)
 	}
@@ -89,7 +89,7 @@ func updateFlagDescriptions(i18nMgr *i18n.Manager) {
 	if i18nMgr == nil {
 		return
 	}
-	
+
 	// Update connect command flag descriptions safely
 	if flag := connectCmd.Flags().Lookup("db-type"); flag != nil {
 		flag.Usage = i18nMgr.Get("flag_db_type")
@@ -267,14 +267,14 @@ func connectAndRunConversation(connConfig *core.ConnectionConfig) error {
 	// Initialize i18n manager for CLI
 	configMgr := config.NewManager()
 	language := "en_au" // Default language
-	
+
 	// Try to get language from AI config
 	if aiManager, err := ai.NewManager(configMgr.GetConfigDir()); err == nil && aiManager != nil {
 		if aiConfig := aiManager.GetConfig(); aiConfig != nil {
 			language = aiConfig.Language
 		}
 	}
-	
+
 	i18nMgr, err := i18n.NewManager(language)
 	if err != nil {
 		// Fallback to default language if i18n fails

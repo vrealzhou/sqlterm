@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"sqlterm/internal/core"
 	"sqlterm/internal/i18n"
-	"github.com/spf13/cobra"
 )
 
 func TestSetVersionInfo(t *testing.T) {
@@ -14,17 +14,17 @@ func TestSetVersionInfo(t *testing.T) {
 	testVersion := "1.0.0"
 	testBuildTime := "2024-01-01T00:00:00Z"
 	testGitCommit := "abc123"
-	
+
 	SetVersionInfo(testVersion, testBuildTime, testGitCommit)
-	
+
 	if Version != testVersion {
 		t.Errorf("Expected Version to be '%s', got '%s'", testVersion, Version)
 	}
-	
+
 	if BuildTime != testBuildTime {
 		t.Errorf("Expected BuildTime to be '%s', got '%s'", testBuildTime, BuildTime)
 	}
-	
+
 	if GitCommit != testGitCommit {
 		t.Errorf("Expected GitCommit to be '%s', got '%s'", testGitCommit, GitCommit)
 	}
@@ -33,7 +33,7 @@ func TestSetVersionInfo(t *testing.T) {
 func TestVersionCommand(t *testing.T) {
 	// Set test version info
 	SetVersionInfo("1.0.0", "2024-01-01T00:00:00Z", "abc123")
-	
+
 	// Create a separate command instance for testing
 	testCmd := &cobra.Command{
 		Use:   "version",
@@ -44,28 +44,28 @@ func TestVersionCommand(t *testing.T) {
 			cmd.Printf("Git commit: %s\n", GitCommit)
 		},
 	}
-	
+
 	// Capture output
 	var buf bytes.Buffer
 	testCmd.SetOut(&buf)
 	testCmd.SetErr(&buf)
-	
+
 	// Execute version command
 	err := testCmd.Execute()
 	if err != nil {
 		t.Errorf("Version command failed: %v", err)
 	}
-	
+
 	// Check that output contains expected version information
 	output := buf.String()
 	if !bytes.Contains(buf.Bytes(), []byte("1.0.0")) {
 		t.Errorf("Version output should contain version number, got: %s", output)
 	}
-	
+
 	if !bytes.Contains(buf.Bytes(), []byte("2024-01-01T00:00:00Z")) {
 		t.Errorf("Version output should contain build time, got: %s", output)
 	}
-	
+
 	if !bytes.Contains(buf.Bytes(), []byte("abc123")) {
 		t.Errorf("Version output should contain git commit, got: %s", output)
 	}
@@ -97,11 +97,11 @@ func TestGetI18nString(t *testing.T) {
 			expected: "Connect to a database connection",
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			var mgr *i18n.Manager
-			
+
 			if tc.name == "Valid key" {
 				// Create a real manager for valid key test
 				var err error
@@ -110,9 +110,9 @@ func TestGetI18nString(t *testing.T) {
 					t.Skip("Could not create i18n manager")
 				}
 			}
-			
+
 			result := getI18nString(mgr, tc.key, tc.fallback)
-			
+
 			if tc.name == "Valid key" {
 				// For valid key test, we expect the actual i18n string
 				if result == tc.fallback {
@@ -155,7 +155,7 @@ func TestConnectCommand_Validation(t *testing.T) {
 			expected: true,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a new command to avoid state pollution
@@ -167,7 +167,7 @@ func TestConnectCommand_Validation(t *testing.T) {
 					return nil
 				},
 			}
-			
+
 			cmd.Flags().StringP("db-type", "t", "", "Database type")
 			cmd.Flags().StringP("database", "d", "", "Database name")
 			cmd.Flags().StringP("username", "u", "", "Username")
@@ -177,11 +177,11 @@ func TestConnectCommand_Validation(t *testing.T) {
 			cmd.MarkFlagRequired("db-type")
 			cmd.MarkFlagRequired("database")
 			cmd.MarkFlagRequired("username")
-			
+
 			cmd.SetArgs(tc.args)
-			
+
 			err := cmd.Execute()
-			
+
 			if tc.expected && err != nil {
 				t.Errorf("Expected command to succeed, but got error: %v", err)
 			} else if !tc.expected && err == nil {
@@ -214,7 +214,7 @@ func TestAddCommand_Validation(t *testing.T) {
 			expected: true,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a new command to avoid state pollution
@@ -227,7 +227,7 @@ func TestAddCommand_Validation(t *testing.T) {
 					return nil
 				},
 			}
-			
+
 			cmd.Flags().StringP("db-type", "t", "", "Database type")
 			cmd.Flags().StringP("database", "d", "", "Database name")
 			cmd.Flags().StringP("username", "u", "", "Username")
@@ -236,11 +236,11 @@ func TestAddCommand_Validation(t *testing.T) {
 			cmd.MarkFlagRequired("db-type")
 			cmd.MarkFlagRequired("database")
 			cmd.MarkFlagRequired("username")
-			
+
 			cmd.SetArgs(tc.args)
-			
+
 			err := cmd.Execute()
-			
+
 			if tc.expected && err != nil {
 				t.Errorf("Expected command to succeed, but got error: %v", err)
 			} else if !tc.expected && err == nil {
@@ -294,11 +294,11 @@ func TestCoreParseDatabaseType(t *testing.T) {
 			hasError: true,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := core.ParseDatabaseType(tc.input)
-			
+
 			if tc.hasError {
 				if err == nil {
 					t.Errorf("Expected error for input '%s', but got none", tc.input)
@@ -307,7 +307,7 @@ func TestCoreParseDatabaseType(t *testing.T) {
 				if err != nil {
 					t.Errorf("Unexpected error for input '%s': %v", tc.input, err)
 				}
-				
+
 				if result != tc.expected {
 					t.Errorf("Expected %v, got %v for input '%s'", tc.expected, result, tc.input)
 				}
@@ -343,11 +343,11 @@ func TestCoreGetDefaultPort(t *testing.T) {
 			expected: 0,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := core.GetDefaultPort(tc.dbType)
-			
+
 			if result != tc.expected {
 				t.Errorf("Expected port %d, got %d for database type %v", tc.expected, result, tc.dbType)
 			}
@@ -382,11 +382,11 @@ func TestDatabaseTypeString(t *testing.T) {
 			expected: "unknown",
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := tc.dbType.String()
-			
+
 			if result != tc.expected {
 				t.Errorf("Expected string '%s', got '%s' for database type %v", tc.expected, result, tc.dbType)
 			}
@@ -406,35 +406,35 @@ func TestConnectionConfigCreation(t *testing.T) {
 		Password:     "testpass",
 		SSL:          false,
 	}
-	
+
 	if config.Name != "test-connection" {
 		t.Errorf("Expected name 'test-connection', got '%s'", config.Name)
 	}
-	
+
 	if config.DatabaseType != core.PostgreSQL {
 		t.Errorf("Expected database type PostgreSQL, got %v", config.DatabaseType)
 	}
-	
+
 	if config.Host != "localhost" {
 		t.Errorf("Expected host 'localhost', got '%s'", config.Host)
 	}
-	
+
 	if config.Port != 5432 {
 		t.Errorf("Expected port 5432, got %d", config.Port)
 	}
-	
+
 	if config.Database != "testdb" {
 		t.Errorf("Expected database 'testdb', got '%s'", config.Database)
 	}
-	
+
 	if config.Username != "testuser" {
 		t.Errorf("Expected username 'testuser', got '%s'", config.Username)
 	}
-	
+
 	if config.Password != "testpass" {
 		t.Errorf("Expected password 'testpass', got '%s'", config.Password)
 	}
-	
+
 	if config.SSL != false {
 		t.Errorf("Expected SSL false, got %v", config.SSL)
 	}

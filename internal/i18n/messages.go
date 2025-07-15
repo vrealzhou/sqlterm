@@ -33,21 +33,21 @@ func NewManager(language string) (*Manager, error) {
 	if language == "" {
 		return nil, fmt.Errorf("language cannot be empty")
 	}
-	
+
 	manager := &Manager{
 		currentLanguage: language,
 		messages:        make(map[string]map[string]string),
 	}
-	
+
 	if err := manager.loadMessages(); err != nil {
 		return nil, fmt.Errorf("failed to load messages: %w", err)
 	}
-	
+
 	// Validate that the requested language exists
 	if _, exists := manager.messages[language]; !exists {
 		return nil, fmt.Errorf("language '%s' not supported", language)
 	}
-	
+
 	return manager, nil
 }
 
@@ -57,34 +57,34 @@ func (m *Manager) loadMessages() error {
 	if err != nil {
 		return fmt.Errorf("failed to read message files: %w", err)
 	}
-	
+
 	for _, file := range files {
 		if !strings.HasSuffix(file.Name(), ".json") {
 			continue
 		}
-		
+
 		// Extract language from filename (e.g., "en_au.json" -> "en_au")
 		language := strings.TrimSuffix(file.Name(), ".json")
-		
+
 		content, err := messageFiles.ReadFile(file.Name())
 		if err != nil {
 			return fmt.Errorf("failed to read message file %s: %w", file.Name(), err)
 		}
-		
+
 		var messages Messages
 		if err := json.Unmarshal(content, &messages); err != nil {
 			return fmt.Errorf("failed to parse message file %s: %w", file.Name(), err)
 		}
-		
+
 		// Build message map for this language
 		langMessages := make(map[string]string)
 		for _, msg := range messages.Messages {
 			langMessages[msg.ID] = msg.Text
 		}
-		
+
 		m.messages[language] = langMessages
 	}
-	
+
 	return nil
 }
 
@@ -96,14 +96,14 @@ func (m *Manager) Get(messageID string) string {
 			return message
 		}
 	}
-	
+
 	// Fallback to English if message not found in current language
 	if langMessages, exists := m.messages["en_au"]; exists {
 		if message, exists := langMessages[messageID]; exists {
 			return message
 		}
 	}
-	
+
 	// Return message ID if not found (for debugging)
 	return fmt.Sprintf("[%s]", messageID)
 }
@@ -119,11 +119,11 @@ func (m *Manager) SetLanguage(language string) error {
 	if language == "" {
 		return fmt.Errorf("language cannot be empty")
 	}
-	
+
 	if _, exists := m.messages[language]; !exists {
 		return fmt.Errorf("language '%s' not supported", language)
 	}
-	
+
 	m.currentLanguage = language
 	return nil
 }

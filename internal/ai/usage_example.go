@@ -72,7 +72,7 @@ func ExampleUsageTracking(manager *Manager) {
 	fmt.Println("\n=== Export Example ===")
 	startDate := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
 	endDate := time.Now().Format("2006-01-02")
-	
+
 	csvData, err := usageStore.ExportUsageData("csv", startDate, endDate)
 	if err != nil {
 		fmt.Printf("Error exporting CSV: %v\n", err)
@@ -95,7 +95,7 @@ func ShowUsageStatistics(manager *Manager) error {
 
 	fmt.Println("📊 Usage Statistics:")
 	fmt.Printf("Session ID: %s\n", manager.GetSessionID())
-	
+
 	if todayStats, ok := summary["today"]; ok {
 		if today, ok := todayStats.(map[string]interface{}); ok {
 			fmt.Printf("Today: %d requests, %d input tokens, %d output tokens, $%.6f\n",

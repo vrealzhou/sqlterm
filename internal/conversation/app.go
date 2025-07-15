@@ -1261,7 +1261,7 @@ func (a *App) processAIChat(message string) error {
 			if summary, err := a.aiManager.GetUsageStore().GetUsageSummary(); err == nil {
 				if todayStats, ok := summary["today"]; ok {
 					if today, ok := todayStats.(map[string]interface{}); ok {
-						usageInfo = fmt.Sprintf(a.i18nMgr.Get("usage_today_summary"), 
+						usageInfo = fmt.Sprintf(a.i18nMgr.Get("usage_today_summary"),
 							int(today["requests"].(int)), today["cost"].(float64))
 					}
 				}
@@ -1318,7 +1318,7 @@ func (a *App) handleConfigStatus() error {
 			fmt.Printf("   Status: ✅ Configured\n")
 			fmt.Printf("   Provider: %s\n", config.AI.Provider)
 			fmt.Printf("   Model: %s\n", config.AI.Model)
-			
+
 			// Show masked API keys
 			hasKeys := false
 			for provider, key := range config.AI.APIKeys {
@@ -1331,7 +1331,7 @@ func (a *App) handleConfigStatus() error {
 					fmt.Printf("     %s: %s\n", provider, maskedKey)
 				}
 			}
-			
+
 			// Show base URLs
 			hasURLs := false
 			for provider, url := range config.AI.BaseURLs {
@@ -1437,19 +1437,19 @@ func (a *App) handleAIConfigStatus() error {
 	fmt.Printf("🤖 AI Configuration:\n")
 	fmt.Printf("   Provider: %s\n", config.AI.Provider)
 	fmt.Printf("   Model: %s\n", config.AI.Model)
-	
+
 	// Show usage statistics from usage store if available
 	if a.aiManager.GetUsageStore() != nil {
 		if summary, err := a.aiManager.GetUsageStore().GetUsageSummary(); err == nil {
 			if todayStats, ok := summary["today"]; ok {
 				if today, ok := todayStats.(map[string]interface{}); ok {
-					fmt.Printf(a.i18nMgr.Get("todays_usage_display"), 
+					fmt.Printf(a.i18nMgr.Get("todays_usage_display"),
 						int(today["requests"].(int)), today["cost"].(float64))
 				}
 			}
 			if weekStats, ok := summary["last_7_days"]; ok {
 				if week, ok := weekStats.(map[string]interface{}); ok {
-					fmt.Printf(a.i18nMgr.Get("last_7_days_display"), 
+					fmt.Printf(a.i18nMgr.Get("last_7_days_display"),
 						int(week["requests"].(int)), week["cost"].(float64))
 				}
 			}
@@ -1588,7 +1588,7 @@ func (a *App) handleConfigLanguage(args []string) error {
 		fmt.Println("🌐 Language Configuration:")
 		config := a.aiManager.GetConfig()
 		fmt.Printf("   Current: %s\n", config.Language)
-		
+
 		availableLanguages := a.i18nMgr.GetAvailableLanguages()
 		fmt.Printf("   Available: %s\n", strings.Join(availableLanguages, ", "))
 		return nil

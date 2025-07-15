@@ -18,7 +18,7 @@ var (
 func main() {
 	// Set version info for CLI
 	cli.SetVersionInfo(version, buildTime, gitCommit)
-	
+
 	if err := cli.Execute(); err != nil {
 		// Try to initialize i18n for error message
 		i18nMgr, i18nErr := i18n.NewManager("en_au")

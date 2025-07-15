@@ -64,7 +64,7 @@ func TestParseDatabaseType(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := ParseDatabaseType(tc.input)
-			
+
 			if tc.hasError {
 				if err == nil {
 					t.Errorf("Expected error for input '%s', but got none", tc.input)
@@ -73,7 +73,7 @@ func TestParseDatabaseType(t *testing.T) {
 				if err != nil {
 					t.Errorf("Unexpected error for input '%s': %v", tc.input, err)
 				}
-				
+
 				if result != tc.expected {
 					t.Errorf("Expected %v, got %v for input '%s'", tc.expected, result, tc.input)
 				}
@@ -180,7 +180,7 @@ func TestStringValue(t *testing.T) {
 			if tc.value.IsNull() != tc.isNull {
 				t.Errorf("Expected IsNull() to return %v, got %v", tc.isNull, tc.value.IsNull())
 			}
-			
+
 			if tc.value.String() != tc.expected {
 				t.Errorf("Expected String() to return '%s', got '%s'", tc.expected, tc.value.String())
 			}
@@ -226,7 +226,7 @@ func TestIntValue(t *testing.T) {
 			if tc.value.IsNull() != tc.isNull {
 				t.Errorf("Expected IsNull() to return %v, got %v", tc.isNull, tc.value.IsNull())
 			}
-			
+
 			if tc.value.String() != tc.expected {
 				t.Errorf("Expected String() to return '%s', got '%s'", tc.expected, tc.value.String())
 			}
@@ -278,7 +278,7 @@ func TestFloatValue(t *testing.T) {
 			if tc.value.IsNull() != tc.isNull {
 				t.Errorf("Expected IsNull() to return %v, got %v", tc.isNull, tc.value.IsNull())
 			}
-			
+
 			if tc.value.String() != tc.expected {
 				t.Errorf("Expected String() to return '%s', got '%s'", tc.expected, tc.value.String())
 			}
@@ -318,7 +318,7 @@ func TestBoolValue(t *testing.T) {
 			if tc.value.IsNull() != tc.isNull {
 				t.Errorf("Expected IsNull() to return %v, got %v", tc.isNull, tc.value.IsNull())
 			}
-			
+
 			if tc.value.String() != tc.expected {
 				t.Errorf("Expected String() to return '%s', got '%s'", tc.expected, tc.value.String())
 			}
@@ -328,11 +328,11 @@ func TestBoolValue(t *testing.T) {
 
 func TestNullValue(t *testing.T) {
 	nullValue := NullValue{}
-	
+
 	if !nullValue.IsNull() {
 		t.Error("NullValue.IsNull() should always return true")
 	}
-	
+
 	if nullValue.String() != "" {
 		t.Errorf("NullValue.String() should return empty string, got '%s'", nullValue.String())
 	}
@@ -340,10 +340,10 @@ func TestNullValue(t *testing.T) {
 
 func TestGenerateNumberedCSVPath(t *testing.T) {
 	testCases := []struct {
-		name         string
-		basePath     string
-		queryIndex   int
-		expected     string
+		name       string
+		basePath   string
+		queryIndex int
+		expected   string
 	}{
 		{
 			name:       "First query",

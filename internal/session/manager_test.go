@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
-	
+
 	"sqlterm/internal/i18n"
 )
 

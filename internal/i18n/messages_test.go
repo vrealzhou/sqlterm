@@ -308,7 +308,7 @@ func TestManager_ErrorHandling(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error when setting invalid language")
 	}
-	
+
 	// Should still work (fallback behavior)
 	message := manager.Get("ai_not_configured")
 	if message == "" {
@@ -328,9 +328,9 @@ func TestManager_ErrorHandling(t *testing.T) {
 
 func TestManager_LanguageSpecificContent(t *testing.T) {
 	testCases := []struct {
-		name        string
-		language    string
-		messageKey  string
+		name          string
+		language      string
+		messageKey    string
 		shouldContain string
 	}{
 		{
@@ -406,7 +406,7 @@ func BenchmarkManager_SetLanguage(b *testing.B) {
 	}
 
 	languages := []string{"en_au", "zh_cn"}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		manager.SetLanguage(languages[i%len(languages)])

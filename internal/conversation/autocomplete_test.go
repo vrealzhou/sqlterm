@@ -11,11 +11,11 @@ import (
 func TestAutoCompleter_NewAutoCompleter(t *testing.T) {
 	app := createTestApp(t)
 	ac := NewAutoCompleter(app)
-	
+
 	if ac == nil {
 		t.Fatal("NewAutoCompleter() returned nil")
 	}
-	
+
 	if ac.app != app {
 		t.Error("AutoCompleter should have reference to app")
 	}
@@ -24,20 +24,20 @@ func TestAutoCompleter_NewAutoCompleter(t *testing.T) {
 func TestAutoCompleter_getCommands(t *testing.T) {
 	app := createTestApp(t)
 	ac := NewAutoCompleter(app)
-	
+
 	commands := ac.getCommands()
-	
+
 	if len(commands) == 0 {
 		t.Error("getCommands() should return at least one command")
 	}
-	
+
 	// Check for expected commands
 	expectedCommands := []string{"/help", "/quit", "/connect", "/status", "/exec"}
 	commandStrings := make([]string, len(commands))
 	for i, cmd := range commands {
 		commandStrings[i] = string(cmd)
 	}
-	
+
 	for _, expected := range expectedCommands {
 		found := false
 		for _, cmd := range commandStrings {
@@ -55,7 +55,7 @@ func TestAutoCompleter_getCommands(t *testing.T) {
 func TestAutoCompleter_getCommandCandidates(t *testing.T) {
 	app := createTestApp(t)
 	ac := NewAutoCompleter(app)
-	
+
 	testCases := []struct {
 		name     string
 		partial  string
@@ -87,16 +87,16 @@ func TestAutoCompleter_getCommandCandidates(t *testing.T) {
 			expected: []string{""},
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			candidates := ac.getCommandCandidates(tc.partial)
-			
+
 			if len(candidates) != len(tc.expected) {
 				t.Errorf("Expected %d candidates, got %d", len(tc.expected), len(candidates))
 				return
 			}
-			
+
 			for i, expected := range tc.expected {
 				if candidates[i] != expected {
 					t.Errorf("Expected candidate '%s', got '%s'", expected, candidates[i])
@@ -109,7 +109,7 @@ func TestAutoCompleter_getCommandCandidates(t *testing.T) {
 func TestAutoCompleter_getConfigCandidates(t *testing.T) {
 	app := createTestApp(t)
 	ac := NewAutoCompleter(app)
-	
+
 	testCases := []struct {
 		name     string
 		words    []string
@@ -147,16 +147,16 @@ func TestAutoCompleter_getConfigCandidates(t *testing.T) {
 			expected: []string{},
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			candidates := ac.getConfigCandidates(tc.words, tc.line)
-			
+
 			if len(candidates) != len(tc.expected) {
 				t.Errorf("Expected %d candidates, got %d", len(tc.expected), len(candidates))
 				return
 			}
-			
+
 			for i, expected := range tc.expected {
 				if candidates[i] != expected {
 					t.Errorf("Expected candidate '%s', got '%s'", expected, candidates[i])
@@ -169,30 +169,30 @@ func TestAutoCompleter_getConfigCandidates(t *testing.T) {
 func TestAutoCompleter_getTableCandidates(t *testing.T) {
 	app := createTestApp(t)
 	ac := NewAutoCompleter(app)
-	
+
 	// Test without connection
 	candidates := ac.getTableCandidates([]string{"/describe", "u"}, "/describe u")
 	if len(candidates) != 0 {
 		t.Error("Should return no candidates without connection")
 	}
-	
+
 	// Test with connection
 	mockConn := &mockConnection{
-		tables: []string{"users", "user_profiles", "posts"},
+		tables:    []string{"users", "user_profiles", "posts"},
 		connected: true,
-		dbType: core.PostgreSQL,
-		name: "test-db",
+		dbType:    core.PostgreSQL,
+		name:      "test-db",
 	}
-	
+
 	config := &core.ConnectionConfig{
 		Name: "test-db",
 	}
-	
+
 	// Disable AI manager to avoid vector database initialization issues
 	app.aiManager = nil
-	
+
 	app.SetConnection(mockConn, config)
-	
+
 	testCases := []struct {
 		name     string
 		words    []string
@@ -218,16 +218,16 @@ func TestAutoCompleter_getTableCandidates(t *testing.T) {
 			expected: []string{"users", "user_profiles", "posts"},
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			candidates := ac.getTableCandidates(tc.words, tc.line)
-			
+
 			if len(candidates) != len(tc.expected) {
 				t.Errorf("Expected %d candidates, got %d", len(tc.expected), len(candidates))
 				return
 			}
-			
+
 			for i, expected := range tc.expected {
 				if candidates[i] != expected {
 					t.Errorf("Expected candidate '%s', got '%s'", expected, candidates[i])
@@ -240,13 +240,13 @@ func TestAutoCompleter_getTableCandidates(t *testing.T) {
 func TestAutoCompleter_getFileCandidates(t *testing.T) {
 	app := createTestApp(t)
 	ac := NewAutoCompleter(app)
-	
+
 	// Create temporary directory with test files
 	tmpDir := t.TempDir()
 	oldDir, _ := os.Getwd()
 	defer os.Chdir(oldDir)
 	os.Chdir(tmpDir)
-	
+
 	// Create test files
 	testFiles := []string{
 		"query1.sql",
@@ -254,7 +254,7 @@ func TestAutoCompleter_getFileCandidates(t *testing.T) {
 		"data.csv",
 		"subdir/nested.sql",
 	}
-	
+
 	for _, file := range testFiles {
 		dir := filepath.Dir(file)
 		if dir != "." {
@@ -262,7 +262,7 @@ func TestAutoCompleter_getFileCandidates(t *testing.T) {
 		}
 		os.WriteFile(file, []byte("test content"), 0644)
 	}
-	
+
 	testCases := []struct {
 		name     string
 		line     string
@@ -289,16 +289,16 @@ func TestAutoCompleter_getFileCandidates(t *testing.T) {
 			expected: []string{},
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			candidates := ac.getFileCandidates(tc.line)
-			
+
 			if len(candidates) != len(tc.expected) {
 				t.Errorf("Expected %d candidates, got %d", len(tc.expected), len(candidates))
 				return
 			}
-			
+
 			for i, expected := range tc.expected {
 				if candidates[i] != expected {
 					t.Errorf("Expected candidate '%s', got '%s'", expected, candidates[i])
@@ -311,13 +311,13 @@ func TestAutoCompleter_getFileCandidates(t *testing.T) {
 func TestAutoCompleter_getCSVCandidates(t *testing.T) {
 	app := createTestApp(t)
 	ac := NewAutoCompleter(app)
-	
+
 	// Create temporary directory with test files
 	tmpDir := t.TempDir()
 	oldDir, _ := os.Getwd()
 	defer os.Chdir(oldDir)
 	os.Chdir(tmpDir)
-	
+
 	// Create test files
 	testFiles := []string{
 		"output.csv",
@@ -325,11 +325,11 @@ func TestAutoCompleter_getCSVCandidates(t *testing.T) {
 		"results.txt",
 		"export.xlsx",
 	}
-	
+
 	for _, file := range testFiles {
 		os.WriteFile(file, []byte("test content"), 0644)
 	}
-	
+
 	testCases := []struct {
 		name     string
 		words    []string
@@ -355,16 +355,16 @@ func TestAutoCompleter_getCSVCandidates(t *testing.T) {
 			expected: []string{".csv"},
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			candidates := ac.getCSVCandidates(tc.words, tc.line)
-			
+
 			if len(candidates) != len(tc.expected) {
 				t.Errorf("Expected %d candidates, got %d", len(tc.expected), len(candidates))
 				return
 			}
-			
+
 			for i, expected := range tc.expected {
 				if candidates[i] != expected {
 					t.Errorf("Expected candidate '%s', got '%s'", expected, candidates[i])
@@ -377,7 +377,7 @@ func TestAutoCompleter_getCSVCandidates(t *testing.T) {
 func TestAutoCompleter_findCommonPrefix(t *testing.T) {
 	app := createTestApp(t)
 	ac := NewAutoCompleter(app)
-	
+
 	testCases := []struct {
 		name       string
 		candidates []string
@@ -414,11 +414,11 @@ func TestAutoCompleter_findCommonPrefix(t *testing.T) {
 			expected:   "he",
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := ac.findCommonPrefix(tc.candidates)
-			
+
 			if result != tc.expected {
 				t.Errorf("Expected common prefix '%s', got '%s'", tc.expected, result)
 			}
@@ -429,53 +429,53 @@ func TestAutoCompleter_findCommonPrefix(t *testing.T) {
 func TestAutoCompleter_processCompletions(t *testing.T) {
 	app := createTestApp(t)
 	ac := NewAutoCompleter(app)
-	
+
 	testCases := []struct {
-		name         string
-		candidates   []string
-		typedLength  int
-		expectedLen  int
+		name          string
+		candidates    []string
+		typedLength   int
+		expectedLen   int
 		expectedFirst string
 	}{
 		{
-			name:         "Single candidate",
-			candidates:   []string{"hello"},
-			typedLength:  2,
-			expectedLen:  1,
+			name:          "Single candidate",
+			candidates:    []string{"hello"},
+			typedLength:   2,
+			expectedLen:   1,
 			expectedFirst: "hello",
 		},
 		{
-			name:         "Multiple candidates with common prefix",
-			candidates:   []string{"hello", "help", "hero"},
-			typedLength:  2,
-			expectedLen:  1,
+			name:          "Multiple candidates with common prefix",
+			candidates:    []string{"hello", "help", "hero"},
+			typedLength:   2,
+			expectedLen:   1,
 			expectedFirst: "he",
 		},
 		{
-			name:         "Multiple candidates no common prefix",
-			candidates:   []string{"apple", "banana", "cherry"},
-			typedLength:  1,
-			expectedLen:  3,
+			name:          "Multiple candidates no common prefix",
+			candidates:    []string{"apple", "banana", "cherry"},
+			typedLength:   1,
+			expectedLen:   3,
 			expectedFirst: "apple",
 		},
 		{
-			name:         "No candidates",
-			candidates:   []string{},
-			typedLength:  0,
-			expectedLen:  0,
+			name:          "No candidates",
+			candidates:    []string{},
+			typedLength:   0,
+			expectedLen:   0,
 			expectedFirst: "",
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := ac.processCompletions(tc.candidates, tc.typedLength)
-			
+
 			if len(result) != tc.expectedLen {
 				t.Errorf("Expected %d completions, got %d", tc.expectedLen, len(result))
 				return
 			}
-			
+
 			if tc.expectedLen > 0 {
 				if string(result[0]) != tc.expectedFirst {
 					t.Errorf("Expected first completion '%s', got '%s'", tc.expectedFirst, string(result[0]))
@@ -488,7 +488,7 @@ func TestAutoCompleter_processCompletions(t *testing.T) {
 func TestAutoCompleter_getCompletionLength(t *testing.T) {
 	app := createTestApp(t)
 	ac := NewAutoCompleter(app)
-	
+
 	testCases := []struct {
 		name     string
 		line     string
@@ -520,11 +520,11 @@ func TestAutoCompleter_getCompletionLength(t *testing.T) {
 			expected: 5,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := ac.getCompletionLength(tc.line)
-			
+
 			if result != tc.expected {
 				t.Errorf("Expected completion length %d, got %d", tc.expected, result)
 			}
@@ -535,7 +535,7 @@ func TestAutoCompleter_getCompletionLength(t *testing.T) {
 func TestAutoCompleter_shouldSkipDirectory(t *testing.T) {
 	app := createTestApp(t)
 	ac := NewAutoCompleter(app)
-	
+
 	testCases := []struct {
 		name     string
 		dirName  string
@@ -567,11 +567,11 @@ func TestAutoCompleter_shouldSkipDirectory(t *testing.T) {
 			expected: true,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := ac.shouldSkipDirectory(tc.dirName)
-			
+
 			if result != tc.expected {
 				t.Errorf("Expected shouldSkipDirectory('%s') to return %v, got %v", tc.dirName, tc.expected, result)
 			}
@@ -582,13 +582,13 @@ func TestAutoCompleter_shouldSkipDirectory(t *testing.T) {
 func TestAutoCompleter_getAvailableModels(t *testing.T) {
 	app := createTestApp(t)
 	ac := NewAutoCompleter(app)
-	
+
 	// Test with no AI manager
 	models := ac.getAvailableModels()
 	if models == nil {
 		t.Error("Should return empty slice when no AI manager is available")
 	}
-	
+
 	// Test with AI manager would require setting up a proper AI manager
 	// which is complex for unit tests. The method is tested indirectly
 	// through the config candidates test.
@@ -598,7 +598,7 @@ func TestAutoCompleter_getAvailableModels(t *testing.T) {
 func TestAutoCompleter_Do(t *testing.T) {
 	app := createTestApp(t)
 	ac := NewAutoCompleter(app)
-	
+
 	testCases := []struct {
 		name        string
 		line        string
@@ -630,16 +630,16 @@ func TestAutoCompleter_Do(t *testing.T) {
 			expectCount: 0,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			lineRunes := []rune(tc.line)
 			newLine, length := ac.Do(lineRunes, tc.pos)
-			
+
 			if len(newLine) != tc.expectCount {
 				t.Errorf("Expected %d completions, got %d", tc.expectCount, len(newLine))
 			}
-			
+
 			// Length should be reasonable for the context
 			if length < 0 {
 				t.Error("Completion length should not be negative")
@@ -652,7 +652,7 @@ func TestAutoCompleter_Do(t *testing.T) {
 func BenchmarkAutoCompleter_getCommandCandidates(b *testing.B) {
 	app := createTestApp(&testing.T{})
 	ac := NewAutoCompleter(app)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		ac.getCommandCandidates("/co")
@@ -662,9 +662,9 @@ func BenchmarkAutoCompleter_getCommandCandidates(b *testing.B) {
 func BenchmarkAutoCompleter_findCommonPrefix(b *testing.B) {
 	app := createTestApp(&testing.T{})
 	ac := NewAutoCompleter(app)
-	
+
 	candidates := []string{"hello", "help", "hero", "heart", "heavy"}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		ac.findCommonPrefix(candidates)
@@ -674,9 +674,9 @@ func BenchmarkAutoCompleter_findCommonPrefix(b *testing.B) {
 func BenchmarkAutoCompleter_processCompletions(b *testing.B) {
 	app := createTestApp(&testing.T{})
 	ac := NewAutoCompleter(app)
-	
+
 	candidates := []string{"hello", "help", "hero"}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		ac.processCompletions(candidates, 2)

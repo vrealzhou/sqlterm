@@ -90,7 +90,7 @@ type PromptHistory struct {
 // AddEntry adds a new prompt entry to the history
 func (h *PromptHistory) AddEntry(entry PromptEntry) {
 	h.Entries = append(h.Entries, entry)
-	
+
 	// Keep only the last MaxSize entries
 	if len(h.Entries) > h.MaxSize {
 		h.Entries = h.Entries[len(h.Entries)-h.MaxSize:]

@@ -19,7 +19,7 @@ func NewOllamaClient(baseURL string) *OllamaClient {
 	if baseURL == "" {
 		baseURL = "http://localhost:11434"
 	}
-	
+
 	return &OllamaClient{
 		baseURL: baseURL,
 		client: &http.Client{
@@ -30,12 +30,12 @@ func NewOllamaClient(baseURL string) *OllamaClient {
 
 func (c *OllamaClient) Chat(ctx context.Context, request ChatRequest) (*ChatResponse, error) {
 	url := fmt.Sprintf("%s/api/chat", c.baseURL)
-	
+
 	// Convert to Ollama format
 	ollamaRequest := struct {
-		Model    string        `json:"model"`
-		Messages []ChatMessage `json:"messages"`
-		Stream   bool          `json:"stream"`
+		Model    string                 `json:"model"`
+		Messages []ChatMessage          `json:"messages"`
+		Stream   bool                   `json:"stream"`
 		Options  map[string]interface{} `json:"options,omitempty"`
 	}{
 		Model:    request.Model,
@@ -81,12 +81,12 @@ func (c *OllamaClient) Chat(ctx context.Context, request ChatRequest) (*ChatResp
 			Role    string `json:"role"`
 			Content string `json:"content"`
 		} `json:"message"`
-		Done               bool `json:"done"`
+		Done               bool  `json:"done"`
 		TotalDuration      int64 `json:"total_duration"`
 		LoadDuration       int64 `json:"load_duration"`
-		PromptEvalCount    int `json:"prompt_eval_count"`
+		PromptEvalCount    int   `json:"prompt_eval_count"`
 		PromptEvalDuration int64 `json:"prompt_eval_duration"`
-		EvalCount          int `json:"eval_count"`
+		EvalCount          int   `json:"eval_count"`
 		EvalDuration       int64 `json:"eval_duration"`
 	}
 
@@ -134,7 +134,7 @@ func (c *OllamaClient) Chat(ctx context.Context, request ChatRequest) (*ChatResp
 
 func (c *OllamaClient) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	url := fmt.Sprintf("%s/api/tags", c.baseURL)
-	
+
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)

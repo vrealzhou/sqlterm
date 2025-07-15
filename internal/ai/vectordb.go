@@ -624,7 +624,7 @@ func (vs *VectorStore) extractTableBaseWord(tableName string) string {
 	// Remove common suffixes
 	name := strings.ToLower(tableName)
 	suffixes := []string{"s", "es", "ies", "_table", "_data", "_info"}
-	
+
 	for _, suffix := range suffixes {
 		if strings.HasSuffix(name, suffix) {
 			name = strings.TrimSuffix(name, suffix)
@@ -738,7 +738,7 @@ func (vs *VectorStore) SearchRelatedTablesForQuery(ctx context.Context, initialT
 			if !processed[relatedTable] {
 				// Score based on relationship type and frequency
 				score := 1
-				
+
 				// Higher score for tables referenced by multiple source tables
 				if existing, exists := tableScores[relatedTable]; exists {
 					score = existing + 2 // Bonus for multiple references

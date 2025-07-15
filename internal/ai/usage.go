@@ -25,20 +25,20 @@ type UsageDetails struct {
 
 // DailyUsageStats represents aggregated daily statistics per provider/model
 type DailyUsageStats struct {
-	ID           int             `json:"id"`
-	Date         string          `json:"date"` // YYYY-MM-DD format
-	Provider     config.Provider `json:"provider"`
-	Model        string          `json:"model"`
-	TotalRequests int            `json:"total_requests"`
-	InputTokens  int             `json:"input_tokens"`
-	OutputTokens int             `json:"output_tokens"`
-	TotalCost    float64         `json:"total_cost"`
-	CreatedAt    time.Time       `json:"created_at"`
+	ID            int             `json:"id"`
+	Date          string          `json:"date"` // YYYY-MM-DD format
+	Provider      config.Provider `json:"provider"`
+	Model         string          `json:"model"`
+	TotalRequests int             `json:"total_requests"`
+	InputTokens   int             `json:"input_tokens"`
+	OutputTokens  int             `json:"output_tokens"`
+	TotalCost     float64         `json:"total_cost"`
+	CreatedAt     time.Time       `json:"created_at"`
 }
 
 // UsageStore manages usage tracking in the vector database
 type UsageStore struct {
-	db             *sql.DB
+	db                *sql.DB
 	lastProcessedDate string
 }
 
@@ -115,7 +115,7 @@ func (us *UsageStore) initializeUsageSchema() error {
 // handleDayChange processes statistics when date changes and truncates current day details
 func (us *UsageStore) handleDayChange() error {
 	currentDate := time.Now().Format("2006-01-02")
-	
+
 	// Check if we need to process the previous day's data
 	var lastDate sql.NullString
 	err := us.db.QueryRow(`SELECT MAX(date(request_time)) FROM usage_details`).Scan(&lastDate)
@@ -128,7 +128,7 @@ func (us *UsageStore) handleDayChange() error {
 		if err := us.aggregateDailyStats(lastDate.String); err != nil {
 			return fmt.Errorf("failed to aggregate daily stats: %w", err)
 		}
-		
+
 		// Clean up old usage details (keep only current day)
 		if err := us.truncateOldDetails(currentDate); err != nil {
 			return fmt.Errorf("failed to truncate old details: %w", err)
@@ -140,14 +140,14 @@ func (us *UsageStore) handleDayChange() error {
 }
 
 // RecordUsage records a new usage entry
-func (us *UsageStore) RecordUsage(sessionID string, provider config.Provider, model string, 
+func (us *UsageStore) RecordUsage(sessionID string, provider config.Provider, model string,
 	inputTokens, outputTokens int, cost float64, userMessage, aiResponse, systemPrompt string) error {
-	
+
 	query := `INSERT INTO usage_details 
 		(session_id, provider, model, input_tokens, output_tokens, cost, request_time, user_message, ai_response, system_prompt)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
-	_, err := us.db.Exec(query, sessionID, string(provider), model, inputTokens, outputTokens, 
+	_, err := us.db.Exec(query, sessionID, string(provider), model, inputTokens, outputTokens,
 		cost, time.Now(), userMessage, aiResponse, systemPrompt)
 
 	if err != nil {
@@ -196,7 +196,7 @@ func (us *UsageStore) truncateOldDetails(currentDate string) error {
 // GetTodayUsage returns today's usage details
 func (us *UsageStore) GetTodayUsage() ([]UsageDetails, error) {
 	currentDate := time.Now().Format("2006-01-02")
-	
+
 	query := `SELECT id, session_id, provider, model, input_tokens, output_tokens, 
 		cost, request_time, user_message, ai_response, system_prompt
 		FROM usage_details 
@@ -279,7 +279,7 @@ func (us *UsageStore) GetUsageSummary() (map[string]interface{}, error) {
 	}
 
 	err := us.db.QueryRow(todayQuery, currentDate).Scan(
-		&todayStats.Requests, &todayStats.InputTokens, 
+		&todayStats.Requests, &todayStats.InputTokens,
 		&todayStats.OutputTokens, &todayStats.Cost)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, fmt.Errorf("failed to get today's summary: %w", err)
@@ -302,7 +302,7 @@ func (us *UsageStore) GetUsageSummary() (map[string]interface{}, error) {
 	}
 
 	err = us.db.QueryRow(weekQuery, weekAgo, currentDate).Scan(
-		&weekStats.Requests, &weekStats.InputTokens, 
+		&weekStats.Requests, &weekStats.InputTokens,
 		&weekStats.OutputTokens, &weekStats.Cost)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, fmt.Errorf("failed to get week summary: %w", err)
@@ -312,10 +312,10 @@ func (us *UsageStore) GetUsageSummary() (map[string]interface{}, error) {
 	summary := map[string]interface{}{
 		"today": todayStats,
 		"last_7_days": map[string]interface{}{
-			"requests":     weekStats.Requests + todayStats.Requests,
-			"input_tokens": weekStats.InputTokens + todayStats.InputTokens,
+			"requests":      weekStats.Requests + todayStats.Requests,
+			"input_tokens":  weekStats.InputTokens + todayStats.InputTokens,
 			"output_tokens": weekStats.OutputTokens + todayStats.OutputTokens,
-			"cost":         weekStats.Cost + todayStats.Cost,
+			"cost":          weekStats.Cost + todayStats.Cost,
 		},
 	}
 
@@ -343,13 +343,13 @@ func (us *UsageStore) ExportUsageData(format string, startDate, endDate string) 
 // exportCSV converts usage stats to CSV format
 func (us *UsageStore) exportCSV(stats []DailyUsageStats) ([]byte, error) {
 	csv := "Date,Provider,Model,Total Requests,Input Tokens,Output Tokens,Total Cost\n"
-	
+
 	for _, stat := range stats {
 		csv += fmt.Sprintf("%s,%s,%s,%d,%d,%d,%.6f\n",
 			stat.Date, stat.Provider, stat.Model, stat.TotalRequests,
 			stat.InputTokens, stat.OutputTokens, stat.TotalCost)
 	}
-	
+
 	return []byte(csv), nil
 }
 
@@ -375,7 +375,7 @@ func (us *UsageStore) GetProviderModelStats(days int) (map[string]map[string]int
 	defer rows.Close()
 
 	result := make(map[string]map[string]interface{})
-	
+
 	for rows.Next() {
 		var provider, model string
 		var requests, inputTokens, outputTokens int
@@ -411,7 +411,7 @@ func (us *UsageStore) GetProviderModelStats(days int) (map[string]map[string]int
 	todayRows, err := us.db.Query(todayQuery, currentDate)
 	if err == nil {
 		defer todayRows.Close()
-		
+
 		for todayRows.Next() {
 			var provider, model string
 			var requests, inputTokens, outputTokens int
