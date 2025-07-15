@@ -459,7 +459,9 @@ func BenchmarkGetDefaultPort(b *testing.B) {
 
 func BenchmarkDatabaseTypeString(b *testing.B) {
 	dbType := core.PostgreSQL
+	var result string
 	for i := 0; i < b.N; i++ {
-		dbType.String()
+		result = dbType.String()
 	}
+	_ = result // Prevent unused variable warning
 }
