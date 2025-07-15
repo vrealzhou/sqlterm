@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -98,7 +99,7 @@ func (m *Manager) initializeClient() error {
 	case config.ProviderOpenRouter:
 		apiKey := m.config.GetAPIKey(config.ProviderOpenRouter)
 		if apiKey == "" {
-			return fmt.Errorf("OpenRouter API key not configured")
+			return errors.New(m.i18nMgr.Get("openrouter_api_key_not_configured"))
 		}
 		m.client = NewOpenRouterClient(apiKey)
 	case config.ProviderOllama:
@@ -108,7 +109,7 @@ func (m *Manager) initializeClient() error {
 		baseURL := m.config.GetBaseURL(config.ProviderLMStudio)
 		m.client = NewLMStudioClient(baseURL, m.i18nMgr)
 	default:
-		return fmt.Errorf("unsupported provider: %s", m.config.AI.Provider)
+		return fmt.Errorf(m.i18nMgr.Get("unsupported_provider"), m.config.AI.Provider)
 	}
 
 	return nil
@@ -138,7 +139,7 @@ func (m *Manager) UpdateLanguage(language string) error {
 // Chat sends a chat message and returns the response
 func (m *Manager) Chat(ctx context.Context, message string, systemPrompt string) (string, error) {
 	if !m.IsConfigured() {
-		return "", fmt.Errorf("AI client not configured")
+		return "", errors.New(m.i18nMgr.Get("ai_client_not_configured"))
 	}
 
 	messages := []ChatMessage{
@@ -155,11 +156,11 @@ func (m *Manager) Chat(ctx context.Context, message string, systemPrompt string)
 
 	response, err := m.client.Chat(ctx, request)
 	if err != nil {
-		return "", fmt.Errorf("chat request failed: %w", err)
+		return "", fmt.Errorf(m.i18nMgr.Get("chat_request_failed"), err)
 	}
 
 	if len(response.Choices) == 0 {
-		return "", fmt.Errorf("no response choices returned")
+		return "", errors.New(m.i18nMgr.Get("no_response_choices_returned"))
 	}
 
 	// Calculate cost and update usage
@@ -211,7 +212,7 @@ func (m *Manager) calculateCost(inputTokens, outputTokens int) float64 {
 // ListModels returns available models for the current provider
 func (m *Manager) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	if !m.IsConfigured() {
-		return nil, fmt.Errorf("AI client not configured")
+		return nil, errors.New(m.i18nMgr.Get("ai_client_not_configured"))
 	}
 	return m.client.ListModels(ctx)
 }
@@ -359,7 +360,7 @@ func (m *Manager) addToPromptHistory(userMessage, systemPrompt, aiResponse strin
 		err := m.usageStore.RecordUsage(m.sessionID, m.config.AI.Provider, m.config.AI.Model,
 			inputTokens, outputTokens, cost, userMessage, aiResponse, systemPrompt)
 		if err != nil {
-			fmt.Printf("Warning: failed to record usage: %v\n", err)
+			fmt.Printf(m.i18nMgr.Get("failed_record_usage_warning"), err)
 		}
 	}
 
@@ -774,7 +775,7 @@ func (m *Manager) ClearConversation() {
 // ChatWithConversation handles chat with conversation context
 func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, allTables []string) (string, error) {
 	if !m.IsConfigured() {
-		return "", fmt.Errorf("AI client not configured")
+		return "", errors.New(m.i18nMgr.Get("ai_client_not_configured"))
 	}
 
 	// Start new conversation if none exists
@@ -803,11 +804,11 @@ func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, 
 
 	response, err := m.client.Chat(ctx, request)
 	if err != nil {
-		return "", fmt.Errorf("chat request failed: %w", err)
+		return "", fmt.Errorf(m.i18nMgr.Get("chat_request_failed"), err)
 	}
 
 	if len(response.Choices) == 0 {
-		return "", fmt.Errorf("no response choices returned")
+		return "", errors.New(m.i18nMgr.Get("no_response_choices_returned"))
 	}
 
 	aiResponse := response.Choices[0].Message.Content

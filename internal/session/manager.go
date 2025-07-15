@@ -8,21 +8,24 @@ import (
 	"time"
 
 	"sqlterm/internal/core"
+	"sqlterm/internal/i18n"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Manager struct {
 	configDir string
+	i18nMgr   *i18n.Manager
 }
 
 type SessionConfig struct {
 	CleanupRetentionDays int `yaml:"cleanup_retention_days"`
 }
 
-func NewManager(configDir string) *Manager {
+func NewManager(configDir string, i18nMgr *i18n.Manager) *Manager {
 	return &Manager{
 		configDir: configDir,
+		i18nMgr:   i18nMgr,
 	}
 }
 
@@ -32,7 +35,7 @@ func (m *Manager) GetSessionDir(connectionName string) string {
 
 func (m *Manager) EnsureSessionDir(connectionName string) error {
 	if connectionName == "" {
-		return errors.New("connectionName can not be empty")
+		return errors.New(m.i18nMgr.Get("connection_name_empty_error"))
 	}
 	sessionDir := m.GetSessionDir(connectionName)
 	if err := os.MkdirAll(sessionDir, 0755); err != nil {
@@ -53,7 +56,7 @@ func (m *Manager) EnsureSessionDir(connectionName string) error {
 	// Perform automatic cleanup
 	if err := m.performAutoCleanup(connectionName); err != nil {
 		// Don't fail if cleanup fails, just log a warning
-		fmt.Printf("Warning: cleanup failed for %s: %v\n", connectionName, err)
+		fmt.Printf(m.i18nMgr.Get("cleanup_failed_warning"), connectionName, err)
 	}
 
 	return nil
@@ -71,7 +74,7 @@ func (m *Manager) ViewMarkdown(filePath string) error {
 
 func (m *Manager) DisplayMarkdown(markdown string) error {
 	// Use the shared markdown renderer
-	renderer := core.NewMarkdownRenderer()
+	renderer := core.NewMarkdownRenderer(m.i18nMgr)
 	return renderer.RenderAndDisplay(markdown)
 }
 
@@ -163,7 +166,7 @@ func (m *Manager) ensureSessionConfig(connectionName string) error {
 		return err
 	}
 
-	fmt.Printf("📁 Created session.yaml for %s (cleanup_retention_days: %d)\n", connectionName, defaultConfig.CleanupRetentionDays)
+	fmt.Printf(m.i18nMgr.Get("session_yaml_created_detailed"), connectionName, defaultConfig.CleanupRetentionDays)
 	return nil
 }
 

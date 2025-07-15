@@ -1092,6 +1092,190 @@
     {
       "id": "unknown_config_help_subcommand",
       "text": "❓ 未知配置子命令 '%s'。使用 '/help config' 查看可用选项。"
+    },
+    {
+      "id": "connection_name_empty_error",
+      "text": "连接名称不能为空"
+    },
+    {
+      "id": "cleanup_failed_warning",
+      "text": "警告：%s 的清理失败：%v\n"
+    },
+    {
+      "id": "session_yaml_created_detailed",
+      "text": "📁 已为 %s 创建 session.yaml（清理保留天数：%d）\n"
+    },
+    {
+      "id": "failed_migrate_legacy_history_warning",
+      "text": "警告：迁移旧历史记录失败：%v\n"
+    },
+    {
+      "id": "migrated_command_history",
+      "text": "📦 已将命令历史迁移到会话文件夹\n"
+    },
+    {
+      "id": "generic_error",
+      "text": "错误：%v\n"
+    },
+    {
+      "id": "failed_create_session_dir_warning",
+      "text": "警告：创建会话目录失败：%v\n"
+    },
+    {
+      "id": "failed_save_markdown_warning",
+      "text": "警告：保存 markdown 失败：%v\n"
+    },
+    {
+      "id": "generic_warning",
+      "text": "警告：%v\n"
+    },
+    {
+      "id": "failed_save_connection_warning",
+      "text": "警告：保存连接失败：%v\n"
+    },
+    {
+      "id": "references_label",
+      "text": "引用"
+    },
+    {
+      "id": "on_delete_label",
+      "text": "删除时"
+    },
+    {
+      "id": "on_update_label",
+      "text": "更新时"
+    },
+    {
+      "id": "failed_save_command_history_warning",
+      "text": "警告：保存命令到历史失败：%v\n"
+    },
+    {
+      "id": "ai_timeout_message",
+      "text": "⏰ AI 请求超时。这可能由以下原因引起：\n"
+    },
+    {
+      "id": "ai_timeout_complex_queries",
+      "text": "   - 复杂查询需要时间处理\n"
+    },
+    {
+      "id": "ai_timeout_network_issues",
+      "text": "   - 网络连接问题\n"
+    },
+    {
+      "id": "ai_timeout_provider_overloaded",
+      "text": "   - AI 提供商过载\n"
+    },
+    {
+      "id": "ai_timeout_suggestion",
+      "text": "💡 请尝试简化您的消息或稍后再试。\n"
+    },
+    {
+      "id": "connection_name_format",
+      "text": "%s 连接"
+    },
+    {
+      "id": "version_command_short",
+      "text": "显示版本信息"
+    },
+    {
+      "id": "version_command_long",
+      "text": "显示版本、构建时间和 git 提交信息"
+    },
+    {
+      "id": "sqlterm_version",
+      "text": "SQLTerm %s\n"
+    },
+    {
+      "id": "build_time",
+      "text": "构建时间：%s\n"
+    },
+    {
+      "id": "git_commit",
+      "text": "Git 提交：%s\n"
+    },
+    {
+      "id": "flag_db_type",
+      "text": "数据库类型（mysql、postgres、sqlite）"
+    },
+    {
+      "id": "flag_host",
+      "text": "主机"
+    },
+    {
+      "id": "flag_port",
+      "text": "端口"
+    },
+    {
+      "id": "flag_database",
+      "text": "数据库名称"
+    },
+    {
+      "id": "flag_username",
+      "text": "用户名"
+    },
+    {
+      "id": "flag_password",
+      "text": "密码"
+    },
+    {
+      "id": "failed_to_connect_error",
+      "text": "连接失败：%w"
+    },
+    {
+      "id": "connection_test_failed_error",
+      "text": "连接测试失败：%w"
+    },
+    {
+      "id": "failed_create_conversation_app",
+      "text": "创建对话应用失败：%w"
+    },
+    {
+      "id": "failed_load_connections",
+      "text": "加载连接失败：%w"
+    },
+    {
+      "id": "main_error",
+      "text": "错误：%v\n"
+    },
+    {
+      "id": "markdown_render_failed_plain_text",
+      "text": "⚠️  创建 markdown 渲染器失败，显示纯文本："
+    },
+    {
+      "id": "markdown_render_failed_showing_plain",
+      "text": "⚠️  渲染 markdown 失败，显示纯文本："
+    },
+    {
+      "id": "query_results_plain_header",
+      "text": "\n📄 查询结果："
+    },
+    {
+      "id": "failed_create_csv_file",
+      "text": "创建 CSV 文件失败：%w"
+    },
+    {
+      "id": "openrouter_api_key_not_configured",
+      "text": "OpenRouter API 密钥未配置"
+    },
+    {
+      "id": "unsupported_provider",
+      "text": "不支持的提供商：%s"
+    },
+    {
+      "id": "ai_client_not_configured",
+      "text": "AI 客户端未配置"
+    },
+    {
+      "id": "chat_request_failed",
+      "text": "聊天请求失败：%w"
+    },
+    {
+      "id": "no_response_choices_returned",
+      "text": "未返回响应选项"
+    },
+    {
+      "id": "failed_record_usage_warning",
+      "text": "警告：记录使用情况失败：%v\n"
     }
   ]
 }

@@ -34,9 +34,8 @@ type App struct {
 
 func NewApp() (*App, error) {
 	configMgr := config.NewManager()
-	sessionMgr := session.NewManager(configMgr.GetConfigDir())
 
-	// Initialize AI manager
+	// Initialize AI manager first
 	aiManager, err := ai.NewManager(configMgr.GetConfigDir())
 	if err != nil {
 		// AI manager initialization failed completely
@@ -56,6 +55,9 @@ func NewApp() (*App, error) {
 		// Fallback to default language if i18n fails
 		i18nMgr, _ = i18n.NewManager("en_au")
 	}
+
+	// Initialize session manager with i18n manager
+	sessionMgr := session.NewManager(configMgr.GetConfigDir(), i18nMgr)
 
 	app := &App{
 		configMgr:  configMgr,
@@ -138,7 +140,7 @@ func (a *App) switchToSessionHistory(connectionName string) error {
 
 	// Migrate legacy global history if this is the first time using session histories
 	if err := a.migrateLegacyHistory(historyFile); err != nil {
-		fmt.Printf("Warning: failed to migrate legacy history: %v\n", err)
+		fmt.Printf(a.i18nMgr.Get("failed_migrate_legacy_history_warning"), err)
 	}
 
 	// Update the readline config with the new history file
@@ -268,7 +270,7 @@ func (a *App) Run() error {
 		}
 
 		if err := a.processLine(line); err != nil {
-			fmt.Printf("Error: %v\n", err)
+			fmt.Printf(a.i18nMgr.Get("generic_error"), err)
 		}
 	}
 
@@ -374,11 +376,11 @@ func (a *App) processQuery(query string, resultWriter io.Writer) error {
 	// Save as markdown and display with glamour
 	if a.config != nil {
 		if err := a.sessionMgr.EnsureSessionDir(a.config.Name); err != nil {
-			fmt.Printf("Warning: failed to create session directory: %v\n", err)
+			fmt.Printf(a.i18nMgr.Get("failed_create_session_dir_warning"), err)
 		} else {
 			err := core.SaveQueryResultAsMarkdown(result, query, a.config.Name, resultWriter, a.i18nMgr)
 			if err != nil {
-				fmt.Printf("Warning: failed to save markdown: %v\n", err)
+				fmt.Printf(a.i18nMgr.Get("failed_save_markdown_warning"), err)
 			}
 		}
 	}
@@ -501,7 +503,7 @@ func (a *App) executeFile(filename string, queryRange []int) error {
 	writer.Close()
 
 	if err := a.sessionMgr.ViewMarkdown(mdPath); err != nil {
-		fmt.Printf("Warning: %v\n", err)
+		fmt.Printf(a.i18nMgr.Get("generic_warning"), err)
 	}
 	fmt.Printf("📍 %s: %s\n", a.i18nMgr.Get("file_location"), mdPath)
 
@@ -699,7 +701,7 @@ func (a *App) interactiveConnect() error {
 
 	// Save connection
 	if err := a.configMgr.SaveConnection(config); err != nil {
-		fmt.Printf("Warning: failed to save connection: %v\n", err)
+		fmt.Printf(a.i18nMgr.Get("failed_save_connection_warning"), err)
 	} else {
 		fmt.Print(a.i18nMgr.Get("connection_saved"))
 	}
@@ -855,7 +857,7 @@ func (a *App) generateTableMarkdown(tableInfo *core.TableInfo) string {
 
 func (a *App) displayMarkdown(markdown string) error {
 	// Use the shared markdown renderer
-	renderer := core.NewMarkdownRenderer()
+	renderer := core.NewMarkdownRenderer(a.i18nMgr)
 	return renderer.RenderAndDisplay(markdown)
 }
 
@@ -903,7 +905,7 @@ func (a *App) handleExecQuery(args []string) error {
 		return nil
 	}
 	if err := a.sessionMgr.ViewMarkdown(mdPath); err != nil {
-		fmt.Printf("Warning: %v\n", err)
+		fmt.Printf(a.i18nMgr.Get("generic_warning"), err)
 	}
 	fmt.Printf("📍 %s: %s\n", a.i18nMgr.Get("file_location"), mdPath)
 	return nil
@@ -977,7 +979,7 @@ func (a *App) handleMultilineExec() error {
 	// Add the complete multi-line query as a single history entry
 	historyEntry := "/exec " + fullQuery
 	if err := a.rl.SaveHistory(historyEntry); err != nil {
-		fmt.Printf("Warning: failed to save command to history: %v\n", err)
+		fmt.Printf(a.i18nMgr.Get("failed_save_command_history_warning"), err)
 	}
 
 	fmt.Print(a.i18nMgr.Get("executing_query"))
@@ -1001,7 +1003,7 @@ func (a *App) handleMultilineExec() error {
 		return nil
 	}
 	if err := a.sessionMgr.ViewMarkdown(mdPath); err != nil {
-		fmt.Printf("Warning: %v\n", err)
+		fmt.Printf(a.i18nMgr.Get("generic_warning"), err)
 	}
 	fmt.Printf("📍 %s: %s\n", a.i18nMgr.Get("file_location"), mdPath)
 	return nil
@@ -1218,11 +1220,11 @@ func (a *App) processAIChat(message string) error {
 	if err != nil {
 		// Provide more helpful error messages for common issues
 		if strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "deadline exceeded") {
-			fmt.Printf("⏰ AI request timed out. This can happen with:\n")
-			fmt.Printf("   - Complex queries that take time to process\n")
-			fmt.Printf("   - Network connectivity issues\n")
-			fmt.Printf("   - AI provider being overloaded\n")
-			fmt.Printf("💡 Try simplifying your message or try again later.\n")
+			fmt.Print(a.i18nMgr.Get("ai_timeout_message"))
+			fmt.Print(a.i18nMgr.Get("ai_timeout_complex_queries"))
+			fmt.Print(a.i18nMgr.Get("ai_timeout_network_issues"))
+			fmt.Print(a.i18nMgr.Get("ai_timeout_provider_overloaded"))
+			fmt.Print(a.i18nMgr.Get("ai_timeout_suggestion"))
 			return nil
 		}
 		return fmt.Errorf(a.i18nMgr.Get("ai_chat_failed"), err)
@@ -1232,7 +1234,7 @@ func (a *App) processAIChat(message string) error {
 	formattedResponse := core.FormatSQLInMarkdown(response)
 
 	// Display response using markdown renderer
-	renderer := core.NewMarkdownRenderer()
+	renderer := core.NewMarkdownRenderer(a.i18nMgr)
 	if err := renderer.RenderAndDisplay(formattedResponse); err != nil {
 		// Fallback to plain text if markdown rendering fails
 		fmt.Println(a.i18nMgr.Get("ai_response_header"))
@@ -2116,7 +2118,7 @@ func (a *App) handleShowPrompts(args []string) error {
 		if mdPath != "" {
 			// Display the markdown file using the same method as query results
 			if err := a.sessionMgr.ViewMarkdown(mdPath); err != nil {
-				fmt.Printf("Warning: %v\n", err)
+				fmt.Printf(a.i18nMgr.Get("generic_warning"), err)
 			}
 			fmt.Printf(a.i18nMgr.Get("conversation_history_saved"), mdPath)
 		}

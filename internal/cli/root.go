@@ -61,6 +61,11 @@ func init() {
 		connectCmd.Short = i18nMgr.Get("connect_command_short")
 		listCmd.Short = i18nMgr.Get("list_command_short")
 		addCmd.Short = i18nMgr.Get("add_command_short")
+		versionCmd.Short = i18nMgr.Get("version_command_short")
+		versionCmd.Long = i18nMgr.Get("version_command_long")
+		
+		// Update flag descriptions
+		updateFlagDescriptions(i18nMgr)
 	}
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", getI18nString(i18nMgr, "config_file_flag", "config file (default is $HOME/.sqlterm.yaml)"))
@@ -78,6 +83,32 @@ func getI18nString(mgr *i18n.Manager, key, fallback string) string {
 		return fallback
 	}
 	return mgr.Get(key)
+}
+
+func updateFlagDescriptions(i18nMgr *i18n.Manager) {
+	if i18nMgr == nil {
+		return
+	}
+	
+	// Update connect command flag descriptions safely
+	if flag := connectCmd.Flags().Lookup("db-type"); flag != nil {
+		flag.Usage = i18nMgr.Get("flag_db_type")
+	}
+	if flag := connectCmd.Flags().Lookup("host"); flag != nil {
+		flag.Usage = i18nMgr.Get("flag_host")
+	}
+	if flag := connectCmd.Flags().Lookup("port"); flag != nil {
+		flag.Usage = i18nMgr.Get("flag_port")
+	}
+	if flag := connectCmd.Flags().Lookup("database"); flag != nil {
+		flag.Usage = i18nMgr.Get("flag_database")
+	}
+	if flag := connectCmd.Flags().Lookup("username"); flag != nil {
+		flag.Usage = i18nMgr.Get("flag_username")
+	}
+	if flag := connectCmd.Flags().Lookup("password"); flag != nil {
+		flag.Usage = i18nMgr.Get("flag_password")
+	}
 }
 
 func initConfig() {
@@ -113,6 +144,12 @@ var connectCmd = &cobra.Command{
 	Use:   "connect",
 	Short: "", // Will be set in init()
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Initialize i18n manager
+		i18nMgr, err := i18n.NewManager("en_au")
+		if err != nil {
+			i18nMgr, _ = i18n.NewManager("en_au")
+		}
+
 		dbType, _ := cmd.Flags().GetString("db-type")
 		host, _ := cmd.Flags().GetString("host")
 		port, _ := cmd.Flags().GetInt("port")
@@ -130,7 +167,7 @@ var connectCmd = &cobra.Command{
 		}
 
 		config := &core.ConnectionConfig{
-			Name:         fmt.Sprintf("%s Connection", dbType),
+			Name:         fmt.Sprintf(i18nMgr.Get("connection_name_format"), dbType),
 			DatabaseType: dbTypeEnum,
 			Host:         host,
 			Port:         port,
@@ -189,16 +226,23 @@ var addCmd = &cobra.Command{
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Show version information",
-	Long:  "Display version, build time, and git commit information",
+	Short: "", // Will be set in init()
+	Long:  "", // Will be set in init(),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("SQLTerm %s\n", Version)
-		fmt.Printf("Build time: %s\n", BuildTime)
-		fmt.Printf("Git commit: %s\n", GitCommit)
+		// Initialize i18n manager
+		i18nMgr, err := i18n.NewManager("en_au")
+		if err != nil {
+			i18nMgr, _ = i18n.NewManager("en_au")
+		}
+
+		fmt.Printf(i18nMgr.Get("sqlterm_version"), Version)
+		fmt.Printf(i18nMgr.Get("build_time"), BuildTime)
+		fmt.Printf(i18nMgr.Get("git_commit"), GitCommit)
 	},
 }
 
 func init() {
+	// Set up flags with English fallbacks - will be updated in initI18n()
 	connectCmd.Flags().StringP("db-type", "t", "", "Database type (mysql, postgres, sqlite)")
 	connectCmd.Flags().StringP("host", "H", "localhost", "Host")
 	connectCmd.Flags().IntP("port", "p", 0, "Port")

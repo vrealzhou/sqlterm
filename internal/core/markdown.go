@@ -7,16 +7,18 @@ import (
 
 	"github.com/charmbracelet/glamour"
 	"golang.org/x/term"
+	"sqlterm/internal/i18n"
 )
 
 // MarkdownRenderer handles markdown rendering with consistent styling
 type MarkdownRenderer struct {
-	width  int
-	height int
+	width   int
+	height  int
+	i18nMgr *i18n.Manager
 }
 
 // NewMarkdownRenderer creates a new markdown renderer with terminal dimensions
-func NewMarkdownRenderer() *MarkdownRenderer {
+func NewMarkdownRenderer(i18nMgr *i18n.Manager) *MarkdownRenderer {
 	width, height, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil || width <= 0 {
 		width = 120 // fallback width
@@ -26,8 +28,9 @@ func NewMarkdownRenderer() *MarkdownRenderer {
 	}
 
 	return &MarkdownRenderer{
-		width:  width,
-		height: height,
+		width:   width,
+		height:  height,
+		i18nMgr: i18nMgr,
 	}
 }
 
@@ -41,7 +44,7 @@ func (mr *MarkdownRenderer) RenderAndDisplay(markdown string) error {
 	)
 	if err != nil {
 		// Fall back to plain text if glamour fails
-		fmt.Println("⚠️  Failed to create markdown renderer, showing plain text:")
+		fmt.Println(mr.i18nMgr.Get("markdown_render_failed_plain_text"))
 		fmt.Print(markdown)
 		return nil
 	}
@@ -50,7 +53,7 @@ func (mr *MarkdownRenderer) RenderAndDisplay(markdown string) error {
 	out, err := r.Render(markdown)
 	if err != nil {
 		// Fall back to plain text if rendering fails
-		fmt.Println("⚠️  Failed to render markdown, showing plain text:")
+		fmt.Println(mr.i18nMgr.Get("markdown_render_failed_showing_plain"))
 		fmt.Print(markdown)
 		return nil
 	}
@@ -63,7 +66,7 @@ func (mr *MarkdownRenderer) RenderAndDisplay(markdown string) error {
 // displayWithFormatting displays content with header and footer
 func (mr *MarkdownRenderer) displayWithFormatting(content string) {
 	// Print a header
-	fmt.Println("\n📄 Query Results:")
+	fmt.Println(mr.i18nMgr.Get("query_results_plain_header"))
 	fmt.Println(strings.Repeat("─", min(mr.width, 80)))
 	
 	// Display the rendered markdown

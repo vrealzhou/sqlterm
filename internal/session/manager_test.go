@@ -5,12 +5,22 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+	
+	"sqlterm/internal/i18n"
 )
+
+func createTestManager(tb testing.TB, configDir string) *Manager {
+	i18nMgr, err := i18n.NewManager("en_au")
+	if err != nil {
+		tb.Fatalf("Failed to create i18n manager: %v", err)
+	}
+	return NewManager(configDir, i18nMgr)
+}
 
 func TestNewManager(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	manager := NewManager(tmpDir)
+	manager := createTestManager(t, tmpDir)
 
 	if manager == nil {
 		t.Fatal("NewManager returned nil")
@@ -23,7 +33,7 @@ func TestNewManager(t *testing.T) {
 
 func TestManager_GetSessionDir(t *testing.T) {
 	tmpDir := t.TempDir()
-	manager := NewManager(tmpDir)
+	manager := createTestManager(t, tmpDir)
 
 	testCases := []struct {
 		name           string
@@ -65,7 +75,7 @@ func TestManager_GetSessionDir(t *testing.T) {
 
 func TestManager_EnsureSessionDir(t *testing.T) {
 	tmpDir := t.TempDir()
-	manager := NewManager(tmpDir)
+	manager := createTestManager(t, tmpDir)
 
 	connectionName := "test-connection"
 
@@ -107,7 +117,7 @@ func TestManager_EnsureSessionDir(t *testing.T) {
 
 func TestManager_EnsureSessionDir_CreatesConfig(t *testing.T) {
 	tmpDir := t.TempDir()
-	manager := NewManager(tmpDir)
+	manager := createTestManager(t, tmpDir)
 
 	connectionName := "test-db"
 
@@ -134,7 +144,7 @@ func TestManager_EnsureSessionDir_CreatesConfig(t *testing.T) {
 
 func TestManager_CleanupOldFiles(t *testing.T) {
 	tmpDir := t.TempDir()
-	manager := NewManager(tmpDir)
+	manager := createTestManager(t, tmpDir)
 
 	connectionName := "test-cleanup"
 
@@ -190,7 +200,7 @@ func TestManager_CleanupOldFiles(t *testing.T) {
 
 func TestManager_getSessionConfig(t *testing.T) {
 	tmpDir := t.TempDir()
-	manager := NewManager(tmpDir)
+	manager := createTestManager(t, tmpDir)
 
 	connectionName := "test-config"
 
@@ -223,7 +233,7 @@ func TestManager_getSessionConfig(t *testing.T) {
 func TestManager_ErrorHandling(t *testing.T) {
 	// Test with invalid directory
 	invalidDir := "/nonexistent/path/that/should/not/exist"
-	manager := NewManager(invalidDir)
+	manager := createTestManager(t, invalidDir)
 
 	// EnsureSessionDir should handle permission errors gracefully
 	err := manager.EnsureSessionDir("test")
@@ -233,7 +243,7 @@ func TestManager_ErrorHandling(t *testing.T) {
 
 	// Test with empty connection name
 	tmpDir := t.TempDir()
-	validManager := NewManager(tmpDir)
+	validManager := createTestManager(t, tmpDir)
 
 	err = validManager.EnsureSessionDir("")
 	if err == nil {
@@ -243,7 +253,7 @@ func TestManager_ErrorHandling(t *testing.T) {
 
 func TestManager_SessionDirIsolation(t *testing.T) {
 	tmpDir := t.TempDir()
-	manager := NewManager(tmpDir)
+	manager := createTestManager(t, tmpDir)
 
 	// Create multiple sessions
 	connections := []string{"db1", "db2", "db3"}
@@ -285,7 +295,7 @@ func TestManager_SessionDirIsolation(t *testing.T) {
 
 func TestManager_ConfigPersistence(t *testing.T) {
 	tmpDir := t.TempDir()
-	manager := NewManager(tmpDir)
+	manager := createTestManager(t, tmpDir)
 
 	connectionName := "test-persistence"
 
@@ -302,7 +312,7 @@ func TestManager_ConfigPersistence(t *testing.T) {
 	}
 
 	// Create new manager instance (simulating restart)
-	manager2 := NewManager(tmpDir)
+	manager2 := createTestManager(t, tmpDir)
 
 	// Config should be the same
 	config2, err := manager2.getSessionConfig(connectionName)
@@ -318,7 +328,7 @@ func TestManager_ConfigPersistence(t *testing.T) {
 // Benchmark tests
 func BenchmarkManager_GetSessionDir(b *testing.B) {
 	tmpDir := b.TempDir()
-	manager := NewManager(tmpDir)
+	manager := createTestManager(b, tmpDir)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -328,7 +338,7 @@ func BenchmarkManager_GetSessionDir(b *testing.B) {
 
 func BenchmarkManager_EnsureSessionDir(b *testing.B) {
 	tmpDir := b.TempDir()
-	manager := NewManager(tmpDir)
+	manager := createTestManager(b, tmpDir)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -339,7 +349,7 @@ func BenchmarkManager_EnsureSessionDir(b *testing.B) {
 
 func BenchmarkManager_getSessionConfig(b *testing.B) {
 	tmpDir := b.TempDir()
-	manager := NewManager(tmpDir)
+	manager := createTestManager(b, tmpDir)
 
 	// Pre-create session
 	manager.EnsureSessionDir("bench-connection")

@@ -76,7 +76,14 @@ func createTestApp(t *testing.T) *App {
 	tmpDir := t.TempDir()
 	
 	configMgr := config.NewManager()
-	sessionMgr := session.NewManager(tmpDir)
+	
+	// Initialize i18n manager for testing
+	i18nMgr, err := i18n.NewManager("en_au")
+	if err != nil {
+		t.Fatalf("Failed to create i18n manager: %v", err)
+	}
+	
+	sessionMgr := session.NewManager(tmpDir, i18nMgr)
 	
 	// Create a mock AI manager
 	aiManager, err := ai.NewManager(tmpDir)
@@ -86,9 +93,9 @@ func createTestApp(t *testing.T) *App {
 	}
 	
 	// Create i18n manager
-	i18nMgr, err := i18n.NewManager("en_au")
-	if err != nil {
-		t.Fatalf("Failed to create i18n manager: %v", err)
+	i18nMgr, i18nErr := i18n.NewManager("en_au")
+	if i18nErr != nil {
+		t.Fatalf("Failed to create i18n manager: %v", i18nErr)
 	}
 	
 	app := &App{

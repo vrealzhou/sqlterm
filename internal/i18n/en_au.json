@@ -1092,6 +1092,190 @@
     {
       "id": "unknown_config_help_subcommand",
       "text": "❓ Unknown config subcommand '%s'. Use '/help config' for available options."
+    },
+    {
+      "id": "connection_name_empty_error",
+      "text": "connectionName can not be empty"
+    },
+    {
+      "id": "cleanup_failed_warning",
+      "text": "Warning: cleanup failed for %s: %v\n"
+    },
+    {
+      "id": "session_yaml_created_detailed",
+      "text": "📁 Created session.yaml for %s (cleanup_retention_days: %d)\n"
+    },
+    {
+      "id": "failed_migrate_legacy_history_warning",
+      "text": "Warning: failed to migrate legacy history: %v\n"
+    },
+    {
+      "id": "migrated_command_history",
+      "text": "📦 Migrated command history to session folder\n"
+    },
+    {
+      "id": "generic_error",
+      "text": "Error: %v\n"
+    },
+    {
+      "id": "failed_create_session_dir_warning",
+      "text": "Warning: failed to create session directory: %v\n"
+    },
+    {
+      "id": "failed_save_markdown_warning",
+      "text": "Warning: failed to save markdown: %v\n"
+    },
+    {
+      "id": "generic_warning",
+      "text": "Warning: %v\n"
+    },
+    {
+      "id": "failed_save_connection_warning",
+      "text": "Warning: failed to save connection: %v\n"
+    },
+    {
+      "id": "references_label",
+      "text": "References"
+    },
+    {
+      "id": "on_delete_label",
+      "text": "On Delete"
+    },
+    {
+      "id": "on_update_label",
+      "text": "On Update"
+    },
+    {
+      "id": "failed_save_command_history_warning",
+      "text": "Warning: failed to save command to history: %v\n"
+    },
+    {
+      "id": "ai_timeout_message",
+      "text": "⏰ AI request timed out. This can happen with:\n"
+    },
+    {
+      "id": "ai_timeout_complex_queries",
+      "text": "   - Complex queries that take time to process\n"
+    },
+    {
+      "id": "ai_timeout_network_issues",
+      "text": "   - Network connectivity issues\n"
+    },
+    {
+      "id": "ai_timeout_provider_overloaded",
+      "text": "   - AI provider being overloaded\n"
+    },
+    {
+      "id": "ai_timeout_suggestion",
+      "text": "💡 Try simplifying your message or try again later.\n"
+    },
+    {
+      "id": "connection_name_format",
+      "text": "%s Connection"
+    },
+    {
+      "id": "version_command_short",
+      "text": "Show version information"
+    },
+    {
+      "id": "version_command_long",
+      "text": "Display version, build time, and git commit information"
+    },
+    {
+      "id": "sqlterm_version",
+      "text": "SQLTerm %s\n"
+    },
+    {
+      "id": "build_time",
+      "text": "Build time: %s\n"
+    },
+    {
+      "id": "git_commit",
+      "text": "Git commit: %s\n"
+    },
+    {
+      "id": "flag_db_type",
+      "text": "Database type (mysql, postgres, sqlite)"
+    },
+    {
+      "id": "flag_host",
+      "text": "Host"
+    },
+    {
+      "id": "flag_port",
+      "text": "Port"
+    },
+    {
+      "id": "flag_database",
+      "text": "Database name"
+    },
+    {
+      "id": "flag_username",
+      "text": "Username"
+    },
+    {
+      "id": "flag_password",
+      "text": "Password"
+    },
+    {
+      "id": "failed_to_connect_error",
+      "text": "failed to connect: %w"
+    },
+    {
+      "id": "connection_test_failed_error",
+      "text": "connection test failed: %w"
+    },
+    {
+      "id": "failed_create_conversation_app",
+      "text": "failed to create conversation app: %w"
+    },
+    {
+      "id": "failed_load_connections",
+      "text": "failed to load connections: %w"
+    },
+    {
+      "id": "main_error",
+      "text": "Error: %v\n"
+    },
+    {
+      "id": "markdown_render_failed_plain_text",
+      "text": "⚠️  Failed to create markdown renderer, showing plain text:"
+    },
+    {
+      "id": "markdown_render_failed_showing_plain",
+      "text": "⚠️  Failed to render markdown, showing plain text:"
+    },
+    {
+      "id": "query_results_plain_header",
+      "text": "\n📄 Query Results:"
+    },
+    {
+      "id": "failed_create_csv_file",
+      "text": "failed to create CSV file: %w"
+    },
+    {
+      "id": "openrouter_api_key_not_configured",
+      "text": "OpenRouter API key not configured"
+    },
+    {
+      "id": "unsupported_provider",
+      "text": "unsupported provider: %s"
+    },
+    {
+      "id": "ai_client_not_configured",
+      "text": "AI client not configured"
+    },
+    {
+      "id": "chat_request_failed",
+      "text": "chat request failed: %w"
+    },
+    {
+      "id": "no_response_choices_returned",
+      "text": "no response choices returned"
+    },
+    {
+      "id": "failed_record_usage_warning",
+      "text": "Warning: failed to record usage: %v\n"
     }
   ]
 }
