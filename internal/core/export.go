@@ -6,11 +6,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sqlterm/internal/i18n"
 	"strings"
 	"time"
 )
 
-func ToMarkdown(result *QueryResult, limit int) string {
+func ToMarkdown(result *QueryResult, limit int, i18nMgr *i18n.Manager) string {
 	count := 0
 	defer result.Close()
 
@@ -39,7 +40,7 @@ func ToMarkdown(result *QueryResult, limit int) string {
 	}
 
 	if result.Error() != nil {
-		sb.WriteString(fmt.Sprint("Query error", result.Error()))
+		sb.WriteString(fmt.Sprint(i18nMgr.Get("query_error"), result.Error()))
 		return sb.String()
 	}
 
@@ -79,28 +80,28 @@ func ToMarkdown(result *QueryResult, limit int) string {
 
 	// Add truncation note if limited
 	if limit > 0 && count >= limit {
-		sb.WriteString(fmt.Sprintf("\n*Note: Showing top %d rows. Use CSV export for complete results.*\n", limit))
+		sb.WriteString(fmt.Sprintf("\n%s\n", i18nMgr.GetWithArgs("markdown_truncation_note", limit)))
 	}
 
 	return sb.String()
 }
 
-func SaveQueryResultAsMarkdown(result *QueryResult, query string, connection string, resultWriter io.Writer) error {
+func SaveQueryResultAsMarkdown(result *QueryResult, query string, connection string, resultWriter io.Writer, i18nMgr *i18n.Manager) error {
 	// Format the SQL query for better readability
 	formatter := NewSQLFormatter()
 	formattedQuery := formatter.Format(query)
-	
+
 	// Create markdown content
 	var content strings.Builder
-	content.WriteString(fmt.Sprintf("**Query:**\n```sql\n%s\n```\n\n", formattedQuery))
+	content.WriteString(fmt.Sprintf("%s\n```sql\n%s\n```\n\n", i18nMgr.Get("markdown_query_header"), formattedQuery))
 
 	// Add the markdown table (limited to 20 rows)
-	content.WriteString(ToMarkdown(result, 20))
+	content.WriteString(ToMarkdown(result, 20, i18nMgr))
 	content.WriteString("\n\n")
 
 	// Write to file
 	if _, err := resultWriter.Write([]byte(content.String())); err != nil {
-		return fmt.Errorf("failed to write markdown file: %w", err)
+		return fmt.Errorf(i18nMgr.Get("failed_to_write_markdown"), err)
 	}
 
 	return nil
@@ -188,11 +189,11 @@ func GenerateNumberedCSVPath(baseFilePath string, queryIndex int) string {
 	return filepath.Join(dir, fmt.Sprintf("%s-%d%s", nameWithoutExt, queryIndex, ext))
 }
 
-func SaveFileQueryResultsAsMarkdown(filename string, queryResults []QueryResultWithQuery, connection string, configDir string) (string, error) {
+func SaveFileQueryResultsAsMarkdown(filename string, queryResults []QueryResultWithQuery, connection string, configDir string, i18nMgr *i18n.Manager) (string, error) {
 	// Create sessions directory structure
 	sessionDir := filepath.Join(configDir, "sessions", connection)
 	if err := os.MkdirAll(sessionDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create session directory: %w", err)
+		return "", fmt.Errorf(i18nMgr.Get("failed_to_create_session_dir"), err)
 	}
 
 	// Generate filename with timestamp
@@ -202,24 +203,24 @@ func SaveFileQueryResultsAsMarkdown(filename string, queryResults []QueryResultW
 
 	// Create markdown content
 	var content strings.Builder
-	content.WriteString(fmt.Sprintf("# File Query Results - %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
-	content.WriteString(fmt.Sprintf("**Connection:** %s\n\n", connection))
-	content.WriteString(fmt.Sprintf("**Source File:** %s\n\n", filename))
-	content.WriteString(fmt.Sprintf("**Total Queries:** %d\n\n", len(queryResults)))
+	content.WriteString(fmt.Sprintf("# %s - %s\n\n", i18nMgr.Get("file_query_results_header"), time.Now().Format("2006-01-02 15:04:05")))
+	content.WriteString(fmt.Sprintf("**%s:** %s\n\n", i18nMgr.Get("connection_header"), connection))
+	content.WriteString(fmt.Sprintf("**%s:** %s\n\n", i18nMgr.Get("source_file_header"), filename))
+	content.WriteString(fmt.Sprintf("**%s:** %d\n\n", i18nMgr.Get("total_queries_header"), len(queryResults)))
 
 	// Add each query result
 	for i, qr := range queryResults {
-		content.WriteString(fmt.Sprintf("## Query %d\n\n", i+1))
+		content.WriteString(fmt.Sprintf("## %s %d\n\n", i18nMgr.Get("query_header"), i+1))
 		content.WriteString(fmt.Sprintf("**SQL:**\n```sql\n%s\n```\n\n", qr.Query))
 
 		// Add the markdown table (limited to 20 rows)
-		content.WriteString(ToMarkdown(qr.Result, 20))
+		content.WriteString(ToMarkdown(qr.Result, 20, i18nMgr))
 		content.WriteString("\n\n")
 	}
 
 	// Write to file
 	if err := os.WriteFile(fullPath, []byte(content.String()), 0644); err != nil {
-		return "", fmt.Errorf("failed to write markdown file: %w", err)
+		return "", fmt.Errorf(i18nMgr.Get("failed_to_write_markdown"), err)
 	}
 
 	return fullPath, nil

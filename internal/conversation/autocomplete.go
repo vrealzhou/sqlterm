@@ -33,8 +33,8 @@ func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int)
 	case strings.HasPrefix(lineStr, "/describe ") && len(words) > 1:
 		candidates = ac.getTableCandidates(words, lineStr)
 		completionLength = ac.getCompletionLength(lineStr)
-	case strings.HasPrefix(lineStr, "/ai-config "):
-		candidates = ac.getAIConfigCandidates(words, lineStr)
+	case strings.HasPrefix(lineStr, "/config "):
+		candidates = ac.getConfigCandidates(words, lineStr)
 		completionLength = ac.getCompletionLength(lineStr)
 	case strings.HasPrefix(lineStr, "@"):
 		candidates = ac.getFileCandidates(lineStr)
@@ -59,7 +59,7 @@ func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int)
 func (ac *AutoCompleter) getCommands() [][]rune {
 	commands := []string{
 		"/help", "/quit", "/exit", "/connect", "/list-connections",
-		"/tables", "/describe", "/status", "/exec", "/ai-config", "/show-prompts",
+		"/tables", "/describe", "/status", "/exec", "/config", "/last-ai-call",
 	}
 
 	result := make([][]rune, len(commands))
@@ -142,7 +142,7 @@ func (ac *AutoCompleter) findCommonPrefix(candidates []string) string {
 func (ac *AutoCompleter) getCommandCandidates(partial string) []string {
 	commands := []string{
 		"/help", "/quit", "/exit", "/connect", "/list-connections",
-		"/tables", "/describe", "/status", "/exec", "/ai-config", "/show-prompts",
+		"/tables", "/describe", "/status", "/exec", "/config", "/last-ai-call",
 	}
 
 	var candidates []string
@@ -462,58 +462,102 @@ func (ac *AutoCompleter) getCompletionLength(line string) int {
 	return len(words[len(words)-1])
 }
 
-func (ac *AutoCompleter) getAIConfigCandidates(words []string, line string) []string {
+func (ac *AutoCompleter) getConfigCandidates(words []string, line string) []string {
 	if len(words) < 2 {
 		return nil
 	}
 
-	// Subcommands for /ai-config
-	subcommands := []string{"provider", "model", "api-key", "base-url", "status", "list-models"}
-	
+	// Main config sections
 	if len(words) == 2 {
-		// Complete subcommands
+		sections := []string{"ai", "language"}
 		var candidates []string
 		currentWord := words[1]
-		for _, subcmd := range subcommands {
-			if strings.HasPrefix(subcmd, currentWord) {
-				completion := subcmd[len(currentWord):]
+		for _, section := range sections {
+			if strings.HasPrefix(section, currentWord) {
+				completion := section[len(currentWord):]
 				candidates = append(candidates, completion)
 			}
 		}
 		return candidates
 	}
 
-	// Handle specific subcommand completions
-	subcmd := words[1]
-	switch subcmd {
-	case "provider":
+	section := words[1]
+	switch section {
+	case "ai":
 		if len(words) == 3 {
-			providers := []string{"openrouter", "ollama", "lmstudio"}
+			// AI subcommands
+			subcommands := []string{"provider", "model", "api-key", "base-url", "status", "list-models", "openrouter"}
 			var candidates []string
 			currentWord := words[2]
-			for _, provider := range providers {
-				if strings.HasPrefix(provider, currentWord) {
-					completion := provider[len(currentWord):]
+			for _, subcmd := range subcommands {
+				if strings.HasPrefix(subcmd, currentWord) {
+					completion := subcmd[len(currentWord):]
 					candidates = append(candidates, completion)
 				}
 			}
 			return candidates
 		}
-	case "model":
-		if len(words) == 3 {
-			// Try to get available models from the current provider
-			if ac.app.aiManager != nil {
-				models := ac.getAvailableModels()
-				var candidates []string
-				currentWord := words[2]
-				for _, model := range models {
-					if strings.HasPrefix(model, currentWord) {
-						completion := model[len(currentWord):]
-						candidates = append(candidates, completion)
+		
+		// Handle AI subcommand completions
+		if len(words) >= 4 {
+			subcmd := words[2]
+			switch subcmd {
+			case "provider":
+				if len(words) == 4 {
+					providers := []string{"openrouter", "ollama", "lmstudio"}
+					var candidates []string
+					currentWord := words[3]
+					for _, provider := range providers {
+						if strings.HasPrefix(provider, currentWord) {
+							completion := provider[len(currentWord):]
+							candidates = append(candidates, completion)
+						}
+					}
+					return candidates
+				}
+			case "model":
+				if len(words) == 4 {
+					// Try to get available models from the current provider
+					if ac.app.aiManager != nil {
+						models := ac.getAvailableModels()
+						var candidates []string
+						currentWord := words[3]
+						for _, model := range models {
+							if strings.HasPrefix(model, currentWord) {
+								completion := model[len(currentWord):]
+								candidates = append(candidates, completion)
+							}
+						}
+						return candidates
 					}
 				}
-				return candidates
+			case "openrouter":
+				if len(words) == 4 {
+					subcommands := []string{"key"}
+					var candidates []string
+					currentWord := words[3]
+					for _, subcmd := range subcommands {
+						if strings.HasPrefix(subcmd, currentWord) {
+							completion := subcmd[len(currentWord):]
+							candidates = append(candidates, completion)
+						}
+					}
+					return candidates
+				}
 			}
+		}
+	case "language":
+		if len(words) == 3 {
+			languages := []string{"en_au", "zh_cn"}
+			var candidates []string
+			currentWord := words[2]
+			for _, lang := range languages {
+				if strings.HasPrefix(lang, currentWord) {
+					completion := lang[len(currentWord):]
+					candidates = append(candidates, completion)
+				}
+			}
+			return candidates
 		}
 	}
 
@@ -527,7 +571,7 @@ func (ac *AutoCompleter) getAvailableModels() []string {
 
 	// Get current provider's models
 	config := ac.app.aiManager.GetConfig()
-	switch config.Provider {
+	switch config.AI.Provider {
 	case "openrouter":
 		return []string{
 			"anthropic/claude-3.5-sonnet",

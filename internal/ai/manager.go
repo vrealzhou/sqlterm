@@ -9,23 +9,29 @@ import (
 	"strings"
 	"time"
 
+	"sqlterm/internal/config"
 	"sqlterm/internal/core"
+	"sqlterm/internal/i18n"
 )
 
 // Manager manages AI clients and configuration
 type Manager struct {
-	config        *Config
-	configDir     string
-	client        Client
-	promptHistory *PromptHistory
-	recentTables  []string     // Session memory for recently mentioned tables
-	maxTables     int          // Maximum tables to include in context
-	vectorStore   *VectorStore // Vector database for semantic search
+	config          *config.Config
+	configDir       string
+	client          Client
+	promptHistory   *PromptHistory
+	recentTables    []string             // Session memory for recently mentioned tables
+	maxTables       int                  // Maximum tables to include in context
+	vectorStore     *VectorStore         // Vector database for semantic search
+	conversationCtx *ConversationContext // Current conversation context
+	i18nMgr         *i18n.Manager        // Internationalization manager
+	usageStore      *UsageStore          // Usage tracking store
+	sessionID       string               // Current session ID for usage tracking
 }
 
 // NewManager creates a new AI manager
 func NewManager(configDir string) (*Manager, error) {
-	config, err := LoadConfig(configDir)
+	i18nMgr, config, err := config.LoadConfig(configDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AI config: %w", err)
 	}
@@ -39,6 +45,8 @@ func NewManager(configDir string) (*Manager, error) {
 		},
 		recentTables: make([]string, 0),
 		maxTables:    15, // Limit context to 15 most relevant tables
+		i18nMgr:      i18nMgr,
+		sessionID:    generateSessionID(),
 	}
 
 	// Try to initialize client, but don't fail if it's not possible
@@ -50,7 +58,7 @@ func NewManager(configDir string) (*Manager, error) {
 
 // NewManagerWithValidation creates a new AI manager and requires valid client initialization
 func NewManagerWithValidation(configDir string) (*Manager, error) {
-	config, err := LoadConfig(configDir)
+	i18nMgr, config, err := config.LoadConfig(configDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AI config: %w", err)
 	}
@@ -64,6 +72,8 @@ func NewManagerWithValidation(configDir string) (*Manager, error) {
 		},
 		recentTables: make([]string, 0),
 		maxTables:    15, // Limit context to 15 most relevant tables
+		i18nMgr:      i18nMgr,
+		sessionID:    generateSessionID(),
 	}
 
 	// Initialize client - this will fail if configuration is invalid
@@ -76,21 +86,21 @@ func NewManagerWithValidation(configDir string) (*Manager, error) {
 
 // initializeClient initializes the appropriate client based on current provider
 func (m *Manager) initializeClient() error {
-	switch m.config.Provider {
-	case ProviderOpenRouter:
-		apiKey := m.config.GetAPIKey(ProviderOpenRouter)
+	switch m.config.AI.Provider {
+	case config.ProviderOpenRouter:
+		apiKey := m.config.GetAPIKey(config.ProviderOpenRouter)
 		if apiKey == "" {
 			return fmt.Errorf("OpenRouter API key not configured")
 		}
 		m.client = NewOpenRouterClient(apiKey)
-	case ProviderOllama:
-		baseURL := m.config.GetBaseURL(ProviderOllama)
+	case config.ProviderOllama:
+		baseURL := m.config.GetBaseURL(config.ProviderOllama)
 		m.client = NewOllamaClient(baseURL)
-	case ProviderLMStudio:
-		baseURL := m.config.GetBaseURL(ProviderLMStudio)
-		m.client = NewLMStudioClient(baseURL)
+	case config.ProviderLMStudio:
+		baseURL := m.config.GetBaseURL(config.ProviderLMStudio)
+		m.client = NewLMStudioClient(baseURL, m.i18nMgr)
 	default:
-		return fmt.Errorf("unsupported provider: %s", m.config.Provider)
+		return fmt.Errorf("unsupported provider: %s", m.config.AI.Provider)
 	}
 
 	return nil
@@ -109,6 +119,14 @@ func (m *Manager) EnsureConfigured() error {
 	return nil
 }
 
+// UpdateLanguage updates the i18n manager when language changes
+func (m *Manager) UpdateLanguage(language string) error {
+	if m.i18nMgr != nil {
+		m.i18nMgr.SetLanguage(language)
+	}
+	return nil
+}
+
 // Chat sends a chat message and returns the response
 func (m *Manager) Chat(ctx context.Context, message string, systemPrompt string) (string, error) {
 	if !m.IsConfigured() {
@@ -121,7 +139,7 @@ func (m *Manager) Chat(ctx context.Context, message string, systemPrompt string)
 	}
 
 	request := ChatRequest{
-		Model:       m.config.Model,
+		Model:       m.config.AI.Model,
 		Messages:    messages,
 		Temperature: 0.7,
 		MaxTokens:   4000,
@@ -138,26 +156,18 @@ func (m *Manager) Chat(ctx context.Context, message string, systemPrompt string)
 
 	// Calculate cost and update usage
 	cost := m.calculateCost(response.Usage.PromptTokens, response.Usage.CompletionTokens)
-	if err := m.config.UpdateUsage(
-		response.Usage.PromptTokens,
-		response.Usage.CompletionTokens,
-		cost,
-		m.configDir,
-	); err != nil {
-		// Don't fail the request if usage update fails
-		fmt.Printf("Warning: failed to update usage stats: %v\n", err)
-	}
 
 	// Add to prompt history
-	m.addToPromptHistory(message, systemPrompt, response.Usage.PromptTokens, response.Usage.CompletionTokens, cost)
+	aiResponse := response.Choices[0].Message.Content
+	m.addToPromptHistory(message, systemPrompt, aiResponse, response.Usage.PromptTokens, response.Usage.CompletionTokens, cost)
 
-	return response.Choices[0].Message.Content, nil
+	return aiResponse, nil
 }
 
 // calculateCost calculates the cost based on token usage and current model
 func (m *Manager) calculateCost(inputTokens, outputTokens int) float64 {
 	// Only calculate cost for OpenRouter (others are free/local)
-	if m.config.Provider != ProviderOpenRouter {
+	if m.config.AI.Provider != config.ProviderOpenRouter {
 		return 0.0
 	}
 
@@ -181,7 +191,7 @@ func (m *Manager) calculateCost(inputTokens, outputTokens int) float64 {
 		},
 	}
 
-	modelPricing, exists := pricing[m.config.Model]
+	modelPricing, exists := pricing[m.config.AI.Model]
 	if !exists {
 		// Default pricing if model not found
 		return float64(inputTokens)*0.001/1000 + float64(outputTokens)*0.003/1000
@@ -199,42 +209,48 @@ func (m *Manager) ListModels(ctx context.Context) ([]ModelInfo, error) {
 }
 
 // SetProvider changes the current provider and model
-func (m *Manager) SetProvider(provider Provider, model string) error {
+func (m *Manager) SetProvider(provider config.Provider, model string) error {
 	m.config.SetProvider(provider, model)
 
 	// Try to initialize client, but don't fail if credentials aren't ready yet
 	_ = m.initializeClient()
 
-	return SaveConfig(m.config, m.configDir)
+	return config.SaveConfig(m.config, m.configDir, m.i18nMgr)
 }
 
 // SetAPIKey sets an API key for a provider
-func (m *Manager) SetAPIKey(provider Provider, apiKey string) error {
+func (m *Manager) SetAPIKey(provider config.Provider, apiKey string) error {
 	m.config.SetAPIKey(provider, apiKey)
 
 	// Re-initialize client if this is the current provider
-	if provider == m.config.Provider {
+	if provider == m.config.AI.Provider {
 		_ = m.initializeClient()
 	}
 
-	return SaveConfig(m.config, m.configDir)
+	return config.SaveConfig(m.config, m.configDir, m.i18nMgr)
 }
 
 // SetBaseURL sets a base URL for a provider
-func (m *Manager) SetBaseURL(provider Provider, baseURL string) error {
+func (m *Manager) SetBaseURL(provider config.Provider, baseURL string) error {
 	m.config.SetBaseURL(provider, baseURL)
 
 	// Re-initialize client if this is the current provider
-	if provider == m.config.Provider {
+	if provider == m.config.AI.Provider {
 		_ = m.initializeClient()
 	}
 
-	return SaveConfig(m.config, m.configDir)
+	return config.SaveConfig(m.config, m.configDir, m.i18nMgr)
 }
 
 // GetConfig returns the current configuration
-func (m *Manager) GetConfig() *Config {
+func (m *Manager) GetConfig() *config.Config {
 	return m.config
+}
+
+// SetLanguage updates the language configuration
+func (m *Manager) SetLanguage(language string) error {
+	m.config.SetLanguage(language)
+	return config.SaveConfig(m.config, m.configDir, m.i18nMgr)
 }
 
 // GenerateSystemPrompt creates a system prompt with database context
@@ -274,17 +290,17 @@ func (m *Manager) GenerateSystemPrompt(tables []string, currentTable string) str
 }
 
 // ParseModelString parses a model string in format "provider/model"
-func ParseModelString(modelStr string) (Provider, string, error) {
+func ParseModelString(modelStr string) (config.Provider, string, error) {
 	parts := strings.SplitN(modelStr, "/", 2)
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("invalid model format, expected 'provider/model'")
 	}
 
-	provider := Provider(parts[0])
+	provider := config.Provider(parts[0])
 	model := parts[1]
 
 	switch provider {
-	case ProviderOpenRouter, ProviderOllama, ProviderLMStudio:
+	case config.ProviderOpenRouter, config.ProviderOllama, config.ProviderLMStudio:
 		return provider, model, nil
 	default:
 		return "", "", fmt.Errorf("unsupported provider: %s", provider)
@@ -308,13 +324,14 @@ func ParseFloat(s string) (float64, error) {
 }
 
 // addToPromptHistory adds a prompt entry to the history
-func (m *Manager) addToPromptHistory(userMessage, systemPrompt string, inputTokens, outputTokens int, cost float64) {
+func (m *Manager) addToPromptHistory(userMessage, systemPrompt, aiResponse string, inputTokens, outputTokens int, cost float64) {
 	entry := PromptEntry{
 		Timestamp:    time.Now(),
 		UserMessage:  userMessage,
 		SystemPrompt: systemPrompt,
-		Provider:     m.config.Provider,
-		Model:        m.config.Model,
+		AIResponse:   aiResponse,
+		Provider:     m.config.AI.Provider,
+		Model:        m.config.AI.Model,
 		InputTokens:  inputTokens,
 		OutputTokens: outputTokens,
 		Cost:         cost,
@@ -325,6 +342,15 @@ func (m *Manager) addToPromptHistory(userMessage, systemPrompt string, inputToke
 	// Keep only the last MaxSize entries
 	if len(m.promptHistory.Entries) > m.promptHistory.MaxSize {
 		m.promptHistory.Entries = m.promptHistory.Entries[len(m.promptHistory.Entries)-m.promptHistory.MaxSize:]
+	}
+
+	// Record usage statistics in the database
+	if m.usageStore != nil {
+		err := m.usageStore.RecordUsage(m.sessionID, m.config.AI.Provider, m.config.AI.Model, 
+			inputTokens, outputTokens, cost, userMessage, aiResponse)
+		if err != nil {
+			fmt.Printf("Warning: failed to record usage: %v\n", err)
+		}
 	}
 
 	// Learn from successful queries for vector store
@@ -368,6 +394,13 @@ func (m *Manager) InitializeVectorStore(connectionName string, connection core.C
 	}
 
 	m.vectorStore = vectorStore
+
+	// Initialize usage store with the vector store
+	usageStore, err := NewUsageStore(vectorStore)
+	if err != nil {
+		return fmt.Errorf("failed to initialize usage store: %w", err)
+	}
+	m.usageStore = usageStore
 
 	// Update embeddings in background
 	go func() {
@@ -710,4 +743,456 @@ func (m *Manager) addGuidelines(prompt *strings.Builder) string {
 	prompt.WriteString("- Validate against available tables and expected schema\n")
 
 	return prompt.String()
+}
+
+// StartConversation begins a new multi-turn conversation
+func (m *Manager) StartConversation(userQuery string) *ConversationContext {
+	m.conversationCtx = NewConversationContext(userQuery)
+	return m.conversationCtx
+}
+
+// GetCurrentConversation returns the current conversation context
+func (m *Manager) GetCurrentConversation() *ConversationContext {
+	return m.conversationCtx
+}
+
+// ClearConversation clears the current conversation context
+func (m *Manager) ClearConversation() {
+	m.conversationCtx = nil
+}
+
+// ChatWithConversation handles chat with conversation context
+func (m *Manager) ChatWithConversation(ctx context.Context, userMessage string, allTables []string) (string, error) {
+	if !m.IsConfigured() {
+		return "", fmt.Errorf("AI client not configured")
+	}
+
+	// Start new conversation if none exists
+	if m.conversationCtx == nil {
+		m.conversationCtx = NewConversationContext(userMessage)
+	}
+
+	// Generate system prompt based on conversation phase
+	systemPrompt, err := m.generateConversationalPrompt(m.conversationCtx, allTables)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate prompt: %w", err)
+	}
+
+	// Send chat request
+	messages := []ChatMessage{
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: userMessage},
+	}
+
+	request := ChatRequest{
+		Model:       m.config.AI.Model,
+		Messages:    messages,
+		Temperature: 0.7,
+		MaxTokens:   4000,
+	}
+
+	response, err := m.client.Chat(ctx, request)
+	if err != nil {
+		return "", fmt.Errorf("chat request failed: %w", err)
+	}
+
+	if len(response.Choices) == 0 {
+		return "", fmt.Errorf("no response choices returned")
+	}
+
+	aiResponse := response.Choices[0].Message.Content
+
+	// Parse AI response for requested tables/actions
+	requestedInfo := m.parseAIResponse(aiResponse, m.conversationCtx.CurrentPhase)
+
+	// Add turn to conversation history
+	turn := ConversationTurn{
+		UserMessage:   userMessage,
+		SystemPrompt:  systemPrompt,
+		AIResponse:    aiResponse,
+		RequestedInfo: requestedInfo,
+		Phase:         m.conversationCtx.CurrentPhase,
+	}
+	m.conversationCtx.AddTurn(turn)
+
+	// Process AI's requests and advance conversation if needed
+	initialPhase := m.conversationCtx.CurrentPhase
+	err = m.processConversationTurn(requestedInfo, allTables)
+	if err != nil {
+		fmt.Printf(m.i18nMgr.Get("conversation_turn_warning"), err)
+	}
+
+	// Calculate cost and update usage
+	cost := m.calculateCost(response.Usage.PromptTokens, response.Usage.CompletionTokens)
+
+	// Add to prompt history
+	m.addToPromptHistory(userMessage, systemPrompt, aiResponse, response.Usage.PromptTokens, response.Usage.CompletionTokens, cost)
+
+	// If schemas were loaded, automatically continue the conversation
+	if len(requestedInfo) > 0 {
+		// Discovery phase: advance to schema analysis
+		if m.conversationCtx.CurrentPhase != initialPhase && m.conversationCtx.CurrentPhase == PhaseSchemaAnalysis {
+			fmt.Printf("📋 Schemas loaded for %v. Analyzing...\n", requestedInfo)
+			followUpMessage := "Please analyze the provided table schemas and generate the SQL query for my original request."
+
+			// Make follow-up call with schema information
+			followUpResponse, err := m.ChatWithConversation(ctx, followUpMessage, allTables)
+			if err != nil {
+				fmt.Printf(m.i18nMgr.Get("conversation_continue_warning"), err)
+				return aiResponse, nil
+			}
+			return followUpResponse, nil
+		}
+
+		// Schema analysis phase: continue with additional schema requests
+		if m.conversationCtx.CurrentPhase == PhaseSchemaAnalysis {
+			fmt.Printf("📋 Additional schemas loaded for %v. Continuing analysis...\n", requestedInfo)
+			followUpMessage := "Please continue your analysis with the newly provided table schemas."
+
+			// Make follow-up call with additional schema information
+			followUpResponse, err := m.ChatWithConversation(ctx, followUpMessage, allTables)
+			if err != nil {
+				fmt.Printf(m.i18nMgr.Get("conversation_continue_additional_warning"), err)
+				return aiResponse, nil
+			}
+			return followUpResponse, nil
+		}
+	}
+
+	return aiResponse, nil
+}
+
+// generateConversationalPrompt creates phase-specific prompts
+func (m *Manager) generateConversationalPrompt(convCtx *ConversationContext, allTables []string) (string, error) {
+	switch convCtx.CurrentPhase {
+	case PhaseDiscovery:
+		return m.generateDiscoveryPrompt(convCtx, allTables), nil
+	case PhaseSchemaAnalysis:
+		return m.generateSchemaAnalysisPrompt(convCtx), nil
+	case PhaseSQLGeneration:
+		return m.generateSQLGenerationPrompt(convCtx), nil
+	default:
+		return "", fmt.Errorf("unknown conversation phase: %v", convCtx.CurrentPhase)
+	}
+}
+
+// generateDiscoveryPrompt creates prompt for table discovery phase
+func (m *Manager) generateDiscoveryPrompt(convCtx *ConversationContext, allTables []string) string {
+	var prompt strings.Builder
+
+	prompt.WriteString("You are an AI assistant helping with SQL queries and database operations. ")
+	prompt.WriteString(fmt.Sprintf("The user wants to: %s\n\n", convCtx.OriginalQuery))
+
+	// Use vector search to find most relevant tables
+	if m.vectorStore != nil && len(allTables) > 0 {
+		ctx := context.Background()
+		results, err := m.vectorStore.SearchSimilarTables(ctx, convCtx.OriginalQuery, 10)
+		if err == nil && len(results) > 0 {
+			prompt.WriteString(fmt.Sprintf("Database has %d tables total. Most relevant tables for this query:\n\n", len(allTables)))
+			for i, result := range results {
+				prompt.WriteString(fmt.Sprintf("%d. **%s** (relevance: %.2f) - %s\n",
+					i+1, result.Table.TableName, result.Similarity, result.Reason))
+			}
+
+			// Store discovered tables in context
+			for _, result := range results {
+				convCtx.DiscoveredTables = append(convCtx.DiscoveredTables, result.Table.TableName)
+			}
+		} else {
+			// Fallback to simple list
+			prompt.WriteString(fmt.Sprintf("Available tables (%d total):\n", len(allTables)))
+			for i, table := range allTables {
+				if i >= 15 { // Limit to first 15
+					prompt.WriteString(fmt.Sprintf("... and %d more tables\n", len(allTables)-15))
+					break
+				}
+				prompt.WriteString(fmt.Sprintf("- %s\n", table))
+			}
+		}
+	} else {
+		prompt.WriteString("No database connection available.\n")
+	}
+
+	prompt.WriteString("\nYour task:\n")
+	prompt.WriteString("1. Analyze the user's request and identify which tables you need detailed schema information for\n")
+	prompt.WriteString("2. Respond with: 'I need detailed schema for: [table1], [table2], [table3]' to request specific table structures\n")
+	prompt.WriteString("3. Be selective - only request tables that are directly relevant to the query\n")
+	prompt.WriteString("4. If you can answer with the information already provided, do so\n\n")
+
+	prompt.WriteString("Important: If you need table schemas, use EXACTLY this format:\n")
+	prompt.WriteString("'I need detailed schema for: table1, table2, table3'\n")
+
+	return prompt.String()
+}
+
+// generateSchemaAnalysisPrompt creates prompt for schema analysis phase
+func (m *Manager) generateSchemaAnalysisPrompt(convCtx *ConversationContext) string {
+	var prompt strings.Builder
+
+	prompt.WriteString("You are an AI assistant helping with SQL queries. ")
+	prompt.WriteString(fmt.Sprintf("The user wants to: %s\n\n", convCtx.OriginalQuery))
+
+	prompt.WriteString("You have requested detailed schema information. Here are the table structures:\n\n")
+
+	// Include loaded table schemas
+	for tableName, tableInfo := range convCtx.LoadedTables {
+		prompt.WriteString(fmt.Sprintf("## Table: %s\n", tableName))
+		prompt.WriteString("Columns:\n")
+		for _, col := range tableInfo.Columns {
+			nullable := "NOT NULL"
+			if col.Nullable {
+				nullable = "NULL"
+			}
+			key := ""
+			if col.Key != "" {
+				key = fmt.Sprintf(" [%s]", col.Key)
+			}
+			prompt.WriteString(fmt.Sprintf("- %s (%s) %s%s\n", col.Name, col.Type, nullable, key))
+		}
+
+		// Include foreign key relationships
+		if len(tableInfo.ForeignKeys) > 0 {
+			prompt.WriteString("Foreign Keys:\n")
+			for _, fk := range tableInfo.ForeignKeys {
+				prompt.WriteString(fmt.Sprintf("- %s → %s.%s\n", fk.Column, fk.ReferencedTable, fk.ReferencedColumn))
+			}
+		}
+		prompt.WriteString("\n")
+	}
+
+	// Add information about available related tables
+	m.addRelatedTableSuggestions(&prompt, convCtx)
+
+	prompt.WriteString("Your task:\n")
+	prompt.WriteString("1. Analyze the provided schemas and relationships\n")
+	prompt.WriteString("2. If you need information about related tables (via foreign keys), request them using: 'I need schema for related tables: [table1], [table2]'\n")
+	prompt.WriteString("3. If you have sufficient information, generate the SQL query\n")
+	prompt.WriteString("4. Include explanations for complex queries\n\n")
+
+	prompt.WriteString("Use ```sql blocks for any SQL queries you generate.\n")
+
+	return prompt.String()
+}
+
+// generateSQLGenerationPrompt creates prompt for final SQL generation
+func (m *Manager) generateSQLGenerationPrompt(convCtx *ConversationContext) string {
+	var prompt strings.Builder
+
+	prompt.WriteString("You are an AI assistant specialized in SQL query generation. ")
+	prompt.WriteString(fmt.Sprintf("The user wants to: %s\n\n", convCtx.OriginalQuery))
+
+	prompt.WriteString("You have complete schema information for the following tables:\n\n")
+
+	// Include all loaded table information
+	for tableName, tableInfo := range convCtx.LoadedTables {
+		prompt.WriteString(fmt.Sprintf("## %s\n", tableName))
+		for _, col := range tableInfo.Columns {
+			nullable := "NOT NULL"
+			if col.Nullable {
+				nullable = "NULL"
+			}
+			prompt.WriteString(fmt.Sprintf("- %s (%s) %s\n", col.Name, col.Type, nullable))
+		}
+
+		if len(tableInfo.ForeignKeys) > 0 {
+			prompt.WriteString("Relationships:\n")
+			for _, fk := range tableInfo.ForeignKeys {
+				prompt.WriteString(fmt.Sprintf("- %s → %s.%s\n", fk.Column, fk.ReferencedTable, fk.ReferencedColumn))
+			}
+		}
+		prompt.WriteString("\n")
+	}
+
+	prompt.WriteString("Generate the complete SQL query to fulfill the user's request.\n")
+	prompt.WriteString("Include:\n")
+	prompt.WriteString("- Proper JOINs based on foreign key relationships\n")
+	prompt.WriteString("- Appropriate WHERE clauses and conditions\n")
+	prompt.WriteString("- Comments explaining complex parts\n")
+	prompt.WriteString("- Performance optimization suggestions if relevant\n\n")
+
+	prompt.WriteString("Use ```sql blocks for your query.\n")
+
+	return prompt.String()
+}
+
+// parseAIResponse extracts requested information from AI response
+func (m *Manager) parseAIResponse(response string, phase ConversationPhase) []string {
+	var requested []string
+
+	switch phase {
+	case PhaseDiscovery, PhaseSchemaAnalysis:
+		// Look for table requests in various formats
+		patterns := []string{
+			`I need detailed schema for:\s*([^.]+)`,
+			`I need schema for related tables:\s*([^.]+)`,
+			`Please provide schema for:\s*([^.]+)`,
+			`Need table structure for:\s*([^.]+)`,
+		}
+
+		for _, pattern := range patterns {
+			re := regexp.MustCompile(pattern)
+			if matches := re.FindStringSubmatch(response); len(matches) > 1 {
+				// Parse comma-separated table names
+				tableNames := strings.Split(matches[1], ",")
+				for _, name := range tableNames {
+					name = strings.TrimSpace(name)
+					if name != "" {
+						requested = append(requested, name)
+					}
+				}
+				break
+			}
+		}
+	}
+
+	return requested
+}
+
+// processConversationTurn handles the AI's requests and advances conversation
+func (m *Manager) processConversationTurn(requestedInfo []string, allTables []string) error {
+	if len(requestedInfo) == 0 {
+		// No specific requests, advance phase if appropriate
+		if m.conversationCtx.CurrentPhase == PhaseDiscovery && len(m.conversationCtx.LoadedTables) > 0 {
+			m.conversationCtx.AdvancePhase()
+		}
+		return nil
+	}
+
+	// Process table schema requests
+	if m.vectorStore != nil && m.vectorStore.connection != nil {
+		for _, tableName := range requestedInfo {
+			// Verify table exists
+			if !m.contains(allTables, tableName) {
+				continue
+			}
+
+			// Skip if already loaded
+			if m.conversationCtx.HasTableLoaded(tableName) {
+				continue
+			}
+
+			// Load table schema
+			tableInfo, err := m.vectorStore.connection.DescribeTable(tableName)
+			if err != nil {
+				fmt.Printf("Warning: failed to describe table %s: %v\n", tableName, err)
+				continue
+			}
+
+			// Add to conversation context
+			m.conversationCtx.AddLoadedTable(tableName, tableInfo)
+			m.conversationCtx.RequestedTables = append(m.conversationCtx.RequestedTables, tableName)
+
+			// Find related tables via foreign keys
+			for _, fk := range tableInfo.ForeignKeys {
+				if !m.contains(m.conversationCtx.RelatedTables, fk.ReferencedTable) {
+					m.conversationCtx.RelatedTables = append(m.conversationCtx.RelatedTables, fk.ReferencedTable)
+				}
+			}
+		}
+
+		// Advance phase if we have loaded tables
+		if len(m.conversationCtx.LoadedTables) > 0 && m.conversationCtx.CurrentPhase == PhaseDiscovery {
+			m.conversationCtx.AdvancePhase()
+		}
+	}
+
+	return nil
+}
+
+// addRelatedTableSuggestions adds information about available related tables to prompt
+func (m *Manager) addRelatedTableSuggestions(prompt *strings.Builder, convCtx *ConversationContext) {
+	if m.vectorStore == nil {
+		return
+	}
+
+	// Get current loaded table names
+	var loadedTableNames []string
+	for tableName := range convCtx.LoadedTables {
+		loadedTableNames = append(loadedTableNames, tableName)
+	}
+
+	if len(loadedTableNames) == 0 {
+		return
+	}
+
+	// Find related tables using enhanced relationship discovery
+	ctx := context.Background()
+	relatedTables, err := m.vectorStore.SearchRelatedTablesForQuery(ctx, loadedTableNames, 5)
+	if err != nil || len(relatedTables) == 0 {
+		return
+	}
+
+	// Also get detailed relationship mapping
+	relationships, err := m.vectorStore.FindRelatedTables(loadedTableNames)
+	if err == nil && len(relationships) > 0 {
+		prompt.WriteString("## Available Related Tables\n\n")
+		prompt.WriteString("The following tables are related to your loaded tables and might be useful:\n\n")
+
+		// Show direct relationships first
+		for sourceTable, related := range relationships {
+			if len(related) > 0 {
+				prompt.WriteString(fmt.Sprintf("**%s** is related to:\n", sourceTable))
+				for _, relTable := range related {
+					// Check if this is a foreign key relationship
+					if tableInfo, exists := convCtx.LoadedTables[sourceTable]; exists {
+						for _, fk := range tableInfo.ForeignKeys {
+							if fk.ReferencedTable == relTable {
+								prompt.WriteString(fmt.Sprintf("- %s (via foreign key %s)\n", relTable, fk.Column))
+								goto nextTable
+							}
+						}
+					}
+					prompt.WriteString(fmt.Sprintf("- %s (similar naming pattern)\n", relTable))
+				nextTable:
+				}
+				prompt.WriteString("\n")
+			}
+		}
+
+		// Add additional suggestions from similarity search
+		additionalTables := make(map[string]bool)
+		for _, table := range relatedTables {
+			alreadyShown := false
+			for _, related := range relationships {
+				if m.contains(related, table) {
+					alreadyShown = true
+					break
+				}
+			}
+			if !alreadyShown && !convCtx.HasTableLoaded(table) {
+				additionalTables[table] = true
+			}
+		}
+
+		if len(additionalTables) > 0 {
+			prompt.WriteString("**Additional potentially relevant tables:**\n")
+			for table := range additionalTables {
+				prompt.WriteString(fmt.Sprintf("- %s\n", table))
+			}
+			prompt.WriteString("\n")
+		}
+
+		prompt.WriteString("💡 You can request any of these tables by saying: 'I need schema for related tables: table1, table2'\n\n")
+	}
+}
+
+// generateSessionID creates a unique session ID
+func generateSessionID() string {
+	return fmt.Sprintf("session_%d_%s", time.Now().Unix(), randomString(8))
+}
+
+
+// GetUsageStore returns the usage store for accessing usage statistics
+func (m *Manager) GetUsageStore() *UsageStore {
+	return m.usageStore
+}
+
+// GetSessionID returns the current session ID
+func (m *Manager) GetSessionID() string {
+	return m.sessionID
+}
+
+// NewSession starts a new session with a new session ID
+func (m *Manager) NewSession() {
+	m.sessionID = generateSessionID()
 }
