@@ -344,44 +344,6 @@ SQLTerm stores configuration in your system's config directory:
 | PostgreSQL | ✅     | ✅         | ✅      | ✅     |
 | SQLite     | ✅     | ✅         | ✅      | ✅     |
 
-## Project Structure
-
-```
-sqlterm/
-├── cmd/
-│   └── sqlterm/          # Main application entry point
-├── internal/
-│   ├── ai/               # AI integration and vector database
-│   │   ├── config.go     # AI provider configuration
-│   │   ├── manager.go    # AI manager with smart context
-│   │   ├── openrouter.go # OpenRouter client
-│   │   ├── ollama.go     # Ollama client
-│   │   ├── lmstudio.go   # LM Studio client
-│   │   ├── vectordb.go   # Vector database for semantic search
-│   │   └── types.go      # AI types and interfaces
-│   ├── cli/              # Command line interface
-│   ├── config/           # Configuration management
-│   │   ├── config.go     # Configuration utilities
-│   │   └── types.go      # Configuration types
-│   ├── conversation/     # Interactive conversation mode
-│   ├── core/             # Core database functionality
-│   │   ├── connection.go # Database connections
-│   │   ├── export.go     # Result export (CSV/Markdown)
-│   │   ├── sqlformatter.go # SQL formatting engine
-│   │   └── types.go      # Core types
-│   ├── i18n/             # Internationalization system
-│   │   ├── messages.go   # i18n manager and message loading
-│   │   ├── en_au.json    # English translations
-│   │   └── zh_cn.json    # Chinese translations
-│   └── session/          # Session management
-├── data/                 # Sample data files
-├── queries/              # Sample SQL query files
-├── go.mod
-├── go.sum
-├── Makefile
-├── LICENSE
-└── README.md
-```
 
 ## License
 

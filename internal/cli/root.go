@@ -250,7 +250,7 @@ func listConnections() error {
 	}
 
 	if len(connections) == 0 {
-		fmt.Println(i18nMgr.Get("no_saved_connections_cli"))
+		fmt.Println(i18nMgr.Get("no_saved_connections_found"))
 		fmt.Println(i18nMgr.Get("add_connection_instruction"))
 		return nil
 	}

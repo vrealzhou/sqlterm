@@ -3,7 +3,7 @@
   "messages": [
     {
       "id": "ai_not_configured",
-      "text": "🤖 AI is not configured. Use /ai-config to set up AI providers."
+      "text": "🤖 AI is not configured. Use /config ai to set up AI providers."
     },
     {
       "id": "ai_conversation_history",
@@ -127,7 +127,7 @@
     },
     {
       "id": "help_last_ai_call",
-      "text": "/last-ai-call [count]    Show AI conversation history with request/response details"
+      "text": "/prompts [count]         Show AI conversation history with request/response details"
     },
     {
       "id": "help_clear_conversation",
@@ -170,10 +170,6 @@
       "text": "Warning: failed to switch to session history: %v\n"
     },
     {
-      "id": "vector_db_init_warning",
-      "text": "Warning: failed to initialize vector store: %v\n"
-    },
-    {
       "id": "usage_update_warning",
       "text": "Warning: failed to update usage stats: %v\n"
     },
@@ -207,7 +203,7 @@
     },
     {
       "id": "help_full",
-      "text": "\nAvailable commands:\n\n/help                    Show this help message\n/connect                 Interactive connection setup\n/connect [name]          Connect to saved connection (Tab: autocomplete names)\n/list-connections        List all saved connections\n/tables                  List tables in current database\n/describe [table]        Show table structure (Tab: autocomplete table names)\n/status                  Show current connection status\n/exec [query]            Execute a query directly\n/exec                    Enter multi-line SQL mode (end with ;)\n/exec [query] > file.csv Export query results to CSV\n/config                  Configure application settings\n/config ai               Configure AI providers and models\n/config language <lang>  Set interface language (en_au, zh_cn)\n/last-ai-call [count]    Show AI conversation history with request/response details\n/clear-conversation      Clear current AI conversation and start fresh\n/quit, /exit             Exit SQLTerm\n\nAI Chat:\nEnter any message without / or @ prefix to chat with AI.\nAI uses multi-turn conversations to progressively gather table information.\nUse /clear-conversation to start fresh or /config ai to set up providers.\n\nFile commands:\n@filename.sql            Execute all queries in file (Tab: autocomplete files)\n@filename.sql 1          Execute only query 1\n@filename.sql 2-5        Execute queries 2 through 5\n\nCSV Export:\nSELECT * FROM table > output.csv    Export query results to CSV (Tab: autocomplete filenames)\n/exec SELECT * FROM table > out.csv Export with /exec command\n\nSQL queries:\nEnter any SQL query directly to execute it.\nResults are automatically saved as markdown and displayed with glamour.\n\nAuto-completion:\n- Tab after /connect to see connection names\n- Tab after /describe to see table names\n- Tab after /config to see configuration sections and options\n- Tab after @ to see .sql files (searches all subdirectories)\n- Tab after > to see... [truncated]\n"
+      "text": "\nAvailable commands:\n\n/help                    Show this help message\n/connect                 Interactive connection setup\n/connect [name]          Connect to saved connection (Tab: autocomplete names)\n/list-connections        List all saved connections\n/tables                  List tables in current database\n/describe [table]        Show table structure (Tab: autocomplete table names)\n/status                  Show current connection status\n/exec [query]            Execute a query directly\n/exec                    Enter multi-line SQL mode (end with ;)\n/exec [query] > file.csv Export query results to CSV\n/config                  Configure application settings\n/config ai               Configure AI providers and models\n/config language <lang>  Set interface language (en_au, zh_cn)\n/prompts [count]         Show AI conversation history with request/response details\n/clear-conversation      Clear current AI conversation and start fresh\n/quit, /exit             Exit SQLTerm\n\nAI Chat:\nEnter any message without / or @ prefix to chat with AI.\nAI uses multi-turn conversations to progressively gather table information.\nUse /clear-conversation to start fresh or /config ai to set up providers.\n\nFile commands:\n@filename.sql            Execute all queries in file (Tab: autocomplete files)\n@filename.sql 1          Execute only query 1\n@filename.sql 2-5        Execute queries 2 through 5\n\nCSV Export:\nSELECT * FROM table > output.csv    Export query results to CSV (Tab: autocomplete filenames)\n/exec SELECT * FROM table > out.csv Export with /exec command\n\nSQL queries:\nEnter any SQL query directly to execute it.\nResults are automatically saved as markdown and displayed with glamour.\n\nAuto-completion:\n- Tab after /connect to see connection names\n- Tab after /describe to see table names\n- Tab after /config to see configuration sections and options\n- Tab after @ to see .sql files (searches all subdirectories)\n- Tab after > to see... [truncated]\n"
     },
     {
       "id": "connection_saved",
@@ -770,10 +766,6 @@
       "text": "Add a new connection"
     },
     {
-      "id": "no_saved_connections_cli",
-      "text": "No saved connections found."
-    },
-    {
       "id": "add_connection_instruction",
       "text": "Add a connection with: sqlterm add <name> --db-type <type> --host <host> --database <db> --username <user>"
     },
@@ -843,19 +835,19 @@
     },
     {
       "id": "usage_ai_config_provider",
-      "text": "Usage: /ai-config provider <openrouter|ollama|lmstudio>"
+      "text": "Usage: /config ai provider <openrouter|ollama|lmstudio>"
     },
     {
       "id": "usage_ai_config_model",
-      "text": "Usage: /ai-config model <model_name>"
+      "text": "Usage: /config ai model <model_name>"
     },
     {
       "id": "usage_ai_config_api_key",
-      "text": "Usage: /ai-config api-key <provider> <api_key>"
+      "text": "Usage: /config ai api-key <provider> <api_key>"
     },
     {
       "id": "usage_ai_config_base_url",
-      "text": "Usage: /ai-config base-url <provider> <url>"
+      "text": "Usage: /config ai base-url <provider> <url>"
     },
     {
       "id": "current_language_display",
@@ -868,10 +860,6 @@
     {
       "id": "available_openrouter_commands",
       "text": "Available OpenRouter commands:"
-    },
-    {
-      "id": "enter_choice_prompt",
-      "text": "Enter choice (1-3): "
     },
     {
       "id": "enter_openrouter_api_key",
@@ -940,6 +928,170 @@
     {
       "id": "system_prompt_header",
       "text": "**System Prompt:**\n"
+    },
+    {
+      "id": "help_config_title",
+      "text": "\n🔧 Configuration Commands:\n"
+    },
+    {
+      "id": "help_config_general",
+      "text": "/config                          Show this help message\n/config status                   Show complete configuration status\n/config language [lang]          Set interface language (en_au, zh_cn)\n/config language status          Show language configuration\n/config ai                       AI configuration wizard\n/config ai status                Show AI configuration and usage\n/config ai provider <name>       Set AI provider (openrouter, ollama, lmstudio)\n/config ai model <model>         Set AI model for current provider\n/config ai api-key <provider> <key>  Set API key for provider\n/config ai base-url <provider> <url> Set base URL for local providers\n/config ai list-models           List available models for current provider\n/config ai openrouter key <key>  Set OpenRouter API key\n"
+    },
+    {
+      "id": "help_config_examples",
+      "text": "Examples:\n/config language zh_cn\n/config ai provider openrouter\n/config ai openrouter key sk-or-v1-xxx...\n/config ai model anthropic/claude-3.5-sonnet\n"
+    },
+    {
+      "id": "help_config_subcommand_tip",
+      "text": "💡 Use '/help config <subcommand>' for detailed help on specific areas:\n   /help config ai        - AI configuration help\n   /help config language  - Language configuration help"
+    },
+    {
+      "id": "help_config_ai_title",
+      "text": "\n🤖 AI Configuration Help:\n"
+    },
+    {
+      "id": "help_config_ai_interactive",
+      "text": "Interactive Setup:\n/config ai                       Start interactive AI setup wizard (recommended)\n"
+    },
+    {
+      "id": "help_config_ai_status",
+      "text": "Status and Information:\n/config ai status                Show current AI configuration and usage statistics\n"
+    },
+    {
+      "id": "help_config_ai_providers",
+      "text": "Provider Management:\n/config ai provider <name>       Set AI provider (openrouter, ollama, lmstudio)\n/config ai list-models           List available models for current provider\n"
+    },
+    {
+      "id": "help_config_ai_models",
+      "text": "Model Selection:\n/config ai model <model>         Set AI model for current provider\n"
+    },
+    {
+      "id": "help_config_ai_auth",
+      "text": "Authentication & Connection:\n/config ai api-key <provider> <key>     Set API key for cloud providers\n/config ai base-url <provider> <url>    Set base URL for local providers\n"
+    },
+    {
+      "id": "help_config_ai_shortcuts",
+      "text": "OpenRouter Shortcuts:\n/config ai openrouter key <key>  Quick way to set OpenRouter API key\n"
+    },
+    {
+      "id": "help_config_ai_examples",
+      "text": "Examples:\n/config ai                       # Interactive setup\n/config ai provider openrouter   # Switch to OpenRouter\n/config ai api-key openrouter sk-or-v1-xxx...\n/config ai model anthropic/claude-3.5-sonnet\n/config ai base-url ollama http://localhost:11434\n"
+    },
+    {
+      "id": "help_config_ai_provider_list",
+      "text": "Providers:\n• openrouter - Cloud AI models (requires API key from https://openrouter.ai/keys)\n• ollama     - Local AI models (requires Ollama installation)\n• lmstudio   - Local AI models (requires LM Studio)"
+    },
+    {
+      "id": "help_config_language_title",
+      "text": "\n🌐 Language Configuration Help:\n"
+    },
+    {
+      "id": "help_config_language_commands",
+      "text": "Available Commands:\n/config language                 Show current language and available options\n/config language status          Show current language configuration\n/config language <lang>          Set interface language\n"
+    },
+    {
+      "id": "help_config_language_options",
+      "text": "Supported Languages:\n• en_au - English (Australia) - Default language with full feature support\n• zh_cn - 中文 (简体) - Complete Chinese translation\n"
+    },
+    {
+      "id": "help_config_language_examples",
+      "text": "Examples:\n/config language zh_cn           # Switch to Chinese\n/config language en_au           # Switch to English\n/config language status          # Show current language"
+    },
+    {
+      "id": "help_config_status_title",
+      "text": "\n📊 Configuration Status Help:\n"
+    },
+    {
+      "id": "help_config_status_description",
+      "text": "The '/config status' command shows a comprehensive overview of your current SQLTerm configuration:\n\n• Language Settings - Current interface language\n• AI Configuration - Provider, model, and masked API keys\n• Database Connection - Current connection status\n• Usage Statistics - AI usage tracking (if available)\n\nAPI keys are displayed in masked format (xxxxxx...XXXX) for security."
+    },
+    {
+      "id": "help_connect_title",
+      "text": "\n🔌 Connection Commands Help:\n"
+    },
+    {
+      "id": "help_connect_commands",
+      "text": "Available Commands:\n/connect                         Interactive connection setup wizard\n/connect <name>                  Connect to saved connection (Tab: autocomplete)\n/list-connections               List all saved database connections\n"
+    },
+    {
+      "id": "help_connect_interactive",
+      "text": "Interactive Setup:\nThe '/connect' command without arguments starts an interactive wizard that guides you through:\n1. Entering connection name\n2. Selecting database type (MySQL, PostgreSQL, SQLite)\n3. Configuring connection details (host, port, database, credentials)\n4. Testing the connection\n5. Saving for future use\n"
+    },
+    {
+      "id": "help_connect_examples",
+      "text": "Examples:\n/connect                         # Start interactive setup\n/connect mydb                    # Connect to saved connection 'mydb'\n/list-connections               # See all available connections"
+    },
+    {
+      "id": "help_exec_title",
+      "text": "\n⚡ SQL Execution Help:\n"
+    },
+    {
+      "id": "help_exec_commands",
+      "text": "Available Modes:\n/exec <query>                    Execute SQL query directly\n/exec                           Enter multi-line SQL mode\n/exec <query> > file.csv        Execute and export to CSV\n"
+    },
+    {
+      "id": "help_exec_multiline_detailed",
+      "text": "Multi-line Mode:\n• Paste or type multiple lines of SQL\n• End with semicolon (;) to execute\n• Press Ctrl+C to cancel\n• Supports complex queries with formatting\n• Add '> filename.csv' at the end for CSV export\n"
+    },
+    {
+      "id": "help_exec_examples",
+      "text": "Examples:\n/exec SELECT * FROM users;       # Direct execution\n/exec                           # Multi-line mode\nSELECT * FROM orders > export.csv  # Direct SQL with export"
+    },
+    {
+      "id": "help_tables_title",
+      "text": "\n📋 Tables Command Help:\n"
+    },
+    {
+      "id": "help_tables_description",
+      "text": "The '/tables' command lists all tables in the currently connected database.\n\nRequires an active database connection. Use '/connect' first if not connected.\n\nDisplays tables in a numbered list for easy reference."
+    },
+    {
+      "id": "help_describe_title",
+      "text": "\n🔍 Table Description Help:\n"
+    },
+    {
+      "id": "help_describe_usage",
+      "text": "Usage:\n/describe <table_name>          Show detailed table structure\n"
+    },
+    {
+      "id": "help_describe_features",
+      "text": "Features:\n• Column details (name, type, nullable, keys, defaults)\n• Primary key information\n• Foreign key relationships\n• Check constraints\n• Formatted as readable markdown\n• Tab completion for table names\n"
+    },
+    {
+      "id": "help_describe_examples",
+      "text": "Examples:\n/describe users                 # Show users table structure\n/describe order_items           # Show order_items table details"
+    },
+    {
+      "id": "help_status_title",
+      "text": "\n📡 Status Command Help:\n"
+    },
+    {
+      "id": "help_status_description",
+      "text": "The '/status' command shows current database connection information:\n\n• Connection status (connected/not connected)\n• Database name and type\n• Host and port information\n• Username\n• Connection name (if using saved connection)\n\nUse this to verify your current connection before running queries."
+    },
+    {
+      "id": "help_prompts_title",
+      "text": "\n💬 AI Prompts History Help:\n"
+    },
+    {
+      "id": "help_prompts_usage",
+      "text": "Usage:\n/prompts                        Show recent AI conversation history\n/prompts <count>                Show last N conversations\n"
+    },
+    {
+      "id": "help_prompts_features",
+      "text": "Features:\n• Shows user requests and AI responses\n• Displays token usage and costs\n• Provider and model information\n• Formatted as markdown for readability\n• Helps track AI usage and costs\n"
+    },
+    {
+      "id": "help_prompts_examples",
+      "text": "Examples:\n/prompts                        # Show recent history\n/prompts 5                      # Show last 5 conversations"
+    },
+    {
+      "id": "unknown_help_command",
+      "text": "❓ Unknown command '%s'. Use '/help' for general help."
+    },
+    {
+      "id": "unknown_config_help_subcommand",
+      "text": "❓ Unknown config subcommand '%s'. Use '/help config' for available options."
     }
   ]
 }

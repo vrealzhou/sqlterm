@@ -3,7 +3,7 @@
   "messages": [
     {
       "id": "ai_not_configured",
-      "text": "🤖 AI 未配置。使用 /ai-config 设置 AI 提供商。"
+      "text": "🤖 AI 未配置。使用 /config ai 设置 AI 提供商。"
     },
     {
       "id": "ai_conversation_history",
@@ -127,7 +127,7 @@
     },
     {
       "id": "help_last_ai_call",
-      "text": "/last-ai-call [数量]     显示 AI 对话历史及请求/响应详情"
+      "text": "/prompts [数量]         显示 AI 对话历史及请求/响应详情"
     },
     {
       "id": "help_clear_conversation",
@@ -170,10 +170,6 @@
       "text": "警告：切换到会话历史失败：%v\n"
     },
     {
-      "id": "vector_db_init_warning",
-      "text": "警告：初始化向量存储失败：%v\n"
-    },
-    {
       "id": "usage_update_warning",
       "text": "警告：更新使用统计失败：%v\n"
     },
@@ -207,7 +203,7 @@
     },
     {
       "id": "help_full",
-      "text": "\n可用命令：\n\n/help                    显示此帮助信息\n/connect                 交互式连接设置\n/connect [名称]          连接到已保存的连接（Tab：自动补全名称）\n/list-connections        列出所有已保存的连接\n/tables                  列出当前数据库中的表\n/describe [表名]         显示表结构（Tab：自动补全表名）\n/status                  显示当前连接状态\n/exec [查询]             直接执行查询\n/exec                    进入多行 SQL 模式（以 ; 结束）\n/exec [查询] > 文件.csv  将查询结果导出到 CSV\n/config                  配置应用程序设置\n/config ai               配置 AI 提供商和模型\n/config language <语言>  设置界面语言（en_au, zh_cn）\n/last-ai-call [数量]     显示 AI 对话历史及请求/响应详情\n/clear-conversation      清除当前 AI 对话并重新开始\n/quit, /exit             退出 SQLTerm\n\nAI 聊天：\n直接输入不带 / 或 @ 前缀的消息与 AI 聊天。\nAI 使用多轮对话逐步收集表信息。\n使用 /clear-conversation 重新开始或 /config ai 设置提供商。\n\n文件命令：\n@文件名.sql              执行文件中的所有查询（Tab：自动补全文件）\n@文件名.sql 1            仅执行查询 1\n@文件名.sql 2-5          执行查询 2 到 5\n\nCSV 导出：\nSELECT * FROM table > output.csv    将查询结果导出到 CSV（Tab：自动补全文件名）\n/exec SELECT * FROM table > out.csv 使用 /exec 命令导出\n\nSQL 查询：\n直接输入任何 SQL 查询以执行它。\n结果会自动保存为 markdown 并使用 glamour 显示。\n\n自动补全：\n- 在 /connect 后按 Tab 查看连接名称\n- 在 /describe 后按 Tab 查看表名\n- 在 /config 后按 Tab 查看配置部分和选项\n- 在 @ 后按 Tab 查看 .sql 文件（搜索所有子目录）\n- 在 > 后按 Tab 查看/创建 .csv 文件\n- 排除隐藏文件夹（以 . 开头）和常见构建目录\n\n会话管理：\n- 结果自动保存到 ~/.config/sqlterm/sessions/{连接}/results/\n- 旧结果文件根据保留设置自动清理\n- 在 ~/.config/sqlterm/sessions/{连接}/session.yaml 中配置清理\n- 默认保留期：30 天（cleanup_retention_days: 30）"
+      "text": "\n可用命令：\n\n/help                    显示此帮助信息\n/connect                 交互式连接设置\n/connect [名称]          连接到已保存的连接（Tab：自动补全名称）\n/list-connections        列出所有已保存的连接\n/tables                  列出当前数据库中的表\n/describe [表名]         显示表结构（Tab：自动补全表名）\n/status                  显示当前连接状态\n/exec [查询]             直接执行查询\n/exec                    进入多行 SQL 模式（以 ; 结束）\n/exec [查询] > 文件.csv  将查询结果导出到 CSV\n/config                  配置应用程序设置\n/config ai               配置 AI 提供商和模型\n/config language <语言>  设置界面语言（en_au, zh_cn）\n/prompts [数量]         显示 AI 对话历史及请求/响应详情\n/clear-conversation      清除当前 AI 对话并重新开始\n/quit, /exit             退出 SQLTerm\n\nAI 聊天：\n直接输入不带 / 或 @ 前缀的消息与 AI 聊天。\nAI 使用多轮对话逐步收集表信息。\n使用 /clear-conversation 重新开始或 /config ai 设置提供商。\n\n文件命令：\n@文件名.sql              执行文件中的所有查询（Tab：自动补全文件）\n@文件名.sql 1            仅执行查询 1\n@文件名.sql 2-5          执行查询 2 到 5\n\nCSV 导出：\nSELECT * FROM table > output.csv    将查询结果导出到 CSV（Tab：自动补全文件名）\n/exec SELECT * FROM table > out.csv 使用 /exec 命令导出\n\nSQL 查询：\n直接输入任何 SQL 查询以执行它。\n结果会自动保存为 markdown 并使用 glamour 显示。\n\n自动补全：\n- 在 /connect 后按 Tab 查看连接名称\n- 在 /describe 后按 Tab 查看表名\n- 在 /config 后按 Tab 查看配置部分和选项\n- 在 @ 后按 Tab 查看 .sql 文件（搜索所有子目录）\n- 在 > 后按 Tab 查看/创建 .csv 文件\n- 排除隐藏文件夹（以 . 开头）和常见构建目录\n\n会话管理：\n- 结果自动保存到 ~/.config/sqlterm/sessions/{连接}/results/\n- 旧结果文件根据保留设置自动清理\n- 在 ~/.config/sqlterm/sessions/{连接}/session.yaml 中配置清理\n- 默认保留期：30 天（cleanup_retention_days: 30）"
     },
     {
       "id": "connection_saved",
@@ -311,7 +307,7 @@
     },
     {
       "id": "failed_to_create_sessions_dir",
-      "text": "创建会话目录失败：%w"
+      "text": "创建会话目录集失败：%w"
     },
     {
       "id": "failed_to_create_readline",
@@ -770,10 +766,6 @@
       "text": "添加新连接"
     },
     {
-      "id": "no_saved_connections_cli",
-      "text": "未找到已保存的连接。"
-    },
-    {
       "id": "add_connection_instruction",
       "text": "使用以下命令添加连接：sqlterm add <名称> --db-type <类型> --host <主机> --database <数据库> --username <用户>"
     },
@@ -843,19 +835,19 @@
     },
     {
       "id": "usage_ai_config_provider",
-      "text": "用法：/ai-config provider <openrouter|ollama|lmstudio>"
+      "text": "用法：/config ai provider <openrouter|ollama|lmstudio>"
     },
     {
       "id": "usage_ai_config_model",
-      "text": "用法：/ai-config model <模型名称>"
+      "text": "用法：/config ai model <模型名称>"
     },
     {
       "id": "usage_ai_config_api_key",
-      "text": "用法：/ai-config api-key <提供商> <API密钥>"
+      "text": "用法：/config ai api-key <提供商> <API密钥>"
     },
     {
       "id": "usage_ai_config_base_url",
-      "text": "用法：/ai-config base-url <提供商> <URL>"
+      "text": "用法：/config ai base-url <提供商> <URL>"
     },
     {
       "id": "current_language_display",
@@ -868,10 +860,6 @@
     {
       "id": "available_openrouter_commands",
       "text": "可用的 OpenRouter 命令："
-    },
-    {
-      "id": "enter_choice_prompt",
-      "text": "输入选择 (1-3)："
     },
     {
       "id": "enter_openrouter_api_key",
@@ -940,6 +928,170 @@
     {
       "id": "system_prompt_header",
       "text": "**系统提示：**\n"
+    },
+    {
+      "id": "help_config_title",
+      "text": "\n🔧 配置命令：\n"
+    },
+    {
+      "id": "help_config_general",
+      "text": "/config                          显示此帮助信息\n/config status                   显示完整配置状态\n/config language [lang]          设置界面语言（en_au, zh_cn）\n/config language status          显示语言配置\n/config ai                       AI 配置向导\n/config ai status                显示 AI 配置和使用情况\n/config ai provider <name>       设置 AI 提供商（openrouter, ollama, lmstudio）\n/config ai model <model>         设置当前提供商的 AI 模型\n/config ai api-key <provider> <key>  设置提供商的 API 密钥\n/config ai base-url <provider> <url> 设置本地提供商的基础 URL\n/config ai list-models           列出当前提供商的可用模型\n/config ai openrouter key <key>  设置 OpenRouter API 密钥\n"
+    },
+    {
+      "id": "help_config_examples",
+      "text": "示例：\n/config language zh_cn\n/config ai provider openrouter\n/config ai openrouter key sk-or-v1-xxx...\n/config ai model anthropic/claude-3.5-sonnet\n"
+    },
+    {
+      "id": "help_config_subcommand_tip",
+      "text": "💡 使用 '/help config <子命令>' 获取特定区域的详细帮助：\n   /help config ai        - AI 配置帮助\n   /help config language  - 语言配置帮助"
+    },
+    {
+      "id": "help_config_ai_title",
+      "text": "\n🤖 AI 配置帮助：\n"
+    },
+    {
+      "id": "help_config_ai_interactive",
+      "text": "交互式设置：\n/config ai                       启动交互式 AI 设置向导（推荐）\n"
+    },
+    {
+      "id": "help_config_ai_status",
+      "text": "状态和信息：\n/config ai status                显示当前 AI 配置和使用统计\n"
+    },
+    {
+      "id": "help_config_ai_providers",
+      "text": "提供商管理：\n/config ai provider <name>       设置 AI 提供商（openrouter, ollama, lmstudio）\n/config ai list-models           列出当前提供商的可用模型\n"
+    },
+    {
+      "id": "help_config_ai_models",
+      "text": "模型选择：\n/config ai model <model>         设置当前提供商的 AI 模型\n"
+    },
+    {
+      "id": "help_config_ai_auth",
+      "text": "认证和连接：\n/config ai api-key <provider> <key>     为云提供商设置 API 密钥\n/config ai base-url <provider> <url>    为本地提供商设置基础 URL\n"
+    },
+    {
+      "id": "help_config_ai_shortcuts",
+      "text": "OpenRouter 快捷方式：\n/config ai openrouter key <key>  快速设置 OpenRouter API 密钥\n"
+    },
+    {
+      "id": "help_config_ai_examples",
+      "text": "示例：\n/config ai                       # 交互式设置\n/config ai provider openrouter   # 切换到 OpenRouter\n/config ai api-key openrouter sk-or-v1-xxx...\n/config ai model anthropic/claude-3.5-sonnet\n/config ai base-url ollama http://localhost:11434\n"
+    },
+    {
+      "id": "help_config_ai_provider_list",
+      "text": "提供商：\n• openrouter - 云 AI 模型（需要从 https://openrouter.ai/keys 获取 API 密钥）\n• ollama     - 本地 AI 模型（需要安装 Ollama）\n• lmstudio   - 本地 AI 模型（需要 LM Studio）"
+    },
+    {
+      "id": "help_config_language_title",
+      "text": "\n🌐 语言配置帮助：\n"
+    },
+    {
+      "id": "help_config_language_commands",
+      "text": "可用命令：\n/config language                 显示当前语言和可用选项\n/config language status          显示当前语言配置\n/config language <lang>          设置界面语言\n"
+    },
+    {
+      "id": "help_config_language_options",
+      "text": "支持的语言：\n• en_au - English（澳大利亚）- 具有完整功能支持的默认语言\n• zh_cn - 中文（简体）- 完整的中文翻译\n"
+    },
+    {
+      "id": "help_config_language_examples",
+      "text": "示例：\n/config language zh_cn           # 切换到中文\n/config language en_au           # 切换到英文\n/config language status          # 显示当前语言"
+    },
+    {
+      "id": "help_config_status_title",
+      "text": "\n📊 配置状态帮助：\n"
+    },
+    {
+      "id": "help_config_status_description",
+      "text": "'/config status' 命令显示您当前 SQLTerm 配置的综合概览：\n\n• 语言设置 - 当前界面语言\n• AI 配置 - 提供商、模型和掩码 API 密钥\n• 数据库连接 - 当前连接状态\n• 使用统计 - AI 使用跟踪（如果可用）\n\nAPI 密钥以掩码格式（xxxxxx...XXXX）显示以确保安全。"
+    },
+    {
+      "id": "help_connect_title",
+      "text": "\n🔌 连接命令帮助：\n"
+    },
+    {
+      "id": "help_connect_commands",
+      "text": "可用命令：\n/connect                         交互式连接设置向导\n/connect <name>                  连接到已保存的连接（Tab：自动完成）\n/list-connections               列出所有已保存的数据库连接\n"
+    },
+    {
+      "id": "help_connect_interactive",
+      "text": "交互式设置：\n不带参数的 '/connect' 命令启动交互式向导，引导您完成：\n1. 输入连接名称\n2. 选择数据库类型（MySQL、PostgreSQL、SQLite）\n3. 配置连接详细信息（主机、端口、数据库、凭据）\n4. 测试连接\n5. 保存以供将来使用\n"
+    },
+    {
+      "id": "help_connect_examples",
+      "text": "示例：\n/connect                         # 启动交互式设置\n/connect mydb                    # 连接到已保存的连接 'mydb'\n/list-connections               # 查看所有可用连接"
+    },
+    {
+      "id": "help_exec_title",
+      "text": "\n⚡ SQL 执行帮助：\n"
+    },
+    {
+      "id": "help_exec_commands",
+      "text": "可用模式：\n/exec <query>                    直接执行 SQL 查询\n/exec                           进入多行 SQL 模式\n/exec <query> > file.csv        执行并导出到 CSV\n"
+    },
+    {
+      "id": "help_exec_multiline_detailed",
+      "text": "多行模式：\n• 粘贴或输入多行 SQL\n• 以分号（;）结束执行\n• 按 Ctrl+C 取消\n• 支持格式化的复杂查询\n• 在末尾添加 '> filename.csv' 进行 CSV 导出\n"
+    },
+    {
+      "id": "help_exec_examples",
+      "text": "示例：\n/exec SELECT * FROM users;       # 直接执行\n/exec                           # 多行模式\nSELECT * FROM orders > export.csv  # 直接 SQL 带导出"
+    },
+    {
+      "id": "help_tables_title",
+      "text": "\n📋 表命令帮助：\n"
+    },
+    {
+      "id": "help_tables_description",
+      "text": "'/tables' 命令列出当前连接数据库中的所有表。\n\n需要活跃的数据库连接。如果未连接，请先使用 '/connect'。\n\n以编号列表形式显示表，便于参考。"
+    },
+    {
+      "id": "help_describe_title",
+      "text": "\n🔍 表描述帮助：\n"
+    },
+    {
+      "id": "help_describe_usage",
+      "text": "用法：\n/describe <table_name>          显示详细的表结构\n"
+    },
+    {
+      "id": "help_describe_features",
+      "text": "功能：\n• 列详细信息（名称、类型、可空、键、默认值）\n• 主键信息\n• 外键关系\n• 检查约束\n• 格式化为可读的 markdown\n• 表名的 Tab 自动完成\n"
+    },
+    {
+      "id": "help_describe_examples",
+      "text": "示例：\n/describe users                 # 显示 users 表结构\n/describe order_items           # 显示 order_items 表详细信息"
+    },
+    {
+      "id": "help_status_title",
+      "text": "\n📡 状态命令帮助：\n"
+    },
+    {
+      "id": "help_status_description",
+      "text": "'/status' 命令显示当前数据库连接信息：\n\n• 连接状态（已连接/未连接）\n• 数据库名称和类型\n• 主机和端口信息\n• 用户名\n• 连接名称（如果使用已保存的连接）\n\n在运行查询之前使用此命令验证您的当前连接。"
+    },
+    {
+      "id": "help_prompts_title",
+      "text": "\n💬 AI 提示历史帮助：\n"
+    },
+    {
+      "id": "help_prompts_usage",
+      "text": "用法：\n/prompts                        显示最近的 AI 对话历史\n/prompts <count>                显示最后 N 次对话\n"
+    },
+    {
+      "id": "help_prompts_features",
+      "text": "功能：\n• 显示用户请求和 AI 回复\n• 显示令牌使用和费用\n• 提供商和模型信息\n• 格式化为 markdown 以便阅读\n• 帮助跟踪 AI 使用和费用\n"
+    },
+    {
+      "id": "help_prompts_examples",
+      "text": "示例：\n/prompts                        # 显示最近历史\n/prompts 5                      # 显示最后 5 次对话"
+    },
+    {
+      "id": "unknown_help_command",
+      "text": "❓ 未知命令 '%s'。使用 '/help' 获取常规帮助。"
+    },
+    {
+      "id": "unknown_config_help_subcommand",
+      "text": "❓ 未知配置子命令 '%s'。使用 '/help config' 查看可用选项。"
     }
   ]
 }

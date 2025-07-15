@@ -287,7 +287,7 @@ func (a *App) processCommand(line string) error {
 
 	switch command {
 	case "/help":
-		a.printHelp()
+		return a.handleHelp(args)
 	case "/quit", "/exit":
 		os.Exit(0)
 	case "/connect":
@@ -530,6 +530,38 @@ func (a *App) truncateQuery(query string) string {
 		return query[:47] + "..."
 	}
 	return query
+}
+
+func (a *App) handleHelp(args []string) error {
+	if len(args) == 0 {
+		// Show general help
+		a.printHelp()
+		return nil
+	}
+
+	// Handle specific command help
+	command := args[0]
+	subArgs := args[1:]
+
+	switch command {
+	case "config":
+		return a.printConfigHelp(subArgs)
+	case "connect":
+		return a.printConnectHelp()
+	case "exec":
+		return a.printExecHelp()
+	case "tables":
+		return a.printTablesHelp()
+	case "describe":
+		return a.printDescribeHelp()
+	case "status":
+		return a.printStatusHelp()
+	case "prompts":
+		return a.printPromptsHelp()
+	default:
+		fmt.Printf(a.i18nMgr.Get("unknown_help_command"), command)
+		return nil
+	}
 }
 
 func (a *App) printHelp() {
@@ -1232,20 +1264,95 @@ func (a *App) processAIChat(message string) error {
 
 func (a *App) handleConfig(args []string) error {
 	if len(args) == 0 {
-		return a.printConfigHelp()
+		return a.printConfigHelp([]string{})
 	}
 
 	section := args[0]
 	switch section {
+	case "status":
+		return a.handleConfigStatus()
 	case "ai":
 		return a.handleConfigAI(args[1:])
 	case "language":
 		return a.handleConfigLanguage(args[1:])
 	default:
 		fmt.Printf(a.i18nMgr.Get("unknown_config_section"), section)
-		a.printConfigHelp()
+		a.printConfigHelp([]string{})
 		return nil
 	}
+}
+
+func (a *App) handleConfigStatus() error {
+	fmt.Println("🔧 SQLTerm Configuration Status")
+	fmt.Println()
+
+	// Language configuration
+	if a.aiManager != nil {
+		config := a.aiManager.GetConfig()
+		fmt.Printf("🌐 Language: %s\n", config.Language)
+	} else {
+		fmt.Printf("🌐 Language: en_au (default)\n")
+	}
+	fmt.Println()
+
+	// AI configuration status
+	fmt.Println("🤖 AI Configuration:")
+	if a.aiManager == nil {
+		fmt.Println("   Status: ❌ Not initialized")
+		fmt.Println("   Use '/config ai' to set up AI integration")
+	} else {
+		config := a.aiManager.GetConfig()
+		if a.aiManager.IsConfigured() {
+			fmt.Printf("   Status: ✅ Configured\n")
+			fmt.Printf("   Provider: %s\n", config.AI.Provider)
+			fmt.Printf("   Model: %s\n", config.AI.Model)
+			
+			// Show masked API keys
+			hasKeys := false
+			for provider, key := range config.AI.APIKeys {
+				if key != "" {
+					if !hasKeys {
+						fmt.Println("   API Keys:")
+						hasKeys = true
+					}
+					maskedKey := "xxxxxx..." + key[max(0, len(key)-4):]
+					fmt.Printf("     %s: %s\n", provider, maskedKey)
+				}
+			}
+			
+			// Show base URLs
+			hasURLs := false
+			for provider, url := range config.AI.BaseURLs {
+				if url != "" {
+					if !hasURLs {
+						fmt.Println("   Base URLs:")
+						hasURLs = true
+					}
+					fmt.Printf("     %s: %s\n", provider, url)
+				}
+			}
+		} else {
+			fmt.Printf("   Status: ⚠️  Initialized but not configured\n")
+			fmt.Println("   Use '/config ai' to complete setup")
+		}
+	}
+	fmt.Println()
+
+	// Connection status
+	fmt.Println("🔗 Database Connection:")
+	if a.connection == nil {
+		fmt.Println("   Status: ❌ Not connected")
+		fmt.Println("   Use '/connect' to establish a connection")
+	} else {
+		fmt.Printf("   Status: ✅ Connected to %s\n", a.config.Name)
+		fmt.Printf("   Database: %s (%s)\n", a.config.Database, a.config.DatabaseType)
+		if a.config.DatabaseType != core.SQLite {
+			fmt.Printf("   Host: %s:%d\n", a.config.Host, a.config.Port)
+			fmt.Printf("   Username: %s\n", a.config.Username)
+		}
+	}
+
+	return nil
 }
 
 func (a *App) handleConfigAI(args []string) error {
@@ -1280,27 +1387,27 @@ func (a *App) printAIConfigHelp() {
 	fmt.Println(`
 🤖 AI Configuration Commands:
 
-/ai-config                     Interactive AI setup wizard (recommended)
-/ai-config status              Show current AI configuration and usage
-/ai-config provider <name>     Set AI provider (openrouter, ollama, lmstudio)
-/ai-config model <model>       Set AI model for current provider
-/ai-config api-key <provider> <key>  Set API key for provider
-/ai-config base-url <provider> <url> Set base URL for local providers
-/ai-config language <lang>     Set interface language (en_au, zh_cn)
-/ai-config list-models         List available models for current provider
+/config ai                     Interactive AI setup wizard (recommended)
+/config ai status              Show current AI configuration and usage
+/config ai provider <name>     Set AI provider (openrouter, ollama, lmstudio)
+/config ai model <model>       Set AI model for current provider
+/config ai api-key <provider> <key>  Set API key for provider
+/config ai base-url <provider> <url> Set base URL for local providers
+/config language <lang>        Set interface language (en_au, zh_cn)
+/config ai list-models         List available models for current provider
 
 Interactive Setup:
-Run /ai-config without arguments to start the setup wizard that will:
+Run /config ai without arguments to start the setup wizard that will:
 1. Let you choose between OpenRouter, Ollama, or LM Studio
 2. Configure API keys (for cloud providers) or base URLs (for local)
 3. Fetch and display available models for your provider
 4. Let you select your preferred model with pricing information
 
 Manual Examples:
-/ai-config provider openrouter
-/ai-config api-key openrouter sk-or-v1-xxx...
-/ai-config model anthropic/claude-3.5-sonnet
-/ai-config base-url ollama http://localhost:11434
+/config ai provider openrouter
+/config ai api-key openrouter sk-or-v1-xxx...
+/config ai model anthropic/claude-3.5-sonnet
+/config ai base-url ollama http://localhost:11434
 
 Providers:
 - openrouter: Cloud AI models (requires API key from https://openrouter.ai/keys)
@@ -1383,7 +1490,7 @@ func (a *App) handleAIConfigProvider(args []string) error {
 
 func (a *App) handleAIConfigModel(args []string) error {
 	if len(args) == 0 {
-		fmt.Println("Usage: /ai-config model <model_name>")
+		fmt.Println("Usage: /config ai model <model_name>")
 		return nil
 	}
 
@@ -1406,7 +1513,7 @@ func (a *App) handleAIConfigModel(args []string) error {
 
 func (a *App) handleAIConfigAPIKey(args []string) error {
 	if len(args) < 2 {
-		fmt.Println("Usage: /ai-config api-key <provider> <api_key>")
+		fmt.Println("Usage: /config ai api-key <provider> <api_key>")
 		return nil
 	}
 
@@ -1428,7 +1535,7 @@ func (a *App) handleAIConfigAPIKey(args []string) error {
 
 func (a *App) handleAIConfigBaseURL(args []string) error {
 	if len(args) < 2 {
-		fmt.Println("Usage: /ai-config base-url <provider> <url>")
+		fmt.Println("Usage: /config ai base-url <provider> <url>")
 		return nil
 	}
 
@@ -1461,6 +1568,17 @@ func (a *App) handleConfigLanguage(args []string) error {
 		// Show available languages
 		availableLanguages := a.i18nMgr.GetAvailableLanguages()
 		fmt.Printf("Available languages: %s\n", strings.Join(availableLanguages, ", "))
+		return nil
+	}
+
+	// Handle status subcommand
+	if args[0] == "status" {
+		fmt.Println("🌐 Language Configuration:")
+		config := a.aiManager.GetConfig()
+		fmt.Printf("   Current: %s\n", config.Language)
+		
+		availableLanguages := a.i18nMgr.GetAvailableLanguages()
+		fmt.Printf("   Available: %s\n", strings.Join(availableLanguages, ", "))
 		return nil
 	}
 
@@ -1527,27 +1645,29 @@ func (a *App) handleConfigAIOpenRouter(args []string) error {
 	}
 }
 
-func (a *App) printConfigHelp() error {
-	fmt.Println(`
-🔧 Configuration Commands:
+func (a *App) printConfigHelp(args []string) error {
+	if len(args) == 0 {
+		// General config help
+		fmt.Print(a.i18nMgr.Get("help_config_title"))
+		fmt.Print(a.i18nMgr.Get("help_config_general"))
+		fmt.Print(a.i18nMgr.Get("help_config_examples"))
+		fmt.Print(a.i18nMgr.Get("help_config_subcommand_tip"))
+		return nil
+	}
 
-/config                          Show this help message
-/config language <lang>          Set interface language (en_au, zh_cn)
-/config ai                       AI configuration wizard
-/config ai status                Show AI configuration and usage
-/config ai provider <name>       Set AI provider (openrouter, ollama, lmstudio)
-/config ai model <model>         Set AI model for current provider
-/config ai api-key <provider> <key>  Set API key for provider
-/config ai base-url <provider> <url> Set base URL for local providers
-/config ai list-models           List available models for current provider
-/config ai openrouter key <key>  Set OpenRouter API key
-
-Examples:
-/config language zh_cn
-/config ai provider openrouter
-/config ai openrouter key sk-or-v1-xxx...
-/config ai model anthropic/claude-3.5-sonnet`)
-	return nil
+	// Subcommand-specific help
+	subcommand := args[0]
+	switch subcommand {
+	case "ai":
+		return a.printConfigAIHelp()
+	case "language":
+		return a.printConfigLanguageHelp()
+	case "status":
+		return a.printConfigStatusHelp()
+	default:
+		fmt.Printf(a.i18nMgr.Get("unknown_config_help_subcommand"), subcommand)
+		return nil
+	}
 }
 
 func (a *App) handleAIConfigListModels() error {
@@ -2023,4 +2143,77 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// Help functions for specific commands and subcommands
+
+func (a *App) printConfigAIHelp() error {
+	fmt.Print(a.i18nMgr.Get("help_config_ai_title"))
+	fmt.Print(a.i18nMgr.Get("help_config_ai_interactive"))
+	fmt.Print(a.i18nMgr.Get("help_config_ai_status"))
+	fmt.Print(a.i18nMgr.Get("help_config_ai_providers"))
+	fmt.Print(a.i18nMgr.Get("help_config_ai_models"))
+	fmt.Print(a.i18nMgr.Get("help_config_ai_auth"))
+	fmt.Print(a.i18nMgr.Get("help_config_ai_shortcuts"))
+	fmt.Print(a.i18nMgr.Get("help_config_ai_examples"))
+	fmt.Print(a.i18nMgr.Get("help_config_ai_provider_list"))
+	return nil
+}
+
+func (a *App) printConfigLanguageHelp() error {
+	fmt.Print(a.i18nMgr.Get("help_config_language_title"))
+	fmt.Print(a.i18nMgr.Get("help_config_language_commands"))
+	fmt.Print(a.i18nMgr.Get("help_config_language_options"))
+	fmt.Print(a.i18nMgr.Get("help_config_language_examples"))
+	return nil
+}
+
+func (a *App) printConfigStatusHelp() error {
+	fmt.Print(a.i18nMgr.Get("help_config_status_title"))
+	fmt.Print(a.i18nMgr.Get("help_config_status_description"))
+	return nil
+}
+
+func (a *App) printConnectHelp() error {
+	fmt.Print(a.i18nMgr.Get("help_connect_title"))
+	fmt.Print(a.i18nMgr.Get("help_connect_commands"))
+	fmt.Print(a.i18nMgr.Get("help_connect_interactive"))
+	fmt.Print(a.i18nMgr.Get("help_connect_examples"))
+	return nil
+}
+
+func (a *App) printExecHelp() error {
+	fmt.Print(a.i18nMgr.Get("help_exec_title"))
+	fmt.Print(a.i18nMgr.Get("help_exec_commands"))
+	fmt.Print(a.i18nMgr.Get("help_exec_multiline_detailed"))
+	fmt.Print(a.i18nMgr.Get("help_exec_examples"))
+	return nil
+}
+
+func (a *App) printTablesHelp() error {
+	fmt.Print(a.i18nMgr.Get("help_tables_title"))
+	fmt.Print(a.i18nMgr.Get("help_tables_description"))
+	return nil
+}
+
+func (a *App) printDescribeHelp() error {
+	fmt.Print(a.i18nMgr.Get("help_describe_title"))
+	fmt.Print(a.i18nMgr.Get("help_describe_usage"))
+	fmt.Print(a.i18nMgr.Get("help_describe_features"))
+	fmt.Print(a.i18nMgr.Get("help_describe_examples"))
+	return nil
+}
+
+func (a *App) printStatusHelp() error {
+	fmt.Print(a.i18nMgr.Get("help_status_title"))
+	fmt.Print(a.i18nMgr.Get("help_status_description"))
+	return nil
+}
+
+func (a *App) printPromptsHelp() error {
+	fmt.Print(a.i18nMgr.Get("help_prompts_title"))
+	fmt.Print(a.i18nMgr.Get("help_prompts_usage"))
+	fmt.Print(a.i18nMgr.Get("help_prompts_features"))
+	fmt.Print(a.i18nMgr.Get("help_prompts_examples"))
+	return nil
 }
