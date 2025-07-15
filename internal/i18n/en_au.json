@@ -740,6 +740,202 @@
     {
       "id": "no_results_to_export",
       "text": "⚠️  No results to export to CSV (all queries returned 0 rows)"
+    },
+    {
+      "id": "app_short_description",
+      "text": "A terminal-based SQL database tool"
+    },
+    {
+      "id": "app_long_description", 
+      "text": "SQLTerm provides an intuitive conversation-style interface for managing database connections and executing queries across MySQL, PostgreSQL, and SQLite."
+    },
+    {
+      "id": "config_file_flag",
+      "text": "config file (default is $HOME/.sqlterm.yaml)"
+    },
+    {
+      "id": "verbose_output_flag",
+      "text": "verbose output"
+    },
+    {
+      "id": "connect_command_short",
+      "text": "Connect to a database directly"
+    },
+    {
+      "id": "list_command_short",
+      "text": "List saved connections"
+    },
+    {
+      "id": "add_command_short",
+      "text": "Add a new connection"
+    },
+    {
+      "id": "no_saved_connections_cli",
+      "text": "No saved connections found."
+    },
+    {
+      "id": "add_connection_instruction",
+      "text": "Add a connection with: sqlterm add <name> --db-type <type> --host <host> --database <db> --username <user>"
+    },
+    {
+      "id": "saved_connections_cli",
+      "text": "Saved connections:"
+    },
+    {
+      "id": "testing_connection_cli",
+      "text": "Testing connection to %s..."
+    },
+    {
+      "id": "connection_test_successful",
+      "text": "✓ Connection test successful"
+    },
+    {
+      "id": "connection_saved_cli",
+      "text": "✓ Connection '%s' saved"
+    },
+    {
+      "id": "use_list_instruction",
+      "text": "Use 'sqlterm list' to see all connections"
+    },
+    {
+      "id": "use_sqlterm_instruction",
+      "text": "Use 'sqlterm' to start the conversation interface"
+    },
+    {
+      "id": "config_migrated_cli",
+      "text": "📦 Migrated configuration from ai.yaml to config.yaml"
+    },
+    {
+      "id": "session_migrated_toml_to_yaml",
+      "text": "📁 Migrated session.toml to session.yaml for %s"
+    },
+    {
+      "id": "session_yaml_created",
+      "text": "📁 Created session.yaml for %s (cleanup_retention_days: %d)"
+    },
+    {
+      "id": "ai_starting_new_conversation",
+      "text": "🤖 Starting new conversation... (this may take up to 2 minutes for complex queries)"
+    },
+    {
+      "id": "ai_processing_conversation",
+      "text": "🤖 Processing conversation (Phase: %s)... "
+    },
+    {
+      "id": "ai_response_header",
+      "text": "🤖 AI Response:"
+    },
+    {
+      "id": "usage_data_unavailable",
+      "text": "No usage data"
+    },
+    {
+      "id": "usage_today_summary",
+      "text": "Today: %d req, $%.4f"
+    },
+    {
+      "id": "unknown_config_section",
+      "text": "Unknown config section: %s"
+    },
+    {
+      "id": "unknown_ai_subcommand",
+      "text": "Unknown AI subcommand: %s"
+    },
+    {
+      "id": "usage_ai_config_provider",
+      "text": "Usage: /ai-config provider <openrouter|ollama|lmstudio>"
+    },
+    {
+      "id": "usage_ai_config_model",
+      "text": "Usage: /ai-config model <model_name>"
+    },
+    {
+      "id": "usage_ai_config_api_key",
+      "text": "Usage: /ai-config api-key <provider> <api_key>"
+    },
+    {
+      "id": "usage_ai_config_base_url",
+      "text": "Usage: /ai-config base-url <provider> <url>"
+    },
+    {
+      "id": "current_language_display",
+      "text": "Current language: %s"
+    },
+    {
+      "id": "available_languages_display",
+      "text": "Available languages: %s"
+    },
+    {
+      "id": "available_openrouter_commands",
+      "text": "Available OpenRouter commands:"
+    },
+    {
+      "id": "enter_choice_prompt",
+      "text": "Enter choice (1-3): "
+    },
+    {
+      "id": "enter_openrouter_api_key",
+      "text": "🔐 Enter OpenRouter API key (get one from https://openrouter.ai/keys): "
+    },
+    {
+      "id": "enter_base_url_for_provider",
+      "text": "🌐 Enter base URL for %s [%s]: "
+    },
+    {
+      "id": "enter_model_name_autocomplete",
+      "text": "🤖 Enter model name (Tab for autocomplete): "
+    },
+    {
+      "id": "using_default_model",
+      "text": "Using default model for provider."
+    },
+    {
+      "id": "please_enter_model_name",
+      "text": "Please enter a model name."
+    },
+    {
+      "id": "be_more_specific_model",
+      "text": "Please be more specific or copy-paste the exact model name."
+    },
+    {
+      "id": "csv_export_header",
+      "text": "Date,Provider,Model,Total Requests,Input Tokens,Output Tokens,Total Cost"
+    },
+    {
+      "id": "usage_tracking_not_available",
+      "text": "usage tracking not available - no database connection"
+    },
+    {
+      "id": "usage_statistics_header",
+      "text": "📊 Usage Statistics:"
+    },
+    {
+      "id": "session_id_display",
+      "text": "Session ID: %s"
+    },
+    {
+      "id": "today_usage_stats",
+      "text": "Today: %d requests, %d input tokens, %d output tokens, $%.6f"
+    },
+    {
+      "id": "last_7_days_usage_stats",
+      "text": "Last 7 days: %d requests, %d input tokens, %d output tokens, $%.6f"
+    },
+    {
+      "id": "usage_not_available_no_db",
+      "text": "Not available (no database connection)"
+    },
+    {
+      "id": "todays_usage_display",
+      "text": "Today's Usage: %d requests, $%.6f"
+    },
+    {
+      "id": "last_7_days_display",
+      "text": "Last 7 Days: %d requests, $%.6f"
+    },
+    {
+      "id": "warning_failed_to_record_usage",
+      "text": "Warning: failed to record usage: %v"
     }
   ]
 }

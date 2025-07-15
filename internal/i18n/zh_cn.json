@@ -740,6 +740,202 @@
     {
       "id": "no_results_to_export",
       "text": "⚠️  没有结果可导出到 CSV（所有查询返回 0 行）"
+    },
+    {
+      "id": "app_short_description",
+      "text": "基于终端的 SQL 数据库工具"
+    },
+    {
+      "id": "app_long_description", 
+      "text": "SQLTerm 提供直观的对话式界面，用于管理数据库连接和执行跨 MySQL、PostgreSQL 和 SQLite 的查询。"
+    },
+    {
+      "id": "config_file_flag",
+      "text": "配置文件（默认为 $HOME/.sqlterm.yaml）"
+    },
+    {
+      "id": "verbose_output_flag",
+      "text": "详细输出"
+    },
+    {
+      "id": "connect_command_short",
+      "text": "直接连接到数据库"
+    },
+    {
+      "id": "list_command_short",
+      "text": "列出已保存的连接"
+    },
+    {
+      "id": "add_command_short",
+      "text": "添加新连接"
+    },
+    {
+      "id": "no_saved_connections_cli",
+      "text": "未找到已保存的连接。"
+    },
+    {
+      "id": "add_connection_instruction",
+      "text": "使用以下命令添加连接：sqlterm add <名称> --db-type <类型> --host <主机> --database <数据库> --username <用户>"
+    },
+    {
+      "id": "saved_connections_cli",
+      "text": "已保存的连接："
+    },
+    {
+      "id": "testing_connection_cli",
+      "text": "正在测试连接到 %s..."
+    },
+    {
+      "id": "connection_test_successful",
+      "text": "✓ 连接测试成功"
+    },
+    {
+      "id": "connection_saved_cli",
+      "text": "✓ 连接 '%s' 已保存"
+    },
+    {
+      "id": "use_list_instruction",
+      "text": "使用 'sqlterm list' 查看所有连接"
+    },
+    {
+      "id": "use_sqlterm_instruction",
+      "text": "使用 'sqlterm' 启动对话界面"
+    },
+    {
+      "id": "config_migrated_cli",
+      "text": "📦 已从 ai.yaml 迁移配置到 config.yaml"
+    },
+    {
+      "id": "session_migrated_toml_to_yaml",
+      "text": "📁 已将 %s 的 session.toml 迁移到 session.yaml"
+    },
+    {
+      "id": "session_yaml_created",
+      "text": "📁 已为 %s 创建 session.yaml（清理保留天数：%d）"
+    },
+    {
+      "id": "ai_starting_new_conversation",
+      "text": "🤖 开始新对话...（复杂查询可能需要 2 分钟）"
+    },
+    {
+      "id": "ai_processing_conversation",
+      "text": "🤖 正在处理对话（阶段：%s）... "
+    },
+    {
+      "id": "ai_response_header",
+      "text": "🤖 AI 响应："
+    },
+    {
+      "id": "usage_data_unavailable",
+      "text": "无使用数据"
+    },
+    {
+      "id": "usage_today_summary",
+      "text": "今日：%d 请求，$%.4f"
+    },
+    {
+      "id": "unknown_config_section",
+      "text": "未知配置部分：%s"
+    },
+    {
+      "id": "unknown_ai_subcommand",
+      "text": "未知 AI 子命令：%s"
+    },
+    {
+      "id": "usage_ai_config_provider",
+      "text": "用法：/ai-config provider <openrouter|ollama|lmstudio>"
+    },
+    {
+      "id": "usage_ai_config_model",
+      "text": "用法：/ai-config model <模型名称>"
+    },
+    {
+      "id": "usage_ai_config_api_key",
+      "text": "用法：/ai-config api-key <提供商> <API密钥>"
+    },
+    {
+      "id": "usage_ai_config_base_url",
+      "text": "用法：/ai-config base-url <提供商> <URL>"
+    },
+    {
+      "id": "current_language_display",
+      "text": "当前语言：%s"
+    },
+    {
+      "id": "available_languages_display",
+      "text": "可用语言：%s"
+    },
+    {
+      "id": "available_openrouter_commands",
+      "text": "可用的 OpenRouter 命令："
+    },
+    {
+      "id": "enter_choice_prompt",
+      "text": "输入选择 (1-3)："
+    },
+    {
+      "id": "enter_openrouter_api_key",
+      "text": "🔐 输入 OpenRouter API 密钥（从 https://openrouter.ai/keys 获取）："
+    },
+    {
+      "id": "enter_base_url_for_provider",
+      "text": "🌐 输入 %s 的基本 URL [%s]："
+    },
+    {
+      "id": "enter_model_name_autocomplete",
+      "text": "🤖 输入模型名称（Tab 自动补全）："
+    },
+    {
+      "id": "using_default_model",
+      "text": "使用提供商的默认模型。"
+    },
+    {
+      "id": "please_enter_model_name",
+      "text": "请输入模型名称。"
+    },
+    {
+      "id": "be_more_specific_model",
+      "text": "请更具体或复制粘贴确切的模型名称。"
+    },
+    {
+      "id": "csv_export_header",
+      "text": "日期,提供商,模型,总请求数,输入令牌,输出令牌,总费用"
+    },
+    {
+      "id": "usage_tracking_not_available",
+      "text": "使用跟踪不可用 - 无数据库连接"
+    },
+    {
+      "id": "usage_statistics_header",
+      "text": "📊 使用统计："
+    },
+    {
+      "id": "session_id_display",
+      "text": "会话 ID：%s"
+    },
+    {
+      "id": "today_usage_stats",
+      "text": "今日：%d 请求，%d 输入令牌，%d 输出令牌，$%.6f"
+    },
+    {
+      "id": "last_7_days_usage_stats",
+      "text": "过去 7 天：%d 请求，%d 输入令牌，%d 输出令牌，$%.6f"
+    },
+    {
+      "id": "usage_not_available_no_db",
+      "text": "不可用（无数据库连接）"
+    },
+    {
+      "id": "todays_usage_display",
+      "text": "今日使用：%d 请求，$%.6f"
+    },
+    {
+      "id": "last_7_days_display",
+      "text": "过去 7 天：%d 请求，$%.6f"
+    },
+    {
+      "id": "warning_failed_to_record_usage",
+      "text": "警告：记录使用情况失败：%v"
     }
   ]
 }
