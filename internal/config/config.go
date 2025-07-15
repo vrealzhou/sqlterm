@@ -49,7 +49,7 @@ func LoadConfig(configDir string) (*i18n.Manager, *Config, error) {
 			if err := os.Rename(legacyConfigPath, configPath); err != nil {
 				return nil, nil, fmt.Errorf(i18nMgr.Get("failed_to_migrate_config"), err)
 			}
-			fmt.Printf("📦 Migrated configuration from ai.yaml to config.yaml\n")
+			fmt.Printf(i18nMgr.Get("config_migrated_cli"))
 		} else {
 			// Create default config if neither file exists
 			config := DefaultConfig()
