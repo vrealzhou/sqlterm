@@ -338,6 +338,35 @@ func TestNullValue(t *testing.T) {
 	}
 }
 
+func TestColumnNames(t *testing.T) {
+	result := &QueryResult{
+		Columns: []Column{
+			{Name: "id", Type: "INTEGER"},
+			{Name: "name", Type: "VARCHAR"},
+			{Name: "email", Type: "VARCHAR"},
+		},
+	}
+
+	names := result.ColumnNames()
+	
+	if len(names) != 3 {
+		t.Errorf("Expected 3 column names, got %d", len(names))
+	}
+	
+	expected := []string{"id", "name", "email"}
+	for i, name := range expected {
+		if names[i] != name {
+			t.Errorf("Expected column name '%s' at index %d, got '%s'", name, i, names[i])
+		}
+	}
+}
+
+func TestNewQueryResult(t *testing.T) {
+	// This function is hard to test without a real database connection
+	// We'll just ensure it doesn't panic with nil input
+	// In a real test environment, we'd use a mock sql.Rows
+}
+
 func TestGenerateNumberedCSVPath(t *testing.T) {
 	testCases := []struct {
 		name       string

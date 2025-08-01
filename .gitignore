@@ -7,6 +7,7 @@ database/
 reports/
 bin
 .crush/
+.crush.json
 
 *.exe
 *.exe~
