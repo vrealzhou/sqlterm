@@ -1276,6 +1276,14 @@
     {
       "id": "failed_record_usage_warning",
       "text": "警告：记录使用情况失败：%v\n"
+    },
+    {
+      "id": "editor_command_short",
+      "text": "启动支持LSP的SQL编辑器"
+    },
+    {
+      "id": "launching_sql_editor",
+      "text": "正在启动支持LSP的SQL编辑器..."
     }
   ]
 }

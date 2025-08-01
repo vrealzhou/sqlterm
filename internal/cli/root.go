@@ -8,8 +8,10 @@ import (
 	"sqlterm/internal/config"
 	"sqlterm/internal/conversation"
 	"sqlterm/internal/core"
+	"sqlterm/internal/editor"
 	"sqlterm/internal/i18n"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -22,6 +24,9 @@ var (
 	Version   string = "dev"
 	BuildTime string = "unknown"
 	GitCommit string = "unknown"
+
+	// Track current connection for editor command
+	currentConnection core.Connection
 )
 
 // SetVersionInfo sets the version information
@@ -63,6 +68,8 @@ func init() {
 		addCmd.Short = i18nMgr.Get("add_command_short")
 		versionCmd.Short = i18nMgr.Get("version_command_short")
 		versionCmd.Long = i18nMgr.Get("version_command_long")
+		editorCmd.Short = i18nMgr.Get("editor_command_short")
+		editorCmd.Short = i18nMgr.Get("editor_command_short")
 
 		// Update flag descriptions
 		updateFlagDescriptions(i18nMgr)
@@ -75,6 +82,7 @@ func init() {
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(addCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(editorCmd)
 }
 
 // getI18nString safely gets an i18n string with fallback
@@ -241,6 +249,24 @@ var versionCmd = &cobra.Command{
 	},
 }
 
+var editorCmd = &cobra.Command{
+	Use:   "editor",
+	Short: "", // Will be set in init()
+	Long:  "Launch the SQL editor with LSP support and autocomplete",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if rootCmd.Flag("help").Value.String() == "true" {
+			return nil
+		}
+		
+		// Check if we have an active connection
+		if currentConnection == nil {
+			return fmt.Errorf("no active database connection. Use 'connect' command first")
+		}
+		
+		return runEditor(currentConnection)
+	},
+}
+
 func init() {
 	// Set up flags with English fallbacks - will be updated in initI18n()
 	connectCmd.Flags().StringP("db-type", "t", "", "Database type (mysql, postgres, sqlite)")
@@ -292,6 +318,9 @@ func connectAndRunConversation(connConfig *core.ConnectionConfig) error {
 		return fmt.Errorf("connection test failed: %w", err)
 	}
 
+	// Set the current connection for editor command
+	currentConnection = conn
+
 	fmt.Printf(i18nMgr.Get("connected_successfully"), connConfig.Name)
 	fmt.Print(i18nMgr.Get("starting_conversation_mode"))
 
@@ -302,6 +331,38 @@ func connectAndRunConversation(connConfig *core.ConnectionConfig) error {
 
 	app.SetConnection(conn, connConfig)
 	return app.Run()
+}
+
+func runEditor(conn core.Connection) error {
+	// Initialize i18n manager
+	configMgr := config.NewManager()
+	language := "en_au" // Default language
+
+	// Try to get language from AI config
+	if aiManager, err := ai.NewManager(configMgr.GetConfigDir()); err == nil && aiManager != nil {
+		if aiConfig := aiManager.GetConfig(); aiConfig != nil {
+			language = aiConfig.Language
+		}
+	}
+
+	i18nMgr, err := i18n.NewManager(language)
+	if err != nil {
+		// Fallback to default language if i18n fails
+		i18nMgr, _ = i18n.NewManager("en_au")
+	}
+
+	fmt.Println(i18nMgr.Get("launching_sql_editor"))
+
+	// Create and run the Bubbletea editor
+	editor := editor.NewEditor(conn)
+	
+	// Run the editor in Bubbletea
+	p := tea.NewProgram(editor)
+	if _, err := p.Run(); err != nil {
+		return fmt.Errorf("editor failed: %w", err)
+	}
+
+	return nil
 }
 
 func listConnections() error {

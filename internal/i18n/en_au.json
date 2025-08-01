@@ -1276,6 +1276,14 @@
     {
       "id": "failed_record_usage_warning",
       "text": "Warning: failed to record usage: %v\n"
+    },
+    {
+      "id": "editor_command_short",
+      "text": "Launch the SQL editor with LSP support"
+    },
+    {
+      "id": "launching_sql_editor",
+      "text": "Launching SQL Editor with LSP support..."
     }
   ]
 }
