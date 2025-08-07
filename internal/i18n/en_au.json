@@ -3,7 +3,7 @@
   "messages": [
     {
       "id": "ai_not_configured",
-      "text": "🤖 AI is not configured. Use /config ai to set up AI providers."
+      "text": "\ud83e\udd16 AI is not configured. Use /config ai to set up AI providers."
     },
     {
       "id": "ai_conversation_history",
@@ -11,27 +11,27 @@
     },
     {
       "id": "no_ai_history",
-      "text": "📝 No AI conversation history found.\nStart chatting with AI (type messages without / or @ prefixes) to see history here.\n"
+      "text": "\ud83d\udcdd No AI conversation history found.\nStart chatting with AI (type messages without / or @ prefixes) to see history here.\n"
     },
     {
       "id": "conversation_history_saved",
-      "text": "📍 Conversation history saved to: %s\n"
+      "text": "\ud83d\udccd Conversation history saved to: %s\n"
     },
     {
       "id": "ai_not_configured_short",
-      "text": "🤖 AI is not configured."
+      "text": "\ud83e\udd16 AI is not configured."
     },
     {
       "id": "no_active_conversation",
-      "text": "📝 No active conversation to clear."
+      "text": "\ud83d\udcdd No active conversation to clear."
     },
     {
       "id": "clearing_conversation",
-      "text": "📊 Clearing conversation (Phase: %s, Tables loaded: %d)\n"
+      "text": "\ud83d\udcca Clearing conversation (Phase: %s, Tables loaded: %d)\n"
     },
     {
       "id": "conversation_cleared",
-      "text": "✅ Conversation cleared. Ready for new queries.\n"
+      "text": "\u2705 Conversation cleared. Ready for new queries.\n"
     },
     {
       "id": "provider_info",
@@ -47,11 +47,11 @@
     },
     {
       "id": "user_request",
-      "text": "### 🧑‍💻 User Request\n```\n"
+      "text": "### \ud83e\uddd1\u200d\ud83d\udcbb User Request\n```\n"
     },
     {
       "id": "ai_response",
-      "text": "### 🤖 AI Response\n"
+      "text": "### \ud83e\udd16 AI Response\n"
     },
     {
       "id": "ai_response_unavailable",
@@ -63,11 +63,11 @@
     },
     {
       "id": "initializing_vector_db",
-      "text": "🔍 Initializing AI vector database for %s...\n"
+      "text": "\ud83d\udd0d Initializing AI vector database for %s...\n"
     },
     {
       "id": "vector_db_ready",
-      "text": "✅ Vector database ready in session folder: ~/.config/sqlterm/sessions/%s/\n"
+      "text": "\u2705 Vector database ready in session folder: ~/.config/sqlterm/sessions/%s/\n"
     },
     {
       "id": "vector_db_init_warning",
@@ -75,15 +75,15 @@
     },
     {
       "id": "config_migrated",
-      "text": "📦 Migrated configuration from ai.yaml to config.yaml\n"
+      "text": "\ud83d\udce6 Migrated configuration from ai.yaml to config.yaml\n"
     },
     {
       "id": "vector_db_migrated",
-      "text": "📦 Migrated vector database for %s to session folder\n"
+      "text": "\ud83d\udce6 Migrated vector database for %s to session folder\n"
     },
     {
       "id": "schemas_loaded_analyzing",
-      "text": "📋 Schemas loaded for %v. Analyzing...\n"
+      "text": "\ud83d\udccb Schemas loaded for %v. Analyzing...\n"
     },
     {
       "id": "help_header",
@@ -134,6 +134,10 @@
       "text": "/clear-conversation      Clear current AI conversation and start fresh"
     },
     {
+      "id": "help_editor",
+      "text": "/editor                  Launch the SQL editor with vi-like keybindings"
+    },
+    {
       "id": "help_quit",
       "text": "/quit, /exit             Exit SQLTerm"
     },
@@ -155,11 +159,11 @@
     },
     {
       "id": "connected_to",
-      "text": "✅ Connected to %s (%s)\n"
+      "text": "\u2705 Connected to %s (%s)\n"
     },
     {
       "id": "connection_failed",
-      "text": "❌ Connection failed: %v\n"
+      "text": "\u274c Connection failed: %v\n"
     },
     {
       "id": "session_init_warning",
@@ -203,11 +207,11 @@
     },
     {
       "id": "help_full",
-      "text": "\nAvailable commands:\n\n/help                    Show this help message\n/connect                 Interactive connection setup\n/connect [name]          Connect to saved connection (Tab: autocomplete names)\n/list-connections        List all saved connections\n/tables                  List tables in current database\n/describe [table]        Show table structure (Tab: autocomplete table names)\n/status                  Show current connection status\n/exec [query]            Execute a query directly\n/exec                    Enter multi-line SQL mode (end with ;)\n/exec [query] > file.csv Export query results to CSV\n/config                  Configure application settings\n/config ai               Configure AI providers and models\n/config language <lang>  Set interface language (en_au, zh_cn)\n/prompts [count]         Show AI conversation history with request/response details\n/clear-conversation      Clear current AI conversation and start fresh\n/quit, /exit             Exit SQLTerm\n\nAI Chat:\nEnter any message without / or @ prefix to chat with AI.\nAI uses multi-turn conversations to progressively gather table information.\nUse /clear-conversation to start fresh or /config ai to set up providers.\n\nFile commands:\n@filename.sql            Execute all queries in file (Tab: autocomplete files)\n@filename.sql 1          Execute only query 1\n@filename.sql 2-5        Execute queries 2 through 5\n\nCSV Export:\nSELECT * FROM table > output.csv    Export query results to CSV (Tab: autocomplete filenames)\n/exec SELECT * FROM table > out.csv Export with /exec command\n\nSQL queries:\nEnter any SQL query directly to execute it.\nResults are automatically saved as markdown and displayed with glamour.\n\nAuto-completion:\n- Tab after /connect to see connection names\n- Tab after /describe to see table names\n- Tab after /config to see configuration sections and options\n- Tab after @ to see .sql files (searches all subdirectories)\n- Tab after > to see... [truncated]\n"
+      "text": "\nAvailable commands:\n\n/help                    Show this help message\n/connect                 Interactive connection setup\n/connect [name]          Connect to saved connection (Tab: autocomplete names)\n/list-connections        List all saved connections\n/tables                  List tables in current database\n/describe [table]        Show table structure (Tab: autocomplete table names)\n/status                  Show current connection status\n/exec [query]            Execute a query directly\n/exec                    Enter multi-line SQL mode (end with ;)\n/exec [query] > file.csv Export query results to CSV\n/editor                  Launch the SQL editor with vi-like keybindings\n/config                  Configure application settings\n/config ai               Configure AI providers and models\n/config language <lang>  Set interface language (en_au, zh_cn)\n/prompts [count]         Show AI conversation history with request/response details\n/clear-conversation      Clear current AI conversation and start fresh\n/quit, /exit             Exit SQLTerm\n\nAI Chat:\nEnter any message without / or @ prefix to chat with AI.\nAI uses multi-turn conversations to progressively gather table information.\nUse /clear-conversation to start fresh or /config ai to set up providers.\n\nFile commands:\n@filename.sql            Execute all queries in file (Tab: autocomplete files)\n@filename.sql 1          Execute only query 1\n@filename.sql 2-5        Execute queries 2 through 5\n\nCSV Export:\nSELECT * FROM table > output.csv    Export query results to CSV (Tab: autocomplete filenames)\n/exec SELECT * FROM table > out.csv Export with /exec command\n\nSQL queries:\nEnter any SQL query directly to execute it.\nResults are automatically saved as markdown and displayed with glamour.\n\nAuto-completion:\n- Tab after /connect to see connection names\n- Tab after /describe to see table names\n- Tab after /config to see configuration sections and options\n- Tab after @ to see .sql files (searches all subdirectories)\n- Tab after > to see... [truncated]\n"
     },
     {
       "id": "connection_saved",
-      "text": "💾 Connection saved!\n"
+      "text": "\ud83d\udcbe Connection saved!\n"
     },
     {
       "id": "starting_conversation_mode",
@@ -299,7 +303,7 @@
     },
     {
       "id": "connected_successfully",
-      "text": "✓ Connected successfully to %s\n"
+      "text": "\u2713 Connected successfully to %s\n"
     },
     {
       "id": "file_location",
@@ -495,7 +499,7 @@
     },
     {
       "id": "sqlterm_conversation_mode",
-      "text": "🗄️  SQLTerm - Conversation Mode"
+      "text": "\ud83d\uddc4\ufe0f  SQLTerm - Conversation Mode"
     },
     {
       "id": "no_database_connection",
@@ -503,15 +507,15 @@
     },
     {
       "id": "interactive_connection_setup",
-      "text": "🔧 Interactive Connection Setup"
+      "text": "\ud83d\udd27 Interactive Connection Setup"
     },
     {
       "id": "enter_connection_name",
-      "text": "📝 Enter connection name: "
+      "text": "\ud83d\udcdd Enter connection name: "
     },
     {
       "id": "select_database_type",
-      "text": "📊 Select database type:"
+      "text": "\ud83d\udcca Select database type:"
     },
     {
       "id": "mysql_option",
@@ -531,23 +535,23 @@
     },
     {
       "id": "enter_host",
-      "text": "📝 Enter host [localhost]: "
+      "text": "\ud83d\udcdd Enter host [localhost]: "
     },
     {
       "id": "enter_port",
-      "text": "📝 Enter port [%d]: "
+      "text": "\ud83d\udcdd Enter port [%d]: "
     },
     {
       "id": "enter_username",
-      "text": "📝 Enter username: "
+      "text": "\ud83d\udcdd Enter username: "
     },
     {
       "id": "enter_password",
-      "text": "🔐 Enter password: "
+      "text": "\ud83d\udd10 Enter password: "
     },
     {
       "id": "enter_database_name",
-      "text": "📝 Enter database name: "
+      "text": "\ud83d\udcdd Enter database name: "
     },
     {
       "id": "testing_connection",
@@ -559,7 +563,7 @@
     },
     {
       "id": "saved_connections",
-      "text": "📋 Saved connections:"
+      "text": "\ud83d\udccb Saved connections:"
     },
     {
       "id": "no_tables_found",
@@ -567,7 +571,7 @@
     },
     {
       "id": "tables_in_database",
-      "text": "📋 Tables in %s:"
+      "text": "\ud83d\udccb Tables in %s:"
     },
     {
       "id": "usage_describe_table",
@@ -591,15 +595,15 @@
     },
     {
       "id": "not_nullable",
-      "text": "❌ NOT NULL"
+      "text": "\u274c NOT NULL"
     },
     {
       "id": "nullable",
-      "text": "✅ NULL"
+      "text": "\u2705 NULL"
     },
     {
       "id": "key_format",
-      "text": "🔑 %s"
+      "text": "\ud83d\udd11 %s"
     },
     {
       "id": "primary_keys_header",
@@ -631,7 +635,7 @@
     },
     {
       "id": "status_not_connected",
-      "text": "📡 Status: Not connected"
+      "text": "\ud83d\udce1 Status: Not connected"
     },
     {
       "id": "use_connect_to_establish_connection",
@@ -639,7 +643,7 @@
     },
     {
       "id": "status_connected",
-      "text": "📡 Status: Connected to %s"
+      "text": "\ud83d\udce1 Status: Connected to %s"
     },
     {
       "id": "database_info",
@@ -659,90 +663,90 @@
     },
     {
       "id": "multi_line_sql_mode",
-      "text": "📝 Multi-line SQL mode. Enter your query:"
+      "text": "\ud83d\udcdd Multi-line SQL mode. Enter your query:"
     },
     {
       "id": "multi_line_sql_paste_lines",
-      "text": "   • Paste multiple lines"
+      "text": "   \u2022 Paste multiple lines"
     },
     {
       "id": "multi_line_sql_end_with_semicolon",
-      "text": "   • End with ; to execute"
+      "text": "   \u2022 End with ; to execute"
     },
     {
       "id": "multi_line_sql_cancel",
-      "text": "   • Or press Ctrl+C to cancel"
+      "text": "   \u2022 Or press Ctrl+C to cancel"
     },
     {
       "id": "multi_line_sql_csv_export",
-      "text": "   • Use > filename.csv at the end for CSV export"
+      "text": "   \u2022 Use > filename.csv at the end for CSV export"
     },
     {
       "id": "multi_line_input_cancelled",
-      "text": "\n❌ Multi-line input cancelled."
+      "text": "\n\u274c Multi-line input cancelled."
     },
     {
       "id": "no_query_entered",
-      "text": "❌ No query entered."
+      "text": "\u274c No query entered."
     },
     {
       "id": "executing_query",
-      "text": "🔍 Executing query...\n"
+      "text": "\ud83d\udd0d Executing query...\n"
     },
     {
       "id": "query_truncated",
-      "text": "📋 Query: %s\n\n"
+      "text": "\ud83d\udccb Query: %s\n\n"
     },
     {
       "id": "executing_query_streaming",
-      "text": "📊 Executing query and streaming to %s...\n"
+      "text": "\ud83d\udcca Executing query and streaming to %s...\n"
     },
     {
       "id": "exported_rows_to_file",
-      "text": "✅ Exported %d rows to %s\n"
+      "text": "\u2705 Exported %d rows to %s\n"
     },
     {
       "id": "executing_sql_file",
-      "text": "📁 Executing SQL file: %s\n"
+      "text": "\ud83d\udcc1 Executing SQL file: %s\n"
     },
     {
       "id": "found_queries_in_file",
-      "text": "🔄 Found %d queries in file\n"
+      "text": "\ud83d\udd04 Found %d queries in file\n"
     },
     {
       "id": "query_number_truncated_query",
-      "text": "\n📝 Query %d: %s\n"
+      "text": "\n\ud83d\udcdd Query %d: %s\n"
     },
     {
       "id": "query_failed",
-      "text": "❌ Query failed: %v\n"
+      "text": "\u274c Query failed: %v\n"
     },
     {
       "id": "query_executed_rows",
-      "text": "📊 Query executed (%d rows)\n"
+      "text": "\ud83d\udcca Query executed (%d rows)\n"
     },
     {
       "id": "exported_to_single_file",
-      "text": "\n📁 Exported to: %s\n"
+      "text": "\n\ud83d\udcc1 Exported to: %s\n"
     },
     {
       "id": "exported_to_multiple_files",
-      "text": "\n📁 Exported to %d files:\n"
+      "text": "\n\ud83d\udcc1 Exported to %d files:\n"
     },
     {
       "id": "total_rows_exported",
-      "text": "📊 Total: %d rows exported\n"
+      "text": "\ud83d\udcca Total: %d rows exported\n"
     },
     {
       "id": "no_results_to_export",
-      "text": "⚠️  No results to export to CSV (all queries returned 0 rows)"
+      "text": "\u26a0\ufe0f  No results to export to CSV (all queries returned 0 rows)"
     },
     {
       "id": "app_short_description",
       "text": "A terminal-based SQL database tool"
     },
     {
-      "id": "app_long_description", 
+      "id": "app_long_description",
       "text": "SQLTerm provides an intuitive conversation-style interface for managing database connections and executing queries across MySQL, PostgreSQL, and SQLite."
     },
     {
@@ -779,11 +783,11 @@
     },
     {
       "id": "connection_test_successful",
-      "text": "✓ Connection test successful"
+      "text": "\u2713 Connection test successful"
     },
     {
       "id": "connection_saved_cli",
-      "text": "✓ Connection '%s' saved"
+      "text": "\u2713 Connection '%s' saved"
     },
     {
       "id": "use_list_instruction",
@@ -795,27 +799,27 @@
     },
     {
       "id": "config_migrated_cli",
-      "text": "📦 Migrated configuration from ai.yaml to config.yaml"
+      "text": "\ud83d\udce6 Migrated configuration from ai.yaml to config.yaml"
     },
     {
       "id": "session_migrated_toml_to_yaml",
-      "text": "📁 Migrated session.toml to session.yaml for %s"
+      "text": "\ud83d\udcc1 Migrated session.toml to session.yaml for %s"
     },
     {
       "id": "session_yaml_created",
-      "text": "📁 Created session.yaml for %s (cleanup_retention_days: %d)"
+      "text": "\ud83d\udcc1 Created session.yaml for %s (cleanup_retention_days: %d)"
     },
     {
       "id": "ai_starting_new_conversation",
-      "text": "🤖 Starting new conversation... (this may take up to 2 minutes for complex queries)"
+      "text": "\ud83e\udd16 Starting new conversation... (this may take up to 2 minutes for complex queries)"
     },
     {
       "id": "ai_processing_conversation",
-      "text": "🤖 Processing conversation (Phase: %s)... "
+      "text": "\ud83e\udd16 Processing conversation (Phase: %s)... "
     },
     {
       "id": "ai_response_header",
-      "text": "🤖 AI Response:"
+      "text": "\ud83e\udd16 AI Response:"
     },
     {
       "id": "usage_data_unavailable",
@@ -863,15 +867,15 @@
     },
     {
       "id": "enter_openrouter_api_key",
-      "text": "🔐 Enter OpenRouter API key (get one from https://openrouter.ai/keys): "
+      "text": "\ud83d\udd10 Enter OpenRouter API key (get one from https://openrouter.ai/keys): "
     },
     {
       "id": "enter_base_url_for_provider",
-      "text": "🌐 Enter base URL for %s [%s]: "
+      "text": "\ud83c\udf10 Enter base URL for %s [%s]: "
     },
     {
       "id": "enter_model_name_autocomplete",
-      "text": "🤖 Enter model name (Tab for autocomplete): "
+      "text": "\ud83e\udd16 Enter model name (Tab for autocomplete): "
     },
     {
       "id": "using_default_model",
@@ -895,7 +899,7 @@
     },
     {
       "id": "usage_statistics_header",
-      "text": "📊 Usage Statistics:"
+      "text": "\ud83d\udcca Usage Statistics:"
     },
     {
       "id": "session_id_display",
@@ -931,7 +935,7 @@
     },
     {
       "id": "help_config_title",
-      "text": "\n🔧 Configuration Commands:\n"
+      "text": "\n\ud83d\udd27 Configuration Commands:\n"
     },
     {
       "id": "help_config_general",
@@ -943,11 +947,11 @@
     },
     {
       "id": "help_config_subcommand_tip",
-      "text": "💡 Use '/help config <subcommand>' for detailed help on specific areas:\n   /help config ai        - AI configuration help\n   /help config language  - Language configuration help"
+      "text": "\ud83d\udca1 Use '/help config <subcommand>' for detailed help on specific areas:\n   /help config ai        - AI configuration help\n   /help config language  - Language configuration help"
     },
     {
       "id": "help_config_ai_title",
-      "text": "\n🤖 AI Configuration Help:\n"
+      "text": "\n\ud83e\udd16 AI Configuration Help:\n"
     },
     {
       "id": "help_config_ai_interactive",
@@ -979,11 +983,11 @@
     },
     {
       "id": "help_config_ai_provider_list",
-      "text": "Providers:\n• openrouter - Cloud AI models (requires API key from https://openrouter.ai/keys)\n• ollama     - Local AI models (requires Ollama installation)\n• lmstudio   - Local AI models (requires LM Studio)"
+      "text": "Providers:\n\u2022 openrouter - Cloud AI models (requires API key from https://openrouter.ai/keys)\n\u2022 ollama     - Local AI models (requires Ollama installation)\n\u2022 lmstudio   - Local AI models (requires LM Studio)"
     },
     {
       "id": "help_config_language_title",
-      "text": "\n🌐 Language Configuration Help:\n"
+      "text": "\n\ud83c\udf10 Language Configuration Help:\n"
     },
     {
       "id": "help_config_language_commands",
@@ -991,7 +995,7 @@
     },
     {
       "id": "help_config_language_options",
-      "text": "Supported Languages:\n• en_au - English (Australia) - Default language with full feature support\n• zh_cn - 中文 (简体) - Complete Chinese translation\n"
+      "text": "Supported Languages:\n\u2022 en_au - English (Australia) - Default language with full feature support\n\u2022 zh_cn - \u4e2d\u6587 (\u7b80\u4f53) - Complete Chinese translation\n"
     },
     {
       "id": "help_config_language_examples",
@@ -999,15 +1003,15 @@
     },
     {
       "id": "help_config_status_title",
-      "text": "\n📊 Configuration Status Help:\n"
+      "text": "\n\ud83d\udcca Configuration Status Help:\n"
     },
     {
       "id": "help_config_status_description",
-      "text": "The '/config status' command shows a comprehensive overview of your current SQLTerm configuration:\n\n• Language Settings - Current interface language\n• AI Configuration - Provider, model, and masked API keys\n• Database Connection - Current connection status\n• Usage Statistics - AI usage tracking (if available)\n\nAPI keys are displayed in masked format (xxxxxx...XXXX) for security."
+      "text": "The '/config status' command shows a comprehensive overview of your current SQLTerm configuration:\n\n\u2022 Language Settings - Current interface language\n\u2022 AI Configuration - Provider, model, and masked API keys\n\u2022 Database Connection - Current connection status\n\u2022 Usage Statistics - AI usage tracking (if available)\n\nAPI keys are displayed in masked format (xxxxxx...XXXX) for security."
     },
     {
       "id": "help_connect_title",
-      "text": "\n🔌 Connection Commands Help:\n"
+      "text": "\n\ud83d\udd0c Connection Commands Help:\n"
     },
     {
       "id": "help_connect_commands",
@@ -1023,7 +1027,7 @@
     },
     {
       "id": "help_exec_title",
-      "text": "\n⚡ SQL Execution Help:\n"
+      "text": "\n\u26a1 SQL Execution Help:\n"
     },
     {
       "id": "help_exec_commands",
@@ -1031,7 +1035,7 @@
     },
     {
       "id": "help_exec_multiline_detailed",
-      "text": "Multi-line Mode:\n• Paste or type multiple lines of SQL\n• End with semicolon (;) to execute\n• Press Ctrl+C to cancel\n• Supports complex queries with formatting\n• Add '> filename.csv' at the end for CSV export\n"
+      "text": "Multi-line Mode:\n\u2022 Paste or type multiple lines of SQL\n\u2022 End with semicolon (;) to execute\n\u2022 Press Ctrl+C to cancel\n\u2022 Supports complex queries with formatting\n\u2022 Add '> filename.csv' at the end for CSV export\n"
     },
     {
       "id": "help_exec_examples",
@@ -1039,7 +1043,7 @@
     },
     {
       "id": "help_tables_title",
-      "text": "\n📋 Tables Command Help:\n"
+      "text": "\n\ud83d\udccb Tables Command Help:\n"
     },
     {
       "id": "help_tables_description",
@@ -1047,7 +1051,7 @@
     },
     {
       "id": "help_describe_title",
-      "text": "\n🔍 Table Description Help:\n"
+      "text": "\n\ud83d\udd0d Table Description Help:\n"
     },
     {
       "id": "help_describe_usage",
@@ -1055,7 +1059,7 @@
     },
     {
       "id": "help_describe_features",
-      "text": "Features:\n• Column details (name, type, nullable, keys, defaults)\n• Primary key information\n• Foreign key relationships\n• Check constraints\n• Formatted as readable markdown\n• Tab completion for table names\n"
+      "text": "Features:\n\u2022 Column details (name, type, nullable, keys, defaults)\n\u2022 Primary key information\n\u2022 Foreign key relationships\n\u2022 Check constraints\n\u2022 Formatted as readable markdown\n\u2022 Tab completion for table names\n"
     },
     {
       "id": "help_describe_examples",
@@ -1063,15 +1067,15 @@
     },
     {
       "id": "help_status_title",
-      "text": "\n📡 Status Command Help:\n"
+      "text": "\n\ud83d\udce1 Status Command Help:\n"
     },
     {
       "id": "help_status_description",
-      "text": "The '/status' command shows current database connection information:\n\n• Connection status (connected/not connected)\n• Database name and type\n• Host and port information\n• Username\n• Connection name (if using saved connection)\n\nUse this to verify your current connection before running queries."
+      "text": "The '/status' command shows current database connection information:\n\n\u2022 Connection status (connected/not connected)\n\u2022 Database name and type\n\u2022 Host and port information\n\u2022 Username\n\u2022 Connection name (if using saved connection)\n\nUse this to verify your current connection before running queries."
     },
     {
       "id": "help_prompts_title",
-      "text": "\n💬 AI Prompts History Help:\n"
+      "text": "\n\ud83d\udcac AI Prompts History Help:\n"
     },
     {
       "id": "help_prompts_usage",
@@ -1079,7 +1083,7 @@
     },
     {
       "id": "help_prompts_features",
-      "text": "Features:\n• Shows user requests and AI responses\n• Displays token usage and costs\n• Provider and model information\n• Formatted as markdown for readability\n• Helps track AI usage and costs\n"
+      "text": "Features:\n\u2022 Shows user requests and AI responses\n\u2022 Displays token usage and costs\n\u2022 Provider and model information\n\u2022 Formatted as markdown for readability\n\u2022 Helps track AI usage and costs\n"
     },
     {
       "id": "help_prompts_examples",
@@ -1087,11 +1091,11 @@
     },
     {
       "id": "unknown_help_command",
-      "text": "❓ Unknown command '%s'. Use '/help' for general help."
+      "text": "\u2753 Unknown command '%s'. Use '/help' for general help."
     },
     {
       "id": "unknown_config_help_subcommand",
-      "text": "❓ Unknown config subcommand '%s'. Use '/help config' for available options."
+      "text": "\u2753 Unknown config subcommand '%s'. Use '/help config' for available options."
     },
     {
       "id": "connection_name_empty_error",
@@ -1103,7 +1107,7 @@
     },
     {
       "id": "session_yaml_created_detailed",
-      "text": "📁 Created session.yaml for %s (cleanup_retention_days: %d)\n"
+      "text": "\ud83d\udcc1 Created session.yaml for %s (cleanup_retention_days: %d)\n"
     },
     {
       "id": "failed_migrate_legacy_history_warning",
@@ -1111,7 +1115,7 @@
     },
     {
       "id": "migrated_command_history",
-      "text": "📦 Migrated command history to session folder\n"
+      "text": "\ud83d\udce6 Migrated command history to session folder\n"
     },
     {
       "id": "generic_error",
@@ -1151,7 +1155,7 @@
     },
     {
       "id": "ai_timeout_message",
-      "text": "⏰ AI request timed out. This can happen with:\n"
+      "text": "\u23f0 AI request timed out. This can happen with:\n"
     },
     {
       "id": "ai_timeout_complex_queries",
@@ -1167,7 +1171,7 @@
     },
     {
       "id": "ai_timeout_suggestion",
-      "text": "💡 Try simplifying your message or try again later.\n"
+      "text": "\ud83d\udca1 Try simplifying your message or try again later.\n"
     },
     {
       "id": "connection_name_format",
@@ -1239,15 +1243,15 @@
     },
     {
       "id": "markdown_render_failed_plain_text",
-      "text": "⚠️  Failed to create markdown renderer, showing plain text:"
+      "text": "\u26a0\ufe0f  Failed to create markdown renderer, showing plain text:"
     },
     {
       "id": "markdown_render_failed_showing_plain",
-      "text": "⚠️  Failed to render markdown, showing plain text:"
+      "text": "\u26a0\ufe0f  Failed to render markdown, showing plain text:"
     },
     {
       "id": "query_results_plain_header",
-      "text": "\n📄 Query Results:"
+      "text": "\n\ud83d\udcc4 Query Results:"
     },
     {
       "id": "failed_create_csv_file",

@@ -25,13 +25,11 @@ func TestEditorInitialization(t *testing.T) {
 	}
 
 	// Test that fields are properly initialized by checking their behavior
-	ta := editor.textarea
-	if ta.Value() != "" {
+	if editor.textarea.Value() != "" {
 		t.Error("New textarea should be empty")
 	}
 
-	vp := editor.viewport
-	if vp.Width == 0 && vp.Height == 0 {
+	if editor.viewport.Width == 0 && editor.viewport.Height == 0 {
 		// This is expected for a new viewport
 		t.Log("Viewport initialized with default dimensions")
 	}
@@ -136,6 +134,8 @@ func TestEditorBubbleteaIntegration(t *testing.T) {
 	editor := &Editor{
 		textarea: textarea.New(),
 		viewport: viewport.New(80, 10),
+		columns:  make(map[string][]string),
+		tables:   []string{},
 	}
 
 	var _ tea.Model = editor

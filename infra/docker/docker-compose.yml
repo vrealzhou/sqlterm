@@ -1,26 +1,4 @@
-version: '3.8'
-
 services:
-  sqlterm:
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile
-    container_name: sqlterm-dev
-    stdin_open: true
-    tty: true
-    volumes:
-      # Mount local directory for development
-      - ../../:/workspace
-      # Mount config directory
-      - sqlterm-config:/home/sqlterm/.config/sqlterm
-      # Mount current directory for SQL files
-      - ${PWD}:/workspace/sql
-    working_dir: /workspace/sql
-    environment:
-      - TERM=xterm-256color
-    networks:
-      - sqlterm-network
-
   # Optional: PostgreSQL for testing
   postgres:
     image: postgres:15-alpine
@@ -63,7 +41,6 @@ services:
       - sqlterm-network
 
 volumes:
-  sqlterm-config:
   postgres-data:
   mysql-data:
   sqlite-data:
