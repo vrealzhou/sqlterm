@@ -1,0 +1,54 @@
+This is a Go project using Go modules. Always use Go 1.25 or later.
+
+Project Structure:
+- Main application code is in cmd/sqlterm/main.go
+- There's a tui UI experiment app in cmd/sqlterm/tui.go
+- Tests are in the same directory as the code they test, with _test.go suffix
+- Documentation is in the docs/ directory
+- Configuration files are in the ~/.config/sqlterm directory
+
+Development Guidelines:
+- Always run tests before committing changes with "go test ./..."
+- Format code with "go fmt ./..." before committing
+- Use "go vet ./..." to check for potential issues
+- Use "go mod tidy" to keep go.mod and go.sum clean
+
+Go Commands:
+- Build: go build -o bin/sqlterm .
+- Test: go test -v ./...
+- Run: go run main.go
+- Format: go fmt ./...
+- Vet: go vet ./...
+- Tidy modules: go mod tidy
+
+Dependencies:
+- Use Go modules for dependency management
+- Add new dependencies with "go get"
+- Always run "go mod tidy" after adding/removing dependencies
+
+Testing:
+- Write table-driven tests where appropriate
+- Use testify for assertions when needed
+- Tests should be in _test.go files
+- Mock external dependencies in tests
+
+Best Practices:
+- Follow Go idioms and conventions
+- Use meaningful variable names
+- Write concise and clear comments
+- Handle errors properly
+- Return early to reduce nesting
+- Use context for cancellation and timeouts
+
+Performance Considerations:
+- Avoid premature optimization
+- Profile before optimizing
+- Use goroutines and channels judiciously
+- Minimize allocations in hot paths
+
+This project is a terminal-based SQL client. Focus on:
+1. Clean and intuitive command-line interface
+2. Secure handling of database credentials
+3. Proper error handling and user feedback
+4. Efficient query execution and result display
+5. Support for multiple database types (PostgreSQL, MySQL, SQLite)

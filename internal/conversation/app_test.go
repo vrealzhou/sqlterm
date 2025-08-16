@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"sqlterm/internal/ai"
-	"sqlterm/internal/config"
-	"sqlterm/internal/core"
-	"sqlterm/internal/i18n"
-	"sqlterm/internal/session"
+	"github.com/vrealzhou/sqlterm/internal/ai"
+	"github.com/vrealzhou/sqlterm/internal/config"
+	"github.com/vrealzhou/sqlterm/internal/database"
+	"github.com/vrealzhou/sqlterm/internal/i18n"
+	"github.com/vrealzhou/sqlterm/internal/session"
 )
 
 // Mock implementations for testing
@@ -18,7 +18,7 @@ import (
 type mockConnection struct {
 	connected bool
 	tables    []string
-	dbType    core.DatabaseType
+	dbType    config.DatabaseType
 	name      string
 }
 
@@ -36,10 +36,10 @@ func (m *mockConnection) IsConnected() bool {
 	return m.connected
 }
 
-func (m *mockConnection) Execute(query string) (*core.QueryResult, error) {
+func (m *mockConnection) Execute(query string) (*database.QueryResult, error) {
 	// Mock query execution - return minimal QueryResult
-	return &core.QueryResult{
-		Columns: []core.Column{
+	return &database.QueryResult{
+		Columns: []database.Column{
 			{Name: "id", Type: "INTEGER"},
 			{Name: "name", Type: "VARCHAR"},
 		},
@@ -54,17 +54,17 @@ func (m *mockConnection) ListTables() ([]string, error) {
 	return m.tables, nil
 }
 
-func (m *mockConnection) DescribeTable(tableName string) (*core.TableInfo, error) {
-	return &core.TableInfo{
+func (m *mockConnection) DescribeTable(tableName string) (*database.TableInfo, error) {
+	return &database.TableInfo{
 		Name: tableName,
-		Columns: []core.ColumnInfo{
+		Columns: []database.ColumnInfo{
 			{Name: "id", Type: "INTEGER", Key: "PRI"},
 			{Name: "name", Type: "VARCHAR(255)", Nullable: true},
 		},
 	}, nil
 }
 
-func (m *mockConnection) GetDatabaseType() core.DatabaseType {
+func (m *mockConnection) GetDatabaseType() config.DatabaseType {
 	return m.dbType
 }
 
@@ -83,19 +83,16 @@ func createTestApp(t *testing.T) *App {
 		t.Fatalf("Failed to create i18n manager: %v", err)
 	}
 
-	sessionMgr := session.NewManager(tmpDir, i18nMgr)
+	sessionMgr, err := session.NewManager(tmpDir, i18nMgr)
+	if err != nil {
+		t.Fatalf("Failed to create session manager: %v", err)
+	}
 
-	// Create a mock AI manager
-	aiManager, err := ai.NewManager(tmpDir)
+	// Create a mock AI manager with dependency injection
+	aiManager, err := ai.NewManager(configMgr, sessionMgr, i18nMgr)
 	if err != nil {
 		// It's okay if AI manager fails to initialize for tests
 		aiManager = nil
-	}
-
-	// Create i18n manager
-	i18nMgr, i18nErr := i18n.NewManager("en_au")
-	if i18nErr != nil {
-		t.Fatalf("Failed to create i18n manager: %v", i18nErr)
 	}
 
 	app := &App{
@@ -142,12 +139,12 @@ func TestApp_SetConnection(t *testing.T) {
 	app.aiManager = nil
 
 	mockConn := &mockConnection{
-		dbType: core.PostgreSQL,
+		dbType: config.PostgreSQL,
 		name:   "test-db",
 		tables: []string{"users", "posts"},
 	}
 
-	config := &core.ConnectionConfig{
+	config := &config.ConnectionConfig{
 		Name:     "test-db",
 		Host:     "localhost",
 		Port:     5432,
@@ -173,12 +170,12 @@ func TestApp_ClearConnection(t *testing.T) {
 	app.aiManager = nil
 
 	mockConn := &mockConnection{
-		dbType:    core.PostgreSQL,
+		dbType:    config.PostgreSQL,
 		name:      "test-db",
 		connected: true,
 	}
 
-	config := &core.ConnectionConfig{
+	config := &config.ConnectionConfig{
 		Name: "test-db",
 	}
 
@@ -357,9 +354,9 @@ func TestApp_truncateQuery(t *testing.T) {
 func TestApp_generateTableMarkdown(t *testing.T) {
 	app := createTestApp(t)
 
-	tableInfo := &core.TableInfo{
+	tableInfo := &database.TableInfo{
 		Name: "users",
-		Columns: []core.ColumnInfo{
+		Columns: []database.ColumnInfo{
 			{
 				Name:     "id",
 				Type:     "INTEGER",
@@ -456,11 +453,11 @@ func TestApp_handleListTables_WithConnection(t *testing.T) {
 	mockConn := &mockConnection{
 		tables:    []string{"users", "posts", "comments"},
 		connected: true,
-		dbType:    core.PostgreSQL,
+		dbType:    config.PostgreSQL,
 		name:      "test-db",
 	}
 
-	config := &core.ConnectionConfig{
+	config := &config.ConnectionConfig{
 		Name: "test-db",
 	}
 
@@ -488,11 +485,11 @@ func TestApp_handleDescribeTable(t *testing.T) {
 	mockConn := &mockConnection{
 		tables:    []string{"users", "posts"},
 		connected: true,
-		dbType:    core.PostgreSQL,
+		dbType:    config.PostgreSQL,
 		name:      "test-db",
 	}
 
-	config := &core.ConnectionConfig{
+	config := &config.ConnectionConfig{
 		Name: "test-db",
 	}
 
@@ -537,9 +534,9 @@ func BenchmarkApp_truncateQuery(b *testing.B) {
 func BenchmarkApp_generateTableMarkdown(b *testing.B) {
 	app := createTestApp(&testing.T{})
 
-	tableInfo := &core.TableInfo{
+	tableInfo := &database.TableInfo{
 		Name: "users",
-		Columns: []core.ColumnInfo{
+		Columns: []database.ColumnInfo{
 			{Name: "id", Type: "INTEGER", Key: "PRI"},
 			{Name: "name", Type: "VARCHAR(255)", Nullable: true},
 			{Name: "email", Type: "VARCHAR(255)", Key: "UNI"},

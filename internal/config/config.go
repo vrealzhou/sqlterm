@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sqlterm/internal/i18n"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/vrealzhou/sqlterm/internal/i18n"
 )
 
 const DefaultConfigFile = "config.yaml"
@@ -14,7 +15,8 @@ const DefaultConfigFile = "config.yaml"
 // DefaultConfig returns a default configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Language: "en_au",
+		Language:    "en_au",
+		Connections: make(map[string]ConnectionConfig),
 		AI: AIConfig{
 			Provider: ProviderOpenRouter,
 			Model:    "anthropic/claude-3.5-sonnet",
@@ -110,58 +112,7 @@ func SaveConfig(config *Config, configDir string, i18nMgr *i18n.Manager) error {
 	return nil
 }
 
-// SetProvider sets the current provider and model
-func (c *Config) SetProvider(provider Provider, model string) {
-	c.AI.Provider = provider
-	c.AI.Model = model
-}
-
-// SetAPIKey sets an API key for a provider
-func (c *Config) SetAPIKey(provider Provider, apiKey string) {
-	if c.AI.APIKeys == nil {
-		c.AI.APIKeys = make(map[string]string)
-	}
-	c.AI.APIKeys[string(provider)] = apiKey
-}
-
-// GetAPIKey gets an API key for a provider
-func (c *Config) GetAPIKey(provider Provider) string {
-	if c.AI.APIKeys == nil {
-		return ""
-	}
-	return c.AI.APIKeys[string(provider)]
-}
-
-// SetBaseURL sets a base URL for a provider
-func (c *Config) SetBaseURL(provider Provider, baseURL string) {
-	if c.AI.BaseURLs == nil {
-		c.AI.BaseURLs = make(map[string]string)
-	}
-	c.AI.BaseURLs[string(provider)] = baseURL
-}
-
-// GetBaseURL gets a base URL for a provider
-func (c *Config) GetBaseURL(provider Provider) string {
-	if c.AI.BaseURLs == nil {
-		return ""
-	}
-	return c.AI.BaseURLs[string(provider)]
-}
-
-// GetDefaultModel gets the default model for a provider
-func (c *Config) GetDefaultModel(provider Provider) string {
-	if c.AI.DefaultModels == nil {
-		return ""
-	}
-	return c.AI.DefaultModels[string(provider)]
-}
-
 // SetLanguage sets the language for the configuration
 func (c *Config) SetLanguage(language string) {
 	c.Language = language
-}
-
-// FormatProviderInfo returns formatted provider and model information
-func (c *Config) FormatProviderInfo() string {
-	return fmt.Sprintf("%s/%s", c.AI.Provider, c.AI.Model)
 }

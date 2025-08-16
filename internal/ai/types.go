@@ -2,9 +2,12 @@ package ai
 
 import (
 	"context"
-	"sqlterm/internal/config"
-	"sqlterm/internal/core"
+	"fmt"
+	"strconv"
 	"time"
+
+	"github.com/vrealzhou/sqlterm/internal/config"
+	"github.com/vrealzhou/sqlterm/internal/database"
 )
 
 // Usage tracks token usage and costs
@@ -70,15 +73,15 @@ type Pricing struct {
 
 // PromptEntry represents a single prompt exchange with the AI
 type PromptEntry struct {
-	Timestamp    time.Time       `json:"timestamp"`
-	UserMessage  string          `json:"user_message"`
-	SystemPrompt string          `json:"system_prompt"`
-	AIResponse   string          `json:"ai_response"`
-	Provider     config.Provider `json:"provider"`
-	Model        string          `json:"model"`
-	InputTokens  int             `json:"input_tokens"`
-	OutputTokens int             `json:"output_tokens"`
-	Cost         float64         `json:"cost"`
+	Timestamp    time.Time         `json:"timestamp"`
+	UserMessage  string            `json:"user_message"`
+	SystemPrompt string            `json:"system_prompt"`
+	AIResponse   string            `json:"ai_response"`
+	Provider     config.AIProvider `json:"provider"`
+	Model        string            `json:"model"`
+	InputTokens  int               `json:"input_tokens"`
+	OutputTokens int               `json:"output_tokens"`
+	Cost         float64           `json:"cost"`
 }
 
 // PromptHistory holds the history of AI prompts
@@ -168,7 +171,7 @@ type ConversationContext struct {
 	OriginalQuery       string                     `json:"original_query"`
 	CurrentPhase        ConversationPhase          `json:"current_phase"`
 	DiscoveredTables    []string                   `json:"discovered_tables"` // Tables found via vector search
-	LoadedTables        map[string]*core.TableInfo `json:"loaded_tables"`     // Full table schemas loaded
+	LoadedTables        map[string]*database.TableInfo `json:"loaded_tables"`     // Full table schemas loaded
 	RequestedTables     []string                   `json:"requested_tables"`  // Tables specifically requested by AI
 	RelatedTables       []string                   `json:"related_tables"`    // Tables found via relationships
 	ConversationHistory []ConversationTurn         `json:"conversation_history"`
@@ -186,7 +189,7 @@ func NewConversationContext(userQuery string) *ConversationContext {
 		OriginalQuery:       userQuery,
 		CurrentPhase:        PhaseDiscovery,
 		DiscoveredTables:    make([]string, 0),
-		LoadedTables:        make(map[string]*core.TableInfo),
+		LoadedTables:        make(map[string]*database.TableInfo),
 		RequestedTables:     make([]string, 0),
 		RelatedTables:       make([]string, 0),
 		ConversationHistory: make([]ConversationTurn, 0),
@@ -231,7 +234,7 @@ func (c *ConversationContext) HasTableLoaded(tableName string) bool {
 }
 
 // AddLoadedTable adds a table's full schema to the context
-func (c *ConversationContext) AddLoadedTable(tableName string, tableInfo *core.TableInfo) {
+func (c *ConversationContext) AddLoadedTable(tableName string, tableInfo *database.TableInfo) {
 	c.LoadedTables[tableName] = tableInfo
 	c.UpdatedAt = time.Now()
 }
@@ -257,4 +260,23 @@ func randomString(length int) string {
 		b[i] = charset[time.Now().UnixNano()%int64(len(charset))]
 	}
 	return string(b)
+}
+
+// FormatPrice formats a price value for display
+func FormatPrice(price float64) string {
+	if price <= 0 {
+		return "Free"
+	}
+	if price < 0.001 {
+		return fmt.Sprintf("$%.6f", price)
+	}
+	if price < 1 {
+		return fmt.Sprintf("$%.6f", price)
+	}
+	return fmt.Sprintf("$%.2f", price)
+}
+
+// ParseFloat parses a string to float64 with error handling
+func ParseFloat(s string) (float64, error) {
+	return strconv.ParseFloat(s, 64)
 }

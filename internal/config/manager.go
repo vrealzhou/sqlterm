@@ -5,13 +5,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"sqlterm/internal/core"
-
 	"gopkg.in/yaml.v3"
 )
 
 type Manager struct {
-	configDir string
+	configDir   string
+	config      *Config
+	connections []*ConnectionConfig
 }
 
 func NewManager() *Manager {
@@ -21,7 +21,7 @@ func NewManager() *Manager {
 	}
 
 	configDir := filepath.Join(home, ".config", "sqlterm")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(configDir), 0755); err != nil {
 		panic(fmt.Sprintf("failed to create config directory: %v", err))
 	}
 
@@ -34,80 +34,124 @@ func (m *Manager) GetConfigDir() string {
 	return m.configDir
 }
 
-func (m *Manager) SaveConnection(config *core.ConnectionConfig) error {
-	connectionsDir := filepath.Join(m.configDir, "connections")
-	if err := os.MkdirAll(connectionsDir, 0755); err != nil {
-		return fmt.Errorf("failed to create connections directory: %w", err)
-	}
-
-	filename := fmt.Sprintf("%s.yaml", config.Name)
-	filepath := filepath.Join(connectionsDir, filename)
-
-	data, err := yaml.Marshal(config)
+func (m *Manager) LoadConfig() error {
+	f, err := os.Open(filepath.Join(m.configDir, "config.yaml"))
 	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
+		return fmt.Errorf("failed on opening config file %s: %w", m.configDir, err)
+	}
+	defer f.Close()
+	
+	// Parse YAML while preserving key order
+	var yamlNode yaml.Node
+	if err := yaml.NewDecoder(f).Decode(&yamlNode); err != nil {
+		return fmt.Errorf("failed on parsing config file %s: %w", m.configDir, err)
+	}
+	
+	// Also parse normally for the config struct
+	f.Seek(0, 0) // Reset file position
+	config := &Config{}
+	if err := yaml.NewDecoder(f).Decode(config); err != nil {
+		return fmt.Errorf("failed on parsing config file %s: %w", m.configDir, err)
 	}
 
-	if err := os.WriteFile(filepath, data, 0600); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
+	// Extract connection names in order from YAML structure
+	connectionOrder := m.extractConnectionOrder(&yamlNode)
+	
+	// Build connections slice in the correct order
+	m.connections = make([]*ConnectionConfig, 0, len(config.Connections))
+	for _, name := range connectionOrder {
+		if conn, exists := config.Connections[name]; exists {
+			conn.Name = name
+			m.connections = append(m.connections, &conn)
+		}
 	}
 
+	m.config = config
 	return nil
 }
 
-func (m *Manager) LoadConnection(name string) (*core.ConnectionConfig, error) {
-	filename := fmt.Sprintf("%s.yaml", name)
-	filepath := filepath.Join(m.configDir, "connections", filename)
-
-	data, err := os.ReadFile(filepath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
+// extractConnectionOrder extracts connection names in the order they appear in the YAML file
+func (m *Manager) extractConnectionOrder(node *yaml.Node) []string {
+	var connectionOrder []string
+	
+	// Navigate to the root document node
+	if node.Kind == yaml.DocumentNode && len(node.Content) > 0 {
+		node = node.Content[0]
 	}
-
-	var config core.ConnectionConfig
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	
+	// Look for the "connections" key in the mapping
+	if node.Kind == yaml.MappingNode {
+		for i := 0; i < len(node.Content); i += 2 {
+			if node.Content[i].Value == "connections" && i+1 < len(node.Content) {
+				connectionsNode := node.Content[i+1]
+				
+				// Extract connection names in order
+				if connectionsNode.Kind == yaml.MappingNode {
+					for j := 0; j < len(connectionsNode.Content); j += 2 {
+						connectionName := connectionsNode.Content[j].Value
+						connectionOrder = append(connectionOrder, connectionName)
+					}
+				}
+				break
+			}
+		}
 	}
-
-	return &config, nil
+	
+	return connectionOrder
 }
 
-func (m *Manager) ListConnections() ([]*core.ConnectionConfig, error) {
-	connectionsDir := filepath.Join(m.configDir, "connections")
-
-	entries, err := os.ReadDir(connectionsDir)
-	if os.IsNotExist(err) {
-		return []*core.ConnectionConfig{}, nil
-	}
+func (m *Manager) SaveConfig() error {
+	data, err := yaml.Marshal(m.config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read connections directory: %w", err)
+		return fmt.Errorf("failed on marshalling config data: %w", err)
 	}
 
-	var connections []*core.ConnectionConfig
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".yaml" {
-			continue
-		}
-
-		name := entry.Name()[:len(entry.Name())-5] // Remove .yaml extension
-		config, err := m.LoadConnection(name)
-		if err != nil {
-			continue // Skip corrupted files
-		}
-
-		connections = append(connections, config)
+	// Ensure the config directory exists
+	if err := os.MkdirAll(m.configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	return connections, nil
+	configFile := filepath.Join(m.configDir, "config.yaml")
+	f, err := os.Create(configFile)
+	if err != nil {
+		return fmt.Errorf("failed on opening config file %s: %w", configFile, err)
+	}
+	defer f.Close()
+	_, err = f.Write(data)
+	return err
 }
 
-func (m *Manager) DeleteConnection(name string) error {
-	filename := fmt.Sprintf("%s.yaml", name)
-	filepath := filepath.Join(m.configDir, "connections", filename)
-
-	if err := os.Remove(filepath); err != nil {
-		return fmt.Errorf("failed to delete config file: %w", err)
+func (m *Manager) LoadConnection(name string) (*ConnectionConfig, error) {
+	if m.config == nil {
+		return nil, fmt.Errorf("config not loaded")
 	}
 
-	return nil
+	conn, exists := m.config.Connections[name]
+	if !exists {
+		return nil, fmt.Errorf("connection '%s' not found", name)
+	}
+
+	return &conn, nil
+}
+
+func (m *Manager) SaveConnection(conn *ConnectionConfig) error {
+	if m.config == nil {
+		m.config = DefaultConfig()
+	}
+
+	// Ensure connections map is initialized
+	if m.config.Connections == nil {
+		m.config.Connections = make(map[string]ConnectionConfig)
+	}
+
+	// Add or update the connection
+	m.config.Connections[conn.Name] = *conn
+	return m.SaveConfig()
+}
+
+func (m *Manager) ListConnections() []*ConnectionConfig {
+	if m.config == nil {
+		return nil
+	}
+	return m.connections
 }

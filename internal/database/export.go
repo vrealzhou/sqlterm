@@ -1,4 +1,4 @@
-package core
+package database
 
 import (
 	"encoding/csv"
@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sqlterm/internal/i18n"
+	"github.com/vrealzhou/sqlterm/internal/i18n"
 	"strings"
 	"time"
 )

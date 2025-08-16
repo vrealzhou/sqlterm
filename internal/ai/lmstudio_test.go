@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"sqlterm/internal/i18n"
+	"github.com/vrealzhou/sqlterm/internal/i18n"
 )
 
 func TestNewLMStudioClient(t *testing.T) {

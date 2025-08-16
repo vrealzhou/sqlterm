@@ -10,8 +10,8 @@
 ## Test Commands
 - `make test` - Run all tests
 - `make test-coverage` - Run tests with coverage report
-- `go test ./internal/core/...` - Run tests for specific package
-- `go test -v ./internal/core/types_test.go` - Run a single test file
+- `go test ./internal/database/...` - Run tests for specific package
+- `go test -v ./internal/database/types_test.go` - Run a single test file
 - `go test -run TestParseDatabaseType` - Run a specific test function
 
 ## Lint/Format Commands
@@ -62,7 +62,7 @@
 ## Project Structure
 - `/cmd/sqlterm` - Main application entry point
 - `/internal/ai` - AI integration (OpenRouter, Ollama, LM Studio)
-- `/internal/core` - Core database functionality
+- `/internal/database` - Core database functionality
 - `/internal/config` - Configuration management
 - `/internal/cli` - CLI command handling
 - `/internal/conversation` - Conversation interface

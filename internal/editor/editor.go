@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"sqlterm/internal/core"
+	"github.com/vrealzhou/sqlterm/internal/database"
 )
 
 type Mode int
@@ -28,7 +28,7 @@ type Editor struct {
 	keymap      KeyMap
 	width       int
 	height      int
-	connection  core.Connection
+	connection  database.Connection
 	tables      []string
 	columns     map[string][]string
 	results     string
@@ -57,7 +57,7 @@ type KeyMap struct {
 	Autocomplete key.Binding
 }
 
-func NewEditor(conn core.Connection) *Editor {
+func NewEditor(conn database.Connection) *Editor {
 	ta := textarea.New()
 	ta.Placeholder = "Enter your SQL query here..."
 	ta.Focus()

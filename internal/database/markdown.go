@@ -1,4 +1,4 @@
-package core
+package database
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/glamour"
 	"golang.org/x/term"
-	"sqlterm/internal/i18n"
+	"github.com/vrealzhou/sqlterm/internal/i18n"
 )
 
 // MarkdownRenderer handles markdown rendering with consistent styling

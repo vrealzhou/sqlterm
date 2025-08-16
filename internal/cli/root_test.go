@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-	"sqlterm/internal/core"
-	"sqlterm/internal/i18n"
+	"github.com/vrealzhou/sqlterm/internal/config"
+	"github.com/vrealzhou/sqlterm/internal/i18n"
 )
 
 func TestSetVersionInfo(t *testing.T) {
@@ -254,50 +254,50 @@ func TestCoreParseDatabaseType(t *testing.T) {
 	testCases := []struct {
 		name     string
 		input    string
-		expected core.DatabaseType
+		expected config.DatabaseType
 		hasError bool
 	}{
 		{
 			name:     "MySQL",
 			input:    "mysql",
-			expected: core.MySQL,
+			expected: config.MySQL,
 			hasError: false,
 		},
 		{
 			name:     "PostgreSQL",
 			input:    "postgres",
-			expected: core.PostgreSQL,
+			expected: config.PostgreSQL,
 			hasError: false,
 		},
 		{
 			name:     "PostgreSQL alternative",
 			input:    "postgresql",
-			expected: core.PostgreSQL,
+			expected: config.PostgreSQL,
 			hasError: false,
 		},
 		{
 			name:     "SQLite",
 			input:    "sqlite",
-			expected: core.SQLite,
+			expected: config.SQLite,
 			hasError: false,
 		},
 		{
 			name:     "Invalid type",
 			input:    "invalid",
-			expected: core.DatabaseType(0),
+			expected: config.DatabaseType(0),
 			hasError: true,
 		},
 		{
 			name:     "Empty string",
 			input:    "",
-			expected: core.DatabaseType(0),
+			expected: config.DatabaseType(0),
 			hasError: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := core.ParseDatabaseType(tc.input)
+			result, err := config.ParseDatabaseType(tc.input)
 
 			if tc.hasError {
 				if err == nil {
@@ -319,34 +319,34 @@ func TestCoreParseDatabaseType(t *testing.T) {
 func TestCoreGetDefaultPort(t *testing.T) {
 	testCases := []struct {
 		name     string
-		dbType   core.DatabaseType
+		dbType   config.DatabaseType
 		expected int
 	}{
 		{
 			name:     "MySQL default port",
-			dbType:   core.MySQL,
+			dbType:   config.MySQL,
 			expected: 3306,
 		},
 		{
 			name:     "PostgreSQL default port",
-			dbType:   core.PostgreSQL,
+			dbType:   config.PostgreSQL,
 			expected: 5432,
 		},
 		{
 			name:     "SQLite default port",
-			dbType:   core.SQLite,
+			dbType:   config.SQLite,
 			expected: 0,
 		},
 		{
 			name:     "Invalid database type",
-			dbType:   core.DatabaseType(999),
+			dbType:   config.DatabaseType(999),
 			expected: 0,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := core.GetDefaultPort(tc.dbType)
+			result := config.GetDefaultPort(tc.dbType)
 
 			if result != tc.expected {
 				t.Errorf("Expected port %d, got %d for database type %v", tc.expected, result, tc.dbType)
@@ -358,27 +358,27 @@ func TestCoreGetDefaultPort(t *testing.T) {
 func TestDatabaseTypeString(t *testing.T) {
 	testCases := []struct {
 		name     string
-		dbType   core.DatabaseType
+		dbType   config.DatabaseType
 		expected string
 	}{
 		{
 			name:     "MySQL string",
-			dbType:   core.MySQL,
+			dbType:   config.MySQL,
 			expected: "mysql",
 		},
 		{
 			name:     "PostgreSQL string",
-			dbType:   core.PostgreSQL,
+			dbType:   config.PostgreSQL,
 			expected: "postgres",
 		},
 		{
 			name:     "SQLite string",
-			dbType:   core.SQLite,
+			dbType:   config.SQLite,
 			expected: "sqlite",
 		},
 		{
 			name:     "Unknown type",
-			dbType:   core.DatabaseType(999),
+			dbType:   config.DatabaseType(999),
 			expected: "unknown",
 		},
 	}
@@ -396,9 +396,9 @@ func TestDatabaseTypeString(t *testing.T) {
 
 func TestConnectionConfigCreation(t *testing.T) {
 	// Test creating ConnectionConfig with proper values
-	config := &core.ConnectionConfig{
+	connConfig := &config.ConnectionConfig{
 		Name:         "test-connection",
-		DatabaseType: core.PostgreSQL,
+		DatabaseType: config.PostgreSQL,
 		Host:         "localhost",
 		Port:         5432,
 		Database:     "testdb",
@@ -407,36 +407,36 @@ func TestConnectionConfigCreation(t *testing.T) {
 		SSL:          false,
 	}
 
-	if config.Name != "test-connection" {
-		t.Errorf("Expected name 'test-connection', got '%s'", config.Name)
+	if connConfig.Name != "test-connection" {
+		t.Errorf("Expected name 'test-connection', got '%s'", connConfig.Name)
 	}
 
-	if config.DatabaseType != core.PostgreSQL {
-		t.Errorf("Expected database type PostgreSQL, got %v", config.DatabaseType)
+	if connConfig.DatabaseType != config.PostgreSQL {
+		t.Errorf("Expected database type PostgreSQL, got %v", connConfig.DatabaseType)
 	}
 
-	if config.Host != "localhost" {
-		t.Errorf("Expected host 'localhost', got '%s'", config.Host)
+	if connConfig.Host != "localhost" {
+		t.Errorf("Expected host 'localhost', got '%s'", connConfig.Host)
 	}
 
-	if config.Port != 5432 {
-		t.Errorf("Expected port 5432, got %d", config.Port)
+	if connConfig.Port != 5432 {
+		t.Errorf("Expected port 5432, got %d", connConfig.Port)
 	}
 
-	if config.Database != "testdb" {
-		t.Errorf("Expected database 'testdb', got '%s'", config.Database)
+	if connConfig.Database != "testdb" {
+		t.Errorf("Expected database 'testdb', got '%s'", connConfig.Database)
 	}
 
-	if config.Username != "testuser" {
-		t.Errorf("Expected username 'testuser', got '%s'", config.Username)
+	if connConfig.Username != "testuser" {
+		t.Errorf("Expected username 'testuser', got '%s'", connConfig.Username)
 	}
 
-	if config.Password != "testpass" {
-		t.Errorf("Expected password 'testpass', got '%s'", config.Password)
+	if connConfig.Password != "testpass" {
+		t.Errorf("Expected password 'testpass', got '%s'", connConfig.Password)
 	}
 
-	if config.SSL != false {
-		t.Errorf("Expected SSL false, got %v", config.SSL)
+	if connConfig.SSL != false {
+		t.Errorf("Expected SSL false, got %v", connConfig.SSL)
 	}
 }
 
@@ -447,18 +447,18 @@ func TestConnectionConfigCreation(t *testing.T) {
 // Benchmark tests
 func BenchmarkParseDatabaseType(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		core.ParseDatabaseType("postgres")
+		config.ParseDatabaseType("postgres")
 	}
 }
 
 func BenchmarkGetDefaultPort(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		core.GetDefaultPort(core.PostgreSQL)
+		config.GetDefaultPort(config.PostgreSQL)
 	}
 }
 
 func BenchmarkDatabaseTypeString(b *testing.B) {
-	dbType := core.PostgreSQL
+	dbType := config.PostgreSQL
 	var result string
 	for i := 0; i < b.N; i++ {
 		result = dbType.String()

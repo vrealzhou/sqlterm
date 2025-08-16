@@ -4,14 +4,14 @@ import (
 	"testing"
 	"time"
 
-	"sqlterm/internal/config"
+	"github.com/vrealzhou/sqlterm/internal/config"
 )
 
 func TestParseModelString(t *testing.T) {
 	testCases := []struct {
 		name             string
 		modelStr         string
-		expectedProvider config.Provider
+		expectedProvider config.AIProvider
 		expectedModel    string
 		hasError         bool
 	}{
@@ -46,7 +46,7 @@ func TestParseModelString(t *testing.T) {
 		{
 			name:             "Empty string",
 			modelStr:         "",
-			expectedProvider: config.Provider(""),
+			expectedProvider: config.AIProvider(""),
 			expectedModel:    "",
 			hasError:         true,
 		},

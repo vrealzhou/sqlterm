@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"sqlterm/internal/cli"
-	"sqlterm/internal/i18n"
+	"github.com/vrealzhou/sqlterm/internal/cli"
+	"github.com/vrealzhou/sqlterm/internal/i18n"
 )
 
 // Version information (set by ldflags during build)

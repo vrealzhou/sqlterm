@@ -1,70 +1,11 @@
-package core
+package database
 
 import (
 	"database/sql"
 	"fmt"
 	"iter"
-	"strings"
 	"time"
 )
-
-type DatabaseType int
-
-const (
-	MySQL DatabaseType = iota
-	PostgreSQL
-	SQLite
-)
-
-func (dt DatabaseType) String() string {
-	switch dt {
-	case MySQL:
-		return "mysql"
-	case PostgreSQL:
-		return "postgres"
-	case SQLite:
-		return "sqlite"
-	default:
-		return "unknown"
-	}
-}
-
-func ParseDatabaseType(s string) (DatabaseType, error) {
-	switch strings.ToLower(s) {
-	case "mysql":
-		return MySQL, nil
-	case "postgres", "postgresql":
-		return PostgreSQL, nil
-	case "sqlite", "sqlite3":
-		return SQLite, nil
-	default:
-		return 0, fmt.Errorf("unsupported database type: %s. Supported types: mysql, postgres, sqlite", s)
-	}
-}
-
-func GetDefaultPort(dbType DatabaseType) int {
-	switch dbType {
-	case MySQL:
-		return 3306
-	case PostgreSQL:
-		return 5432
-	case SQLite:
-		return 0
-	default:
-		return 0
-	}
-}
-
-type ConnectionConfig struct {
-	Name         string       `yaml:"name"`
-	DatabaseType DatabaseType `yaml:"database_type"`
-	Host         string       `yaml:"host"`
-	Port         int          `yaml:"port"`
-	Database     string       `yaml:"database"`
-	Username     string       `yaml:"username"`
-	Password     string       `yaml:"password,omitempty"`
-	SSL          bool         `yaml:"ssl"`
-}
 
 type Value interface {
 	String() string

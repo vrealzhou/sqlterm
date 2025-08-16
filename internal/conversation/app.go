@@ -13,19 +13,19 @@ import (
 	"strings"
 	"time"
 
-	"sqlterm/internal/ai"
-	"sqlterm/internal/config"
-	"sqlterm/internal/core"
-	"sqlterm/internal/i18n"
-	"sqlterm/internal/session"
+	"github.com/vrealzhou/sqlterm/internal/ai"
+	"github.com/vrealzhou/sqlterm/internal/config"
+	"github.com/vrealzhou/sqlterm/internal/database"
+	"github.com/vrealzhou/sqlterm/internal/i18n"
+	"github.com/vrealzhou/sqlterm/internal/session"
 
 	"github.com/chzyer/readline"
 )
 
 type App struct {
 	rl         *readline.Instance
-	connection core.Connection
-	config     *core.ConnectionConfig
+	connection database.Connection
+	config     *config.ConnectionConfig
 	configMgr  *config.Manager
 	sessionMgr *session.Manager
 	aiManager  *ai.Manager
@@ -35,19 +35,10 @@ type App struct {
 func NewApp() (*App, error) {
 	configMgr := config.NewManager()
 
-	// Initialize AI manager first
-	aiManager, err := ai.NewManager(configMgr.GetConfigDir())
-	if err != nil {
-		// AI manager initialization failed completely
-		aiManager = nil
-	}
-
-	// Initialize i18n manager
+	// Initialize i18n manager first
 	language := "en_au" // Default language
-	if aiManager != nil {
-		if config := aiManager.GetConfig(); config != nil {
-			language = config.Language
-		}
+	if configMgr.Config != nil {
+		language = configMgr.Config.Language
 	}
 
 	i18nMgr, err := i18n.NewManager(language)
@@ -57,7 +48,17 @@ func NewApp() (*App, error) {
 	}
 
 	// Initialize session manager with i18n manager
-	sessionMgr := session.NewManager(configMgr.GetConfigDir(), i18nMgr)
+	sessionMgr, err := session.NewManager(configMgr.GetConfigDir(), i18nMgr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize session manager: %w", err)
+	}
+
+	// Initialize AI manager with dependency injection
+	aiManager, err := ai.NewManager(configMgr, sessionMgr, i18nMgr)
+	if err != nil {
+		// AI manager initialization failed completely
+		aiManager = nil
+	}
 
 	app := &App{
 		configMgr:  configMgr,
@@ -88,7 +89,7 @@ func NewApp() (*App, error) {
 	return app, nil
 }
 
-func (a *App) SetConnection(conn core.Connection, config *core.ConnectionConfig) {
+func (a *App) SetConnection(conn database.Connection, config *config.ConnectionConfig) {
 	a.connection = conn
 	a.config = config
 	a.updatePrompt()
@@ -103,8 +104,17 @@ func (a *App) SetConnection(conn core.Connection, config *core.ConnectionConfig)
 		fmt.Printf(a.i18nMgr.Get("session_history_warning"), err)
 	}
 
-	// Initialize vector store for AI context if AI manager is available
+	// Initialize AI manager session and vector store if AI manager is available
 	if a.aiManager != nil {
+		// Create or get session for this connection
+		session, err := a.aiManager.CreateSessionForConnection(config.Name)
+		if err != nil {
+			fmt.Printf(a.i18nMgr.Get("session_init_warning"), err)
+		} else {
+			fmt.Printf("Session ID: %d for connection %s\n", session.ID, config.Name)
+		}
+
+		// Initialize vector store for AI context
 		fmt.Printf(a.i18nMgr.Get("initializing_vector_db"), config.Name)
 		if err := a.aiManager.InitializeVectorStore(config.Name, conn); err != nil {
 			fmt.Printf(a.i18nMgr.Get("vector_db_init_warning"), err)
@@ -378,7 +388,7 @@ func (a *App) processQuery(query string, resultWriter io.Writer) error {
 		if err := a.sessionMgr.EnsureSessionDir(a.config.Name); err != nil {
 			fmt.Printf(a.i18nMgr.Get("failed_create_session_dir_warning"), err)
 		} else {
-			err := core.SaveQueryResultAsMarkdown(result, query, a.config.Name, resultWriter, a.i18nMgr)
+			err := database.SaveQueryResultAsMarkdown(result, query, a.config.Name, resultWriter, a.i18nMgr)
 			if err != nil {
 				fmt.Printf(a.i18nMgr.Get("failed_save_markdown_warning"), err)
 			}
@@ -592,7 +602,7 @@ func (a *App) handleConnect(args []string) error {
 	}
 
 	fmt.Printf(a.i18nMgr.Get("connecting_to"), config.Name)
-	conn, err := core.NewConnection(config)
+	conn, err := database.NewConnection(config)
 	if err != nil {
 		return fmt.Errorf(a.i18nMgr.Get("failed_to_connect"), err)
 	}
@@ -629,61 +639,61 @@ func (a *App) interactiveConnect() error {
 	choice, _ := reader.ReadString('\n')
 	choice = strings.TrimSpace(choice)
 
-	var dbType core.DatabaseType
+	var dbType config.DatabaseType
 	switch choice {
 	case "1":
-		dbType = core.MySQL
+		dbType = config.MySQL
 	case "2":
-		dbType = core.PostgreSQL
+		dbType = config.PostgreSQL
 	case "3":
-		dbType = core.SQLite
+		dbType = config.SQLite
 	default:
 		return fmt.Errorf(a.i18nMgr.Get("invalid_choice"), choice)
 	}
 
-	config := &core.ConnectionConfig{
+	connConfig := &config.ConnectionConfig{
 		Name:         name,
 		DatabaseType: dbType,
 	}
 
-	if dbType != core.SQLite {
+	if dbType != config.SQLite {
 		fmt.Print(a.i18nMgr.Get("enter_host"))
 		host, _ := reader.ReadString('\n')
 		host = strings.TrimSpace(host)
 		if host == "" {
 			host = "localhost"
 		}
-		config.Host = host
+		connConfig.Host = host
 
-		fmt.Printf(a.i18nMgr.Get("enter_port"), core.GetDefaultPort(dbType))
+		fmt.Printf(a.i18nMgr.Get("enter_port"), config.GetDefaultPort(dbType))
 		portStr, _ := reader.ReadString('\n')
 		portStr = strings.TrimSpace(portStr)
 		if portStr == "" {
-			config.Port = core.GetDefaultPort(dbType)
+			connConfig.Port = config.GetDefaultPort(dbType)
 		} else {
 			port, err := strconv.Atoi(portStr)
 			if err != nil {
 				return fmt.Errorf(a.i18nMgr.Get("invalid_port"), portStr)
 			}
-			config.Port = port
+			connConfig.Port = port
 		}
 
 		fmt.Print(a.i18nMgr.Get("enter_username"))
 		username, _ := reader.ReadString('\n')
-		config.Username = strings.TrimSpace(username)
+		connConfig.Username = strings.TrimSpace(username)
 
 		fmt.Print(a.i18nMgr.Get("enter_password"))
 		password, _ := reader.ReadString('\n')
-		config.Password = strings.TrimSpace(password)
+		connConfig.Password = strings.TrimSpace(password)
 	}
 
 	fmt.Print(a.i18nMgr.Get("enter_database_name"))
-	database, _ := reader.ReadString('\n')
-	config.Database = strings.TrimSpace(database)
+	dbName, _ := reader.ReadString('\n')
+	connConfig.Database = strings.TrimSpace(dbName)
 
 	// Test connection
-	fmt.Printf(a.i18nMgr.Get("testing_connection"), config.Name)
-	conn, err := core.NewConnection(config)
+	fmt.Printf(a.i18nMgr.Get("testing_connection"), connConfig.Name)
+	conn, err := database.NewConnection(connConfig)
 	if err != nil {
 		return fmt.Errorf(a.i18nMgr.Get("failed_to_connect"), err)
 	}
@@ -696,11 +706,11 @@ func (a *App) interactiveConnect() error {
 		a.connection.Close()
 	}
 
-	a.SetConnection(conn, config)
-	fmt.Printf(a.i18nMgr.Get("connected_to"), config.Name, config.Database)
+	a.SetConnection(conn, connConfig)
+	fmt.Printf(a.i18nMgr.Get("connected_to"), connConfig.Name, connConfig.Database)
 
 	// Save connection
-	if err := a.configMgr.SaveConnection(config); err != nil {
+	if err := a.configMgr.SaveConnection(connConfig); err != nil {
 		fmt.Printf(a.i18nMgr.Get("failed_save_connection_warning"), err)
 	} else {
 		fmt.Print(a.i18nMgr.Get("connection_saved"))
@@ -710,10 +720,7 @@ func (a *App) interactiveConnect() error {
 }
 
 func (a *App) handleListConnections() error {
-	connections, err := a.configMgr.ListConnections()
-	if err != nil {
-		return fmt.Errorf(a.i18nMgr.Get("failed_to_list_connections"), err)
-	}
+	connections := a.configMgr.ListConnections()
 
 	if len(connections) == 0 {
 		fmt.Println(a.i18nMgr.Get("no_saved_connections_found"))
@@ -721,15 +728,17 @@ func (a *App) handleListConnections() error {
 	}
 
 	fmt.Println(a.i18nMgr.Get("saved_connections"))
-	for i, conn := range connections {
+	index := 1
+	for _, conn := range connections {
 		fmt.Printf("  %d. %s (%s) - %s://%s:%d/%s\n",
-			i+1,
+			index,
 			conn.Name,
 			conn.DatabaseType,
 			conn.DatabaseType.String(),
 			conn.Host,
 			conn.Port,
 			conn.Database)
+		index++
 	}
 
 	return nil
@@ -783,7 +792,7 @@ func (a *App) handleDescribeTable(args []string) error {
 	return a.displayMarkdown(markdown)
 }
 
-func (a *App) generateTableMarkdown(tableInfo *core.TableInfo) string {
+func (a *App) generateTableMarkdown(tableInfo *database.TableInfo) string {
 	var sb strings.Builder
 
 	// Title
@@ -857,7 +866,7 @@ func (a *App) generateTableMarkdown(tableInfo *core.TableInfo) string {
 
 func (a *App) displayMarkdown(markdown string) error {
 	// Use the shared markdown renderer
-	renderer := core.NewMarkdownRenderer(a.i18nMgr)
+	renderer := database.NewMarkdownRenderer(a.i18nMgr)
 	return renderer.RenderAndDisplay(markdown)
 }
 
@@ -871,7 +880,7 @@ func (a *App) handleStatus() {
 	fmt.Printf(a.i18nMgr.Get("status_connected"), a.config.Name)
 	fmt.Printf(a.i18nMgr.Get("database_info"), a.config.Database)
 	fmt.Printf(a.i18nMgr.Get("type_info"), a.config.DatabaseType)
-	if a.config.DatabaseType != core.SQLite {
+	if a.config.DatabaseType != config.SQLite {
 		fmt.Printf(a.i18nMgr.Get("host_info"), a.config.Host, a.config.Port)
 		fmt.Printf(a.i18nMgr.Get("username_info"), a.config.Username)
 	}
@@ -1030,7 +1039,7 @@ func (a *App) processQueryWithCSVExport(line string) error {
 		return fmt.Errorf(a.i18nMgr.Get("query_execution_failed"), err)
 	}
 
-	rows, err := core.SaveQueryResultAsStreamingCSV(result, filename)
+	rows, err := database.SaveQueryResultAsStreamingCSV(result, filename)
 	if err != nil {
 		return fmt.Errorf("failed to save CSV: %w", err)
 	}
@@ -1154,10 +1163,10 @@ func (a *App) executeFileWithCSVExport(filename string, queryRange []int, csvFil
 			outputPath = csvFilename
 		} else {
 			// Multiple queries - use numbered filenames
-			outputPath = core.GenerateNumberedCSVPath(csvFilename, queryNumber)
+			outputPath = database.GenerateNumberedCSVPath(csvFilename, queryNumber)
 		}
 
-		rows, err := core.SaveQueryResultAsStreamingCSV(result, outputPath)
+		rows, err := database.SaveQueryResultAsStreamingCSV(result, outputPath)
 		if err != nil {
 			fmt.Printf("❌ Failed to save CSV: %v\n", err)
 			continue
@@ -1193,30 +1202,17 @@ func (a *App) processAIChat(message string) error {
 		return nil
 	}
 
-	// Get current conversation or show thinking message
-	conversation := a.aiManager.GetCurrentConversation()
-	if conversation == nil {
-		fmt.Print(a.i18nMgr.Get("ai_starting_new_conversation"))
-	} else {
-		fmt.Printf(a.i18nMgr.Get("ai_processing_conversation"), conversation.CurrentPhase.String())
-	}
+	// Show thinking message (conversation context is now managed internally)
+	fmt.Print(a.i18nMgr.Get("ai_starting_new_conversation"))
 
-	// Get database tables for context
-	var tables []string
-	if a.connection != nil {
-		var err error
-		tables, err = a.connection.ListTables()
-		if err != nil {
-			fmt.Printf("Warning: failed to get table list for AI context: %v\n", err)
-		}
-	}
+	// Database tables context is now managed internally by the AI manager
 
 	// Create context with timeout for AI requests
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	// Use new conversational chat system
-	response, err := a.aiManager.ChatWithConversation(ctx, message, tables)
+	// Use AI chat system
+	response, _, err := a.aiManager.Chat(ctx, message, nil)
 	if err != nil {
 		// Provide more helpful error messages for common issues
 		if strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "deadline exceeded") {
@@ -1231,26 +1227,18 @@ func (a *App) processAIChat(message string) error {
 	}
 
 	// Format any SQL code blocks in the response
-	formattedResponse := core.FormatSQLInMarkdown(response)
+	formattedResponse := database.FormatSQLInMarkdown(response)
 
 	// Display response using markdown renderer
-	renderer := core.NewMarkdownRenderer(a.i18nMgr)
+	renderer := database.NewMarkdownRenderer(a.i18nMgr)
 	if err := renderer.RenderAndDisplay(formattedResponse); err != nil {
 		// Fallback to plain text if markdown rendering fails
 		fmt.Println(a.i18nMgr.Get("ai_response_header"))
 		fmt.Println(formattedResponse)
 	}
 
-	// Show conversation status and AI info
-	conversation = a.aiManager.GetCurrentConversation()
-	if conversation != nil {
-		statusInfo := fmt.Sprintf("📊 Conversation: %s | Tables loaded: %d",
-			conversation.CurrentPhase.String(), len(conversation.LoadedTables))
-		if conversation.IsComplete {
-			statusInfo += " | ✅ Complete"
-		}
-		fmt.Printf("\n%s\n", statusInfo)
-	}
+	// Show AI status info (conversation context is now managed internally)
+	fmt.Printf("\n%s\n", "✅ AI response completed")
 
 	// Show AI status after response
 	if a.aiManager != nil && a.aiManager.IsConfigured() {
@@ -1267,7 +1255,7 @@ func (a *App) processAIChat(message string) error {
 				}
 			}
 		}
-		aiInfo := fmt.Sprintf("🤖 %s | %s", aiConfig.FormatProviderInfo(), usageInfo)
+		aiInfo := fmt.Sprintf("🤖 %s | %s", aiConfig.AI.FormatProviderInfo(), usageInfo)
 		fmt.Printf("%s\n", aiInfo)
 	}
 
@@ -1358,7 +1346,7 @@ func (a *App) handleConfigStatus() error {
 	} else {
 		fmt.Printf("   Status: ✅ Connected to %s\n", a.config.Name)
 		fmt.Printf("   Database: %s (%s)\n", a.config.Database, a.config.DatabaseType)
-		if a.config.DatabaseType != core.SQLite {
+		if a.config.DatabaseType != config.SQLite {
 			fmt.Printf("   Host: %s:%d\n", a.config.Host, a.config.Port)
 			fmt.Printf("   Username: %s\n", a.config.Username)
 		}
@@ -1486,9 +1474,9 @@ func (a *App) handleAIConfigProvider(args []string) error {
 		return errors.New(a.i18nMgr.Get("ai_manager_not_initialized"))
 	}
 
-	provider := config.Provider(args[0])
+	provider := config.AIProvider(args[0])
 	config := a.aiManager.GetConfig()
-	defaultModel := config.GetDefaultModel(provider)
+	defaultModel := config.AI.GetDefaultModel(provider)
 
 	if err := a.aiManager.SetProvider(provider, defaultModel); err != nil {
 		return fmt.Errorf(a.i18nMgr.Get("failed_to_set_provider"), err)
@@ -1533,7 +1521,7 @@ func (a *App) handleAIConfigAPIKey(args []string) error {
 		return errors.New(a.i18nMgr.Get("ai_manager_not_initialized"))
 	}
 
-	provider := config.Provider(args[0])
+	provider := config.AIProvider(args[0])
 	apiKey := args[1]
 
 	if err := a.aiManager.SetAPIKey(provider, apiKey); err != nil {
@@ -1555,7 +1543,7 @@ func (a *App) handleAIConfigBaseURL(args []string) error {
 		return errors.New(a.i18nMgr.Get("ai_manager_not_initialized"))
 	}
 
-	provider := config.Provider(args[0])
+	provider := config.AIProvider(args[0])
 	baseURL := args[1]
 
 	if err := a.aiManager.SetBaseURL(provider, baseURL); err != nil {
@@ -1604,19 +1592,14 @@ func (a *App) handleConfigLanguage(args []string) error {
 		return errors.New(a.i18nMgr.GetWithArgs("language_not_available", newLanguage, strings.Join(availableLanguages, ", ")))
 	}
 
-	// Update language in AI config
-	if err := a.aiManager.SetLanguage(newLanguage); err != nil {
-		return fmt.Errorf(a.i18nMgr.Get("failed_to_update_language"), err)
-	}
+	// Update language in config
+	config := a.aiManager.GetConfig()
+	config.Language = newLanguage
 
 	// Update i18n manager
 	a.i18nMgr.SetLanguage(newLanguage)
 
-	// Update AI manager i18n
-	if err := a.aiManager.UpdateLanguage(newLanguage); err != nil {
-		// Don't fail if AI manager i18n update fails
-		fmt.Printf("Warning: failed to update AI manager language: %v\n", err)
-	}
+	// AI manager i18n is managed through the injected i18n manager
 
 	fmt.Printf("✅ Language changed to %s\n", newLanguage)
 	return nil
@@ -1643,7 +1626,7 @@ func (a *App) handleConfigAIOpenRouter(args []string) error {
 
 		// Set the API key
 		aiConfig := a.aiManager.GetConfig()
-		aiConfig.SetAPIKey(config.ProviderOpenRouter, apiKey)
+		aiConfig.AI.SetAPIKey(config.ProviderOpenRouter, apiKey)
 
 		// Save configuration
 		if err := a.aiManager.SetProvider(config.ProviderOpenRouter, aiConfig.AI.Model); err != nil {
@@ -1690,7 +1673,7 @@ func (a *App) handleAIConfigListModels() error {
 	fmt.Printf("🔍 Fetching available models...\n")
 
 	ctx := context.Background()
-	models, err := a.aiManager.ListModels(ctx)
+	models, err := a.aiManager.GetModels(ctx)
 	if err != nil {
 		return fmt.Errorf(a.i18nMgr.Get("failed_to_list_models"), err)
 	}
@@ -1704,8 +1687,8 @@ func (a *App) handleAIConfigListModels() error {
 	for i, model := range models {
 		fmt.Printf("  %d. %s - %s\n", i+1, model.ID, model.Description)
 		if model.Pricing != nil {
-			inputCost := ai.FormatPrice(model.Pricing.InputCostPerToken * 1000000)   // per 1M tokens
-			outputCost := ai.FormatPrice(model.Pricing.OutputCostPerToken * 1000000) // per 1M tokens
+			inputCost := fmt.Sprintf("$%.4f", model.Pricing.InputCostPerToken * 1000000)   // per 1M tokens
+			outputCost := fmt.Sprintf("$%.4f", model.Pricing.OutputCostPerToken * 1000000) // per 1M tokens
 			fmt.Printf("     Pricing: %s input / %s output (per 1M tokens)\n", inputCost, outputCost)
 		}
 	}
@@ -1732,7 +1715,7 @@ func (a *App) interactiveAIConfig() error {
 	}
 	choice = strings.TrimSpace(choice)
 
-	var selectedProvider config.Provider
+	var selectedProvider config.AIProvider
 	switch choice {
 	case "1":
 		selectedProvider = config.ProviderOpenRouter
@@ -1756,7 +1739,7 @@ func (a *App) interactiveAIConfig() error {
 		// Check if API key already exists
 		if a.aiManager != nil {
 			config := a.aiManager.GetConfig()
-			existingKey := config.GetAPIKey(selectedProvider)
+			existingKey := config.AI.GetAPIKey(selectedProvider)
 			if existingKey != "" {
 				maskedKey := existingKey[:min(8, len(existingKey))] + "..." + existingKey[max(0, len(existingKey)-4):]
 				fmt.Printf("\n🔑 Existing OpenRouter API key found: %s - keeping existing key\n", maskedKey)
@@ -1800,10 +1783,10 @@ func (a *App) interactiveAIConfig() error {
 		}
 	}
 
-	// Step 4: Initialize/Update AI Manager
+	// Step 4: Initialize/Update AI Manager (if not already initialized)
 	if a.aiManager == nil {
 		var err error
-		a.aiManager, err = ai.NewManager(a.configMgr.GetConfigDir())
+		a.aiManager, err = ai.NewManager(a.configMgr, a.sessionMgr, a.i18nMgr)
 		if err != nil {
 			return fmt.Errorf(a.i18nMgr.Get("failed_to_initialize_ai_manager"), err)
 		}
@@ -1831,18 +1814,18 @@ func (a *App) interactiveAIConfig() error {
 	// Temporarily set the provider to fetch models
 	tempConfig := a.aiManager.GetConfig()
 
-	if err := a.aiManager.SetProvider(selectedProvider, tempConfig.GetDefaultModel(selectedProvider)); err != nil {
+	if err := a.aiManager.SetProvider(selectedProvider, tempConfig.AI.GetDefaultModel(selectedProvider)); err != nil {
 		return fmt.Errorf(a.i18nMgr.Get("failed_to_set_temporary_provider"), err)
 	}
 
 	ctx := context.Background()
-	models, err := a.aiManager.ListModels(ctx)
+	models, err := a.aiManager.GetModels(ctx)
 	if err != nil {
 		// If we can't fetch models, fall back to defaults
 		fmt.Printf("⚠️  Could not fetch models from %s: %v\n", selectedProvider, err)
 		fmt.Println("Using default model for provider.")
 
-		defaultModel := tempConfig.GetDefaultModel(selectedProvider)
+		defaultModel := tempConfig.AI.GetDefaultModel(selectedProvider)
 		if err := a.aiManager.SetProvider(selectedProvider, defaultModel); err != nil {
 			return fmt.Errorf(a.i18nMgr.Get("failed_to_set_default_model"), err)
 		}
@@ -1854,7 +1837,7 @@ func (a *App) interactiveAIConfig() error {
 
 	if len(models) == 0 {
 		fmt.Printf("⚠️  No models available for %s\n", selectedProvider)
-		defaultModel := tempConfig.GetDefaultModel(selectedProvider)
+		defaultModel := tempConfig.AI.GetDefaultModel(selectedProvider)
 		if err := a.aiManager.SetProvider(selectedProvider, defaultModel); err != nil {
 			return fmt.Errorf(a.i18nMgr.Get("failed_to_set_default_model"), err)
 		}
@@ -1877,8 +1860,8 @@ func (a *App) interactiveAIConfig() error {
 					fmt.Printf(" (%s)", model.Description)
 				}
 				if model.Pricing != nil {
-					inputCost := ai.FormatPrice(model.Pricing.InputCostPerToken * 1000000)
-					outputCost := ai.FormatPrice(model.Pricing.OutputCostPerToken * 1000000)
+					inputCost := fmt.Sprintf("$%.4f", model.Pricing.InputCostPerToken * 1000000)
+					outputCost := fmt.Sprintf("$%.4f", model.Pricing.OutputCostPerToken * 1000000)
 					fmt.Printf(" [%s/%s per 1M tokens]", inputCost, outputCost)
 				}
 				fmt.Println()
@@ -1985,8 +1968,8 @@ func (a *App) interactiveAIConfig() error {
 	}
 
 	// Ensure the client is properly configured
-	if err := a.aiManager.EnsureConfigured(); err != nil {
-		return fmt.Errorf(a.i18nMgr.Get("failed_to_initialize_ai_client"), err)
+	if !a.aiManager.IsConfigured() {
+		return fmt.Errorf("%s", a.i18nMgr.Get("failed_to_initialize_ai_client"))
 	}
 
 	fmt.Printf("\n🎉 AI Configuration Complete!\n")
@@ -1997,8 +1980,8 @@ func (a *App) interactiveAIConfig() error {
 	}
 
 	if selectedProvider == config.ProviderOpenRouter && selectedModel.Pricing != nil {
-		inputCost := ai.FormatPrice(selectedModel.Pricing.InputCostPerToken * 1000000)
-		outputCost := ai.FormatPrice(selectedModel.Pricing.OutputCostPerToken * 1000000)
+		inputCost := fmt.Sprintf("$%.4f", selectedModel.Pricing.InputCostPerToken * 1000000)
+		outputCost := fmt.Sprintf("$%.4f", selectedModel.Pricing.OutputCostPerToken * 1000000)
 		fmt.Printf("   Pricing: %s input / %s output (per 1M tokens)\n", inputCost, outputCost)
 	}
 
@@ -2133,18 +2116,9 @@ func (a *App) handleClearConversation() error {
 		return nil
 	}
 
-	conversation := a.aiManager.GetCurrentConversation()
-	if conversation == nil {
-		fmt.Println(a.i18nMgr.Get("no_active_conversation"))
-		return nil
-	}
-
-	// Show conversation summary before clearing
-	fmt.Printf(a.i18nMgr.Get("clearing_conversation"),
-		conversation.CurrentPhase.String(), len(conversation.LoadedTables))
-
-	// Clear the conversation
-	a.aiManager.ClearConversation()
+	// Conversation context is now managed internally by the AI manager
+	// Reset session ID for a fresh start
+	a.aiManager.ResetSessionID()
 	fmt.Println(a.i18nMgr.Get("conversation_cleared"))
 
 	return nil

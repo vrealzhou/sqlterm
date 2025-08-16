@@ -1,4 +1,4 @@
-package core
+package database
 
 import (
 	"bytes"
@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"sqlterm/internal/i18n"
+	"github.com/vrealzhou/sqlterm/internal/i18n"
 )
 
 func TestToMarkdown(t *testing.T) {

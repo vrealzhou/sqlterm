@@ -4,36 +4,37 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"sqlterm/internal/config"
 	"time"
+
+	"github.com/vrealzhou/sqlterm/internal/config"
 )
 
 // UsageDetails represents a single LLM request with detailed information
 type UsageDetails struct {
-	ID           int             `json:"id"`
-	SessionID    string          `json:"session_id"`
-	Provider     config.Provider `json:"provider"`
-	Model        string          `json:"model"`
-	InputTokens  int             `json:"input_tokens"`
-	OutputTokens int             `json:"output_tokens"`
-	Cost         float64         `json:"cost"`
-	RequestTime  time.Time       `json:"request_time"`
-	UserMessage  string          `json:"user_message"`
-	AIResponse   string          `json:"ai_response"`
-	SystemPrompt string          `json:"system_prompt"`
+	ID           int               `json:"id"`
+	SessionID    string            `json:"session_id"`
+	Provider     config.AIProvider `json:"provider"`
+	Model        string            `json:"model"`
+	InputTokens  int               `json:"input_tokens"`
+	OutputTokens int               `json:"output_tokens"`
+	Cost         float64           `json:"cost"`
+	RequestTime  time.Time         `json:"request_time"`
+	UserMessage  string            `json:"user_message"`
+	AIResponse   string            `json:"ai_response"`
+	SystemPrompt string            `json:"system_prompt"`
 }
 
 // DailyUsageStats represents aggregated daily statistics per provider/model
 type DailyUsageStats struct {
-	ID            int             `json:"id"`
-	Date          string          `json:"date"` // YYYY-MM-DD format
-	Provider      config.Provider `json:"provider"`
-	Model         string          `json:"model"`
-	TotalRequests int             `json:"total_requests"`
-	InputTokens   int             `json:"input_tokens"`
-	OutputTokens  int             `json:"output_tokens"`
-	TotalCost     float64         `json:"total_cost"`
-	CreatedAt     time.Time       `json:"created_at"`
+	ID            int               `json:"id"`
+	Date          string            `json:"date"` // YYYY-MM-DD format
+	Provider      config.AIProvider `json:"provider"`
+	Model         string            `json:"model"`
+	TotalRequests int               `json:"total_requests"`
+	InputTokens   int               `json:"input_tokens"`
+	OutputTokens  int               `json:"output_tokens"`
+	TotalCost     float64           `json:"total_cost"`
+	CreatedAt     time.Time         `json:"created_at"`
 }
 
 // UsageStore manages usage tracking in the vector database
@@ -140,10 +141,10 @@ func (us *UsageStore) handleDayChange() error {
 }
 
 // RecordUsage records a new usage entry
-func (us *UsageStore) RecordUsage(sessionID string, provider config.Provider, model string,
+func (us *UsageStore) RecordUsage(sessionID string, provider config.AIProvider, model string,
 	inputTokens, outputTokens int, cost float64, userMessage, aiResponse, systemPrompt string) error {
 
-	query := `INSERT INTO usage_details 
+	query := `INSERT INTO usage_details
 		(session_id, provider, model, input_tokens, output_tokens, cost, request_time, user_message, ai_response, system_prompt)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
@@ -168,9 +169,9 @@ func (us *UsageStore) RecordUsage(sessionID string, provider config.Provider, mo
 
 // aggregateDailyStats calculates and stores daily statistics for a specific date
 func (us *UsageStore) aggregateDailyStats(date string) error {
-	query := `INSERT OR REPLACE INTO daily_usage_stats 
+	query := `INSERT OR REPLACE INTO daily_usage_stats
 		(date, provider, model, total_requests, input_tokens, output_tokens, total_cost)
-		SELECT 
+		SELECT
 			date(request_time) as date,
 			provider,
 			model,
@@ -178,7 +179,7 @@ func (us *UsageStore) aggregateDailyStats(date string) error {
 			SUM(input_tokens) as input_tokens,
 			SUM(output_tokens) as output_tokens,
 			SUM(cost) as total_cost
-		FROM usage_details 
+		FROM usage_details
 		WHERE date(request_time) = ?
 		GROUP BY date(request_time), provider, model`
 
@@ -197,9 +198,9 @@ func (us *UsageStore) truncateOldDetails(currentDate string) error {
 func (us *UsageStore) GetTodayUsage() ([]UsageDetails, error) {
 	currentDate := time.Now().Format("2006-01-02")
 
-	query := `SELECT id, session_id, provider, model, input_tokens, output_tokens, 
+	query := `SELECT id, session_id, provider, model, input_tokens, output_tokens,
 		cost, request_time, user_message, ai_response, system_prompt
-		FROM usage_details 
+		FROM usage_details
 		WHERE date(request_time) = ?
 		ORDER BY request_time DESC`
 
@@ -219,7 +220,7 @@ func (us *UsageStore) GetTodayUsage() ([]UsageDetails, error) {
 		if err != nil {
 			continue
 		}
-		usage.Provider = config.Provider(provider)
+		usage.Provider = config.AIProvider(provider)
 		usageList = append(usageList, usage)
 	}
 
@@ -228,9 +229,9 @@ func (us *UsageStore) GetTodayUsage() ([]UsageDetails, error) {
 
 // GetDailyStats returns daily aggregated statistics for a date range
 func (us *UsageStore) GetDailyStats(startDate, endDate string) ([]DailyUsageStats, error) {
-	query := `SELECT id, date, provider, model, total_requests, input_tokens, 
+	query := `SELECT id, date, provider, model, total_requests, input_tokens,
 		output_tokens, total_cost, created_at
-		FROM daily_usage_stats 
+		FROM daily_usage_stats
 		WHERE date BETWEEN ? AND ?
 		ORDER BY date DESC, provider, model`
 
@@ -250,7 +251,7 @@ func (us *UsageStore) GetDailyStats(startDate, endDate string) ([]DailyUsageStat
 		if err != nil {
 			continue
 		}
-		stats.Provider = config.Provider(provider)
+		stats.Provider = config.AIProvider(provider)
 		statsList = append(statsList, stats)
 	}
 
@@ -263,12 +264,12 @@ func (us *UsageStore) GetUsageSummary() (map[string]interface{}, error) {
 	weekAgo := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
 
 	// Get today's totals
-	todayQuery := `SELECT 
+	todayQuery := `SELECT
 		COUNT(*) as requests,
 		COALESCE(SUM(input_tokens), 0) as input_tokens,
 		COALESCE(SUM(output_tokens), 0) as output_tokens,
 		COALESCE(SUM(cost), 0) as cost
-		FROM usage_details 
+		FROM usage_details
 		WHERE date(request_time) = ?`
 
 	var todayStats struct {
@@ -286,12 +287,12 @@ func (us *UsageStore) GetUsageSummary() (map[string]interface{}, error) {
 	}
 
 	// Get last 7 days from daily stats
-	weekQuery := `SELECT 
+	weekQuery := `SELECT
 		COALESCE(SUM(total_requests), 0) as requests,
 		COALESCE(SUM(input_tokens), 0) as input_tokens,
 		COALESCE(SUM(output_tokens), 0) as output_tokens,
 		COALESCE(SUM(total_cost), 0) as cost
-		FROM daily_usage_stats 
+		FROM daily_usage_stats
 		WHERE date BETWEEN ? AND ?`
 
 	var weekStats struct {
@@ -363,7 +364,7 @@ func (us *UsageStore) GetProviderModelStats(days int) (map[string]map[string]int
 		COALESCE(SUM(input_tokens), 0) as input_tokens,
 		COALESCE(SUM(output_tokens), 0) as output_tokens,
 		COALESCE(SUM(total_cost), 0) as cost
-		FROM daily_usage_stats 
+		FROM daily_usage_stats
 		WHERE date BETWEEN ? AND ?
 		GROUP BY provider, model
 		ORDER BY cost DESC`
@@ -404,7 +405,7 @@ func (us *UsageStore) GetProviderModelStats(days int) (map[string]map[string]int
 		COALESCE(SUM(input_tokens), 0) as input_tokens,
 		COALESCE(SUM(output_tokens), 0) as output_tokens,
 		COALESCE(SUM(cost), 0) as cost
-		FROM usage_details 
+		FROM usage_details
 		WHERE date(request_time) = ?
 		GROUP BY provider, model`
 

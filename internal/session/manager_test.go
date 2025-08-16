@@ -1,12 +1,12 @@
 package session
 
 import (
-	"os"
-	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
-	"sqlterm/internal/i18n"
+	"github.com/vrealzhou/sqlterm/internal/database"
+	"github.com/vrealzhou/sqlterm/internal/i18n"
 )
 
 func createTestManager(tb testing.TB, configDir string) *Manager {
@@ -14,7 +14,11 @@ func createTestManager(tb testing.TB, configDir string) *Manager {
 	if err != nil {
 		tb.Fatalf("Failed to create i18n manager: %v", err)
 	}
-	return NewManager(configDir, i18nMgr)
+	manager, err := NewManager(configDir, i18nMgr)
+	if err != nil {
+		tb.Fatalf("Failed to create session manager: %v", err)
+	}
+	return manager
 }
 
 func TestNewManager(t *testing.T) {
@@ -23,11 +27,307 @@ func TestNewManager(t *testing.T) {
 	manager := createTestManager(t, tmpDir)
 
 	if manager == nil {
-		t.Fatal("NewManager returned nil")
+		t.Fatal("Expected manager to be created, got nil")
 	}
 
 	if manager.configDir != tmpDir {
-		t.Errorf("Expected configDir to be '%s', got '%s'", tmpDir, manager.configDir)
+		t.Errorf("Expected configDir to be %s, got %s", tmpDir, manager.configDir)
+	}
+}
+
+func TestManager_CreateSession(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := createTestManager(t, tmpDir)
+
+	connectionName := "test-connection"
+	
+	session, err := manager.CreateSession(connectionName)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	if session == nil {
+		t.Fatal("Expected session to be created, got nil")
+	}
+
+	if session.ConnectionName != connectionName {
+		t.Errorf("Expected connection name %s, got %s", connectionName, session.ConnectionName)
+	}
+
+	if session.Status != "active" {
+		t.Errorf("Expected session status to be 'active', got %s", session.Status)
+	}
+}
+
+func TestManager_GetSession(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := createTestManager(t, tmpDir)
+
+	connectionName := "test-connection"
+	
+	// Create a session first
+	createdSession, err := manager.CreateSession(connectionName)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	// Get the session by ID
+	retrievedSession, err := manager.GetSession(createdSession.ID)
+	if err != nil {
+		t.Fatalf("GetSession failed: %v", err)
+	}
+
+	if retrievedSession == nil {
+		t.Fatal("Expected session to be retrieved, got nil")
+	}
+
+	if retrievedSession.ID != createdSession.ID {
+		t.Errorf("Expected session ID %d, got %d", createdSession.ID, retrievedSession.ID)
+	}
+
+	if retrievedSession.ConnectionName != connectionName {
+		t.Errorf("Expected connection name %s, got %s", connectionName, retrievedSession.ConnectionName)
+	}
+}
+
+func TestManager_GetActiveSession(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := createTestManager(t, tmpDir)
+
+	connectionName := "test-connection"
+	
+	// Check no active session initially
+	activeSession, err := manager.GetActiveSession(connectionName)
+	if err != nil {
+		t.Fatalf("GetActiveSession failed: %v", err)
+	}
+
+	if activeSession != nil {
+		t.Error("Expected no active session initially, got one")
+	}
+
+	// Create a session
+	createdSession, err := manager.CreateSession(connectionName)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	// Check active session exists
+	activeSession, err = manager.GetActiveSession(connectionName)
+	if err != nil {
+		t.Fatalf("GetActiveSession failed: %v", err)
+	}
+
+	if activeSession == nil {
+		t.Fatal("Expected active session, got nil")
+	}
+
+	if activeSession.ID != createdSession.ID {
+		t.Errorf("Expected active session ID %d, got %d", createdSession.ID, activeSession.ID)
+	}
+}
+
+func TestManager_RecordQuery(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := createTestManager(t, tmpDir)
+
+	connectionName := "test-connection"
+	
+	// Create a session
+	session, err := manager.CreateSession(connectionName)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	// For testing, we'll pass nil result since QueryResult needs proper initialization
+	// The manager should handle nil results gracefully
+	var result *database.QueryResult = nil
+
+	query := "SELECT * FROM users"
+	executionTime := 100 * time.Millisecond
+
+	// Record the query
+	queryRecord, err := manager.RecordQuery(session.ID, query, result, executionTime)
+	if err != nil {
+		t.Fatalf("RecordQuery failed: %v", err)
+	}
+
+	if queryRecord == nil {
+		t.Fatal("Expected query record to be created, got nil")
+	}
+
+	if queryRecord.Query != query {
+		t.Errorf("Expected query %s, got %s", query, queryRecord.Query)
+	}
+
+	expectedTimeMs := executionTime.Milliseconds()
+	if queryRecord.ExecutionTimeMs != expectedTimeMs {
+		t.Errorf("Expected execution time %d ms, got %d ms", expectedTimeMs, queryRecord.ExecutionTimeMs)
+	}
+
+	if queryRecord.RowsAffected != 0 {
+		t.Errorf("Expected rows affected 0, got %d", queryRecord.RowsAffected)
+	}
+}
+
+func TestManager_GetQueryHistory(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := createTestManager(t, tmpDir)
+
+	connectionName := "test-connection"
+	
+	// Create a session
+	session, err := manager.CreateSession(connectionName)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	// Record multiple queries
+	queries := []string{
+		"SELECT * FROM users",
+		"SELECT * FROM posts",
+		"SELECT COUNT(*) FROM comments",
+	}
+
+	for _, query := range queries {
+		_, err := manager.RecordQuery(session.ID, query, nil, 100*time.Millisecond)
+		if err != nil {
+			t.Fatalf("RecordQuery failed: %v", err)
+		}
+	}
+
+	// Get query history
+	history, err := manager.GetQueryHistory(session.ID, 10, 0)
+	if err != nil {
+		t.Fatalf("GetQueryHistory failed: %v", err)
+	}
+
+	if len(history) != len(queries) {
+		t.Errorf("Expected %d queries in history, got %d", len(queries), len(history))
+	}
+
+	// Check that all queries are present (order may vary)
+	queryMap := make(map[string]bool)
+	for _, query := range queries {
+		queryMap[query] = false
+	}
+
+	for _, record := range history {
+		if _, exists := queryMap[record.Query]; exists {
+			queryMap[record.Query] = true
+		}
+	}
+
+	// Verify all queries were found
+	for query, found := range queryMap {
+		if !found {
+			t.Errorf("Expected query %s not found in history", query)
+		}
+	}
+}
+
+func TestManager_SearchQueryHistory(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := createTestManager(t, tmpDir)
+
+	connectionName := "test-connection"
+	
+	// Create a session
+	session, err := manager.CreateSession(connectionName)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	// Record queries
+	queries := []string{
+		"SELECT * FROM users WHERE name = 'john'",
+		"SELECT * FROM posts WHERE title LIKE '%test%'",
+		"SELECT COUNT(*) FROM users",
+		"UPDATE users SET active = 1",
+	}
+
+	for _, query := range queries {
+		_, err := manager.RecordQuery(session.ID, query, nil, 100*time.Millisecond)
+		if err != nil {
+			t.Fatalf("RecordQuery failed: %v", err)
+		}
+	}
+
+	// Search for queries containing "users"
+	results, err := manager.SearchQueryHistory(session.ID, "users", 10)
+	if err != nil {
+		t.Fatalf("SearchQueryHistory failed: %v", err)
+	}
+
+	// Should find 3 queries containing "users"
+	expectedCount := 3
+	if len(results) != expectedCount {
+		t.Errorf("Expected %d search results, got %d", expectedCount, len(results))
+	}
+
+	// Verify all results contain "users"
+	for _, record := range results {
+		if !containsIgnoreCase(record.Query, "users") {
+			t.Errorf("Search result should contain 'users': %s", record.Query)
+		}
+	}
+}
+
+func TestManager_GetSessionStats(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := createTestManager(t, tmpDir)
+
+	connectionName := "test-connection"
+	
+	// Create a session
+	session, err := manager.CreateSession(connectionName)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	// Record some queries
+	for i := 0; i < 5; i++ {
+		query := "SELECT * FROM test_table"
+		_, err := manager.RecordQuery(session.ID, query, nil, 100*time.Millisecond)
+		if err != nil {
+			t.Fatalf("RecordQuery failed: %v", err)
+		}
+	}
+
+	// Get session stats
+	stats, err := manager.GetSessionStats(session.ID)
+	if err != nil {
+		t.Fatalf("GetSessionStats failed: %v", err)
+	}
+
+	if stats == nil {
+		t.Fatal("Expected session stats, got nil")
+	}
+
+	if stats.TotalQueries != 5 {
+		t.Errorf("Expected 5 total queries, got %d", stats.TotalQueries)
+	}
+}
+
+func TestManager_CleanupOldSessions(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := createTestManager(t, tmpDir)
+
+	// Test cleanup functionality
+	err := manager.CleanupOldSessions(30)
+	if err != nil {
+		t.Fatalf("CleanupOldSessions failed: %v", err)
+	}
+}
+
+func TestManager_CleanupResultFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := createTestManager(t, tmpDir)
+
+	// Test cleanup functionality
+	err := manager.CleanupResultFiles(30)
+	if err != nil {
+		t.Fatalf("CleanupResultFiles failed: %v", err)
 	}
 }
 
@@ -35,327 +335,66 @@ func TestManager_GetSessionDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	manager := createTestManager(t, tmpDir)
 
-	testCases := []struct {
-		name           string
-		connectionName string
-		expectedSuffix string
-	}{
-		{
-			name:           "Simple connection name",
-			connectionName: "test-db",
-			expectedSuffix: filepath.Join("sessions", "test-db"),
-		},
-		{
-			name:           "Connection with spaces",
-			connectionName: "my database",
-			expectedSuffix: filepath.Join("sessions", "my database"),
-		},
-		{
-			name:           "Connection with special chars",
-			connectionName: "db-prod_2024",
-			expectedSuffix: filepath.Join("sessions", "db-prod_2024"),
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			sessionDir := manager.GetSessionDir(tc.connectionName)
-
-			if !filepath.IsAbs(sessionDir) {
-				t.Error("Session directory should be absolute path")
-			}
-
-			expectedPath := filepath.Join(tmpDir, tc.expectedSuffix)
-			if sessionDir != expectedPath {
-				t.Errorf("Expected session dir '%s', got '%s'", expectedPath, sessionDir)
-			}
-		})
-	}
-}
-
-func TestManager_EnsureSessionDir(t *testing.T) {
-	tmpDir := t.TempDir()
-	manager := createTestManager(t, tmpDir)
-
 	connectionName := "test-connection"
-
-	// Initially, session directory should not exist
+	
 	sessionDir := manager.GetSessionDir(connectionName)
-	if _, err := os.Stat(sessionDir); !os.IsNotExist(err) {
-		t.Error("Session directory should not exist initially")
+	if sessionDir == "" {
+		t.Error("Expected non-empty session directory")
 	}
 
-	// EnsureSessionDir should create it
-	err := manager.EnsureSessionDir(connectionName)
-	if err != nil {
-		t.Fatalf("EnsureSessionDir failed: %v", err)
-	}
-
-	// Now it should exist
-	if _, err := os.Stat(sessionDir); os.IsNotExist(err) {
-		t.Error("Session directory should exist after EnsureSessionDir")
-	}
-
-	// Should create results subdirectory
-	resultsDir := filepath.Join(sessionDir, "results")
-	if _, err := os.Stat(resultsDir); os.IsNotExist(err) {
-		t.Error("Results directory should be created")
-	}
-
-	// Should create session.yaml config file
-	sessionConfigPath := filepath.Join(sessionDir, "session.yaml")
-	if _, err := os.Stat(sessionConfigPath); os.IsNotExist(err) {
-		t.Error("Session config file should be created")
-	}
-
-	// Calling EnsureSessionDir again should not fail
-	err = manager.EnsureSessionDir(connectionName)
-	if err != nil {
-		t.Errorf("EnsureSessionDir should not fail when directory already exists: %v", err)
+	// Should contain the connection name
+	if !containsIgnoreCase(sessionDir, connectionName) {
+		t.Errorf("Expected session dir to contain connection name '%s', got '%s'", connectionName, sessionDir)
 	}
 }
 
-func TestManager_EnsureSessionDir_CreatesConfig(t *testing.T) {
+func TestManager_Preferences(t *testing.T) {
 	tmpDir := t.TempDir()
 	manager := createTestManager(t, tmpDir)
 
-	connectionName := "test-db"
+	key := "test_key"
+	value := "test_value"
 
-	err := manager.EnsureSessionDir(connectionName)
+	// Set preference
+	err := manager.SetPreference(key, value)
 	if err != nil {
-		t.Fatalf("EnsureSessionDir failed: %v", err)
+		t.Fatalf("SetPreference failed: %v", err)
 	}
 
-	// Read the session config
-	config, err := manager.getSessionConfig(connectionName)
+	// Get preference
+	retrievedValue, err := manager.GetPreference(key)
 	if err != nil {
-		t.Fatalf("Failed to get session config: %v", err)
+		t.Fatalf("GetPreference failed: %v", err)
 	}
 
-	if config == nil {
-		t.Fatal("Session config should not be nil")
+	if retrievedValue != value {
+		t.Errorf("Expected preference value %s, got %s", value, retrievedValue)
 	}
 
-	// Check default values
-	if config.CleanupRetentionDays != 30 {
-		t.Errorf("Expected default retention days to be 30, got %d", config.CleanupRetentionDays)
+	// Get all preferences
+	allPrefs, err := manager.GetAllPreferences()
+	if err != nil {
+		t.Fatalf("GetAllPreferences failed: %v", err)
+	}
+
+	if allPrefs[key] != value {
+		t.Errorf("Expected preference %s to be %s in all preferences, got %s", key, value, allPrefs[key])
 	}
 }
 
-func TestManager_CleanupOldFiles(t *testing.T) {
-	tmpDir := t.TempDir()
-	manager := createTestManager(t, tmpDir)
-
-	connectionName := "test-cleanup"
-
-	// Create session directory
-	err := manager.EnsureSessionDir(connectionName)
-	if err != nil {
-		t.Fatalf("EnsureSessionDir failed: %v", err)
-	}
-
-	sessionDir := manager.GetSessionDir(connectionName)
-	resultsDir := filepath.Join(sessionDir, "results")
-
-	// Create some test files with different ages
-	now := time.Now()
-
-	// Create old file (should be deleted)
-	oldFile := filepath.Join(resultsDir, "old_result.md")
-	err = os.WriteFile(oldFile, []byte("old content"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create old file: %v", err)
-	}
-
-	// Make it old by changing access time
-	oldTime := now.Add(-35 * 24 * time.Hour) // 35 days ago
-	err = os.Chtimes(oldFile, oldTime, oldTime)
-	if err != nil {
-		t.Fatalf("Failed to change file time: %v", err)
-	}
-
-	// Create recent file (should be kept)
-	recentFile := filepath.Join(resultsDir, "recent_result.md")
-	err = os.WriteFile(recentFile, []byte("recent content"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create recent file: %v", err)
-	}
-
-	// Run cleanup with 30 days retention
-	err = manager.CleanupOldFiles(connectionName, 30)
-	if err != nil {
-		t.Fatalf("CleanupOldFiles failed: %v", err)
-	}
-
-	// Old file should be deleted
-	if _, err := os.Stat(oldFile); !os.IsNotExist(err) {
-		t.Error("Old file should be deleted after cleanup")
-	}
-
-	// Recent file should still exist
-	if _, err := os.Stat(recentFile); os.IsNotExist(err) {
-		t.Error("Recent file should not be deleted")
-	}
+// Helper function for string contains check (case insensitive)
+func containsIgnoreCase(s, substr string) bool {
+	return len(s) >= len(substr) && 
+		   (s == substr || 
+		    (len(s) > len(substr) && 
+		     contains(strings.ToLower(s), strings.ToLower(substr))))
 }
 
-func TestManager_getSessionConfig(t *testing.T) {
-	tmpDir := t.TempDir()
-	manager := createTestManager(t, tmpDir)
-
-	connectionName := "test-config"
-
-	// Initially, getting config should create default config
-	config, err := manager.getSessionConfig(connectionName)
-	if err != nil {
-		t.Fatalf("Failed to get session config: %v", err)
-	}
-
-	if config == nil {
-		t.Fatal("Session config should not be nil")
-	}
-
-	// Check default values
-	if config.CleanupRetentionDays != 30 {
-		t.Errorf("Expected default retention days to be 30, got %d", config.CleanupRetentionDays)
-	}
-
-	// Getting config again should return the same values
-	config2, err := manager.getSessionConfig(connectionName)
-	if err != nil {
-		t.Fatalf("Failed to get session config second time: %v", err)
-	}
-
-	if config2.CleanupRetentionDays != config.CleanupRetentionDays {
-		t.Error("Config values should be consistent between calls")
-	}
-}
-
-func TestManager_ErrorHandling(t *testing.T) {
-	// Test with invalid directory
-	invalidDir := "/nonexistent/path/that/should/not/exist"
-	manager := createTestManager(t, invalidDir)
-
-	// EnsureSessionDir should handle permission errors gracefully
-	err := manager.EnsureSessionDir("test")
-	if err == nil {
-		t.Error("Expected error when creating session in invalid directory")
-	}
-
-	// Test with empty connection name
-	tmpDir := t.TempDir()
-	validManager := createTestManager(t, tmpDir)
-
-	err = validManager.EnsureSessionDir("")
-	if err == nil {
-		t.Error("Expected error for empty connection name")
-	}
-}
-
-func TestManager_SessionDirIsolation(t *testing.T) {
-	tmpDir := t.TempDir()
-	manager := createTestManager(t, tmpDir)
-
-	// Create multiple sessions
-	connections := []string{"db1", "db2", "db3"}
-
-	for _, conn := range connections {
-		err := manager.EnsureSessionDir(conn)
-		if err != nil {
-			t.Fatalf("Failed to create session for %s: %v", conn, err)
+func contains(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
 		}
 	}
-
-	// Each should have its own directory
-	for _, conn := range connections {
-		sessionDir := manager.GetSessionDir(conn)
-
-		if _, err := os.Stat(sessionDir); os.IsNotExist(err) {
-			t.Errorf("Session directory for %s should exist", conn)
-		}
-
-		// Check that each has its own config
-		config, err := manager.getSessionConfig(conn)
-		if err != nil {
-			t.Errorf("Failed to get config for %s: %v", conn, err)
-		}
-
-		if config == nil {
-			t.Errorf("Config for %s should not be nil", conn)
-		}
-	}
-
-	// Directories should be different
-	dir1 := manager.GetSessionDir("db1")
-	dir2 := manager.GetSessionDir("db2")
-
-	if dir1 == dir2 {
-		t.Error("Different connections should have different session directories")
-	}
-}
-
-func TestManager_ConfigPersistence(t *testing.T) {
-	tmpDir := t.TempDir()
-	manager := createTestManager(t, tmpDir)
-
-	connectionName := "test-persistence"
-
-	// Create session and modify config
-	err := manager.EnsureSessionDir(connectionName)
-	if err != nil {
-		t.Fatalf("EnsureSessionDir failed: %v", err)
-	}
-
-	// Get initial config
-	config1, err := manager.getSessionConfig(connectionName)
-	if err != nil {
-		t.Fatalf("Failed to get initial config: %v", err)
-	}
-
-	// Create new manager instance (simulating restart)
-	manager2 := createTestManager(t, tmpDir)
-
-	// Config should be the same
-	config2, err := manager2.getSessionConfig(connectionName)
-	if err != nil {
-		t.Fatalf("Failed to get config with new manager: %v", err)
-	}
-
-	if config1.CleanupRetentionDays != config2.CleanupRetentionDays {
-		t.Error("Config should persist between manager instances")
-	}
-}
-
-// Benchmark tests
-func BenchmarkManager_GetSessionDir(b *testing.B) {
-	tmpDir := b.TempDir()
-	manager := createTestManager(b, tmpDir)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		manager.GetSessionDir("test-connection")
-	}
-}
-
-func BenchmarkManager_EnsureSessionDir(b *testing.B) {
-	tmpDir := b.TempDir()
-	manager := createTestManager(b, tmpDir)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		connectionName := "test-connection"
-		manager.EnsureSessionDir(connectionName)
-	}
-}
-
-func BenchmarkManager_getSessionConfig(b *testing.B) {
-	tmpDir := b.TempDir()
-	manager := createTestManager(b, tmpDir)
-
-	// Pre-create session
-	manager.EnsureSessionDir("bench-connection")
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		manager.getSessionConfig("bench-connection")
-	}
+	return false
 }

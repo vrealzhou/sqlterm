@@ -163,10 +163,7 @@ func (ac *AutoCompleter) getConnectionCandidates(words []string, line string) []
 		return nil
 	}
 
-	connections, err := ac.app.configMgr.ListConnections()
-	if err != nil {
-		return nil
-	}
+	connections := ac.app.configMgr.ListConnections()
 
 	var candidates []string
 	currentWord := ""

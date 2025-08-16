@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sqlterm/internal/i18n"
+	"github.com/vrealzhou/sqlterm/internal/i18n"
 	"time"
 )
 

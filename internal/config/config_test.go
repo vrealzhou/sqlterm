@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"sqlterm/internal/i18n"
+	"github.com/vrealzhou/sqlterm/internal/i18n"
 )
 
 func TestDefaultConfig(t *testing.T) {
@@ -41,7 +41,7 @@ func TestConfig_SetProvider(t *testing.T) {
 
 	testCases := []struct {
 		name     string
-		provider Provider
+		provider AIProvider
 		model    string
 		expected string
 	}{
@@ -67,7 +67,7 @@ func TestConfig_SetProvider(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			config.SetProvider(tc.provider, tc.model)
+			config.AI.SetProvider(tc.provider, tc.model)
 
 			if config.AI.Provider != tc.provider {
 				t.Errorf("Expected provider %v, got %v", tc.provider, config.AI.Provider)
@@ -85,7 +85,7 @@ func TestConfig_APIKeys(t *testing.T) {
 
 	testCases := []struct {
 		name     string
-		provider Provider
+		provider AIProvider
 		apiKey   string
 	}{
 		{
@@ -102,9 +102,9 @@ func TestConfig_APIKeys(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			config.SetAPIKey(tc.provider, tc.apiKey)
+			config.AI.SetAPIKey(tc.provider, tc.apiKey)
 
-			retrievedKey := config.GetAPIKey(tc.provider)
+			retrievedKey := config.AI.GetAPIKey(tc.provider)
 			if retrievedKey != tc.apiKey {
 				t.Errorf("Expected API key '%s', got '%s'", tc.apiKey, retrievedKey)
 			}
@@ -117,7 +117,7 @@ func TestConfig_BaseURLs(t *testing.T) {
 
 	testCases := []struct {
 		name     string
-		provider Provider
+		provider AIProvider
 		baseURL  string
 	}{
 		{
@@ -139,9 +139,9 @@ func TestConfig_BaseURLs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			config.SetBaseURL(tc.provider, tc.baseURL)
+			config.AI.SetBaseURL(tc.provider, tc.baseURL)
 
-			retrievedURL := config.GetBaseURL(tc.provider)
+			retrievedURL := config.AI.GetBaseURL(tc.provider)
 			if retrievedURL != tc.baseURL {
 				t.Errorf("Expected base URL '%s', got '%s'", tc.baseURL, retrievedURL)
 			}
@@ -154,7 +154,7 @@ func TestConfig_GetDefaultModel(t *testing.T) {
 
 	testCases := []struct {
 		name     string
-		provider Provider
+		provider AIProvider
 		expected string
 	}{
 		{
@@ -176,7 +176,7 @@ func TestConfig_GetDefaultModel(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defaultModel := config.GetDefaultModel(tc.provider)
+			defaultModel := config.AI.GetDefaultModel(tc.provider)
 			if defaultModel != tc.expected {
 				t.Errorf("Expected default model '%s', got '%s'", tc.expected, defaultModel)
 			}
@@ -186,10 +186,10 @@ func TestConfig_GetDefaultModel(t *testing.T) {
 
 func TestConfig_FormatProviderInfo(t *testing.T) {
 	config := DefaultConfig()
-	config.SetProvider(ProviderOpenRouter, "anthropic/claude-3.5-sonnet")
-	config.SetAPIKey(ProviderOpenRouter, "sk-or-v1-test-key-1234")
+	config.AI.SetProvider(ProviderOpenRouter, "anthropic/claude-3.5-sonnet")
+	config.AI.SetAPIKey(ProviderOpenRouter, "sk-or-v1-test-key-1234")
 
-	info := config.FormatProviderInfo()
+	info := config.AI.FormatProviderInfo()
 
 	if info == "" {
 		t.Error("FormatProviderInfo() returned empty string")
@@ -228,9 +228,9 @@ func TestSaveAndLoadConfig(t *testing.T) {
 
 	// Create test config
 	originalConfig := DefaultConfig()
-	originalConfig.SetProvider(ProviderOllama, "llama2:13b")
-	originalConfig.SetAPIKey(ProviderOpenRouter, "test-api-key")
-	originalConfig.SetBaseURL(ProviderOllama, "http://localhost:11434")
+	originalConfig.AI.SetProvider(ProviderOllama, "llama2:13b")
+	originalConfig.AI.SetAPIKey(ProviderOpenRouter, "test-api-key")
+	originalConfig.AI.SetBaseURL(ProviderOllama, "http://localhost:11434")
 	originalConfig.Language = "zh_cn"
 
 	// Save config
@@ -272,11 +272,11 @@ func TestSaveAndLoadConfig(t *testing.T) {
 		t.Errorf("Expected model '%s', got '%s'", originalConfig.AI.Model, loadedConfig.AI.Model)
 	}
 
-	if loadedConfig.GetAPIKey(ProviderOpenRouter) != originalConfig.GetAPIKey(ProviderOpenRouter) {
+	if loadedConfig.AI.GetAPIKey(ProviderOpenRouter) != originalConfig.AI.GetAPIKey(ProviderOpenRouter) {
 		t.Error("API keys don't match after save/load")
 	}
 
-	if loadedConfig.GetBaseURL(ProviderOllama) != originalConfig.GetBaseURL(ProviderOllama) {
+	if loadedConfig.AI.GetBaseURL(ProviderOllama) != originalConfig.AI.GetBaseURL(ProviderOllama) {
 		t.Error("Base URLs don't match after save/load")
 	}
 }

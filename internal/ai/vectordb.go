@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"sqlterm/internal/core"
+	"github.com/vrealzhou/sqlterm/internal/database"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -19,8 +19,8 @@ import (
 // VectorStore manages vector embeddings for database schema information
 type VectorStore struct {
 	db             *sql.DB
-	connection     core.Connection
-	configDir      string
+	connection     database.Connection
+	sessionDir     string
 	connectionName string
 }
 
@@ -58,9 +58,8 @@ type VectorSearchResult struct {
 }
 
 // NewVectorStore creates a new vector store for a database connection
-func NewVectorStore(configDir, connectionName string, connection core.Connection) (*VectorStore, error) {
-	// Create session directory for this connection
-	sessionDir := fmt.Sprintf("%s/sessions/%s", configDir, connectionName)
+func NewVectorStore(sessionDir, connectionName string, connection database.Connection) (*VectorStore, error) {
+	// Ensure session directory exists
 	if err := os.MkdirAll(sessionDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create session directory: %w", err)
 	}
@@ -68,10 +67,8 @@ func NewVectorStore(configDir, connectionName string, connection core.Connection
 	// New vector database path in session folder
 	dbPath := fmt.Sprintf("%s/vectors.db", sessionDir)
 
-	// Check for legacy vector database and migrate if exists
-	if err := migrateLegacyVectorDB(configDir, connectionName, dbPath); err != nil {
-		fmt.Printf("Warning: failed to migrate legacy vector database: %v\n", err)
-	}
+	// Note: Legacy migration is no longer supported in the new session management system
+	// Users should manually export/import their data if needed
 
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
@@ -81,7 +78,7 @@ func NewVectorStore(configDir, connectionName string, connection core.Connection
 	store := &VectorStore{
 		db:             db,
 		connection:     connection,
-		configDir:      configDir,
+		sessionDir:     sessionDir,
 		connectionName: connectionName,
 	}
 

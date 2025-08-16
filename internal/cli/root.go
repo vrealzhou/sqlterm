@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"sqlterm/internal/ai"
-	"sqlterm/internal/config"
-	"sqlterm/internal/conversation"
-	"sqlterm/internal/core"
-	"sqlterm/internal/editor"
-	"sqlterm/internal/i18n"
+	"github.com/vrealzhou/sqlterm/internal/config"
+	"github.com/vrealzhou/sqlterm/internal/conversation"
+	"github.com/vrealzhou/sqlterm/internal/database"
+	"github.com/vrealzhou/sqlterm/internal/editor"
+	"github.com/vrealzhou/sqlterm/internal/i18n"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -26,7 +25,7 @@ var (
 	GitCommit string = "unknown"
 
 	// Track current connection for editor command
-	currentConnection core.Connection
+	currentConnection database.Connection
 )
 
 // SetVersionInfo sets the version information
@@ -165,16 +164,16 @@ var connectCmd = &cobra.Command{
 		username, _ := cmd.Flags().GetString("username")
 		password, _ := cmd.Flags().GetString("password")
 
-		dbTypeEnum, err := core.ParseDatabaseType(dbType)
+		dbTypeEnum, err := config.ParseDatabaseType(dbType)
 		if err != nil {
 			return err
 		}
 
 		if port == 0 {
-			port = core.GetDefaultPort(dbTypeEnum)
+			port = config.GetDefaultPort(dbTypeEnum)
 		}
 
-		config := &core.ConnectionConfig{
+		config := &config.ConnectionConfig{
 			Name:         fmt.Sprintf(i18nMgr.Get("connection_name_format"), dbType),
 			DatabaseType: dbTypeEnum,
 			Host:         host,
@@ -209,16 +208,16 @@ var addCmd = &cobra.Command{
 		database, _ := cmd.Flags().GetString("database")
 		username, _ := cmd.Flags().GetString("username")
 
-		dbTypeEnum, err := core.ParseDatabaseType(dbType)
+		dbTypeEnum, err := config.ParseDatabaseType(dbType)
 		if err != nil {
 			return err
 		}
 
 		if port == 0 {
-			port = core.GetDefaultPort(dbTypeEnum)
+			port = config.GetDefaultPort(dbTypeEnum)
 		}
 
-		config := &core.ConnectionConfig{
+		config := &config.ConnectionConfig{
 			Name:         name,
 			DatabaseType: dbTypeEnum,
 			Host:         host,
@@ -289,17 +288,11 @@ func init() {
 	addCmd.MarkFlagRequired("username")
 }
 
-func connectAndRunConversation(connConfig *core.ConnectionConfig) error {
+func connectAndRunConversation(connConfig *config.ConnectionConfig) error {
 	// Initialize i18n manager for CLI
-	configMgr := config.NewManager()
 	language := "en_au" // Default language
 
-	// Try to get language from AI config
-	if aiManager, err := ai.NewManager(configMgr.GetConfigDir()); err == nil && aiManager != nil {
-		if aiConfig := aiManager.GetConfig(); aiConfig != nil {
-			language = aiConfig.Language
-		}
-	}
+	// Use default language for CLI (AI config is managed in the conversation app)
 
 	i18nMgr, err := i18n.NewManager(language)
 	if err != nil {
@@ -309,7 +302,7 @@ func connectAndRunConversation(connConfig *core.ConnectionConfig) error {
 
 	fmt.Printf(i18nMgr.Get("connecting_to"), connConfig.Name)
 
-	conn, err := core.NewConnection(connConfig)
+	conn, err := database.NewConnection(connConfig)
 	if err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
@@ -333,17 +326,11 @@ func connectAndRunConversation(connConfig *core.ConnectionConfig) error {
 	return app.Run()
 }
 
-func runEditor(conn core.Connection) error {
+func runEditor(conn database.Connection) error {
 	// Initialize i18n manager
-	configMgr := config.NewManager()
 	language := "en_au" // Default language
 
-	// Try to get language from AI config
-	if aiManager, err := ai.NewManager(configMgr.GetConfigDir()); err == nil && aiManager != nil {
-		if aiConfig := aiManager.GetConfig(); aiConfig != nil {
-			language = aiConfig.Language
-		}
-	}
+	// Use default language for CLI (AI config is managed in the conversation app)
 
 	i18nMgr, err := i18n.NewManager(language)
 	if err != nil {
@@ -373,10 +360,7 @@ func listConnections() error {
 	}
 
 	configManager := config.NewManager()
-	connections, err := configManager.ListConnections()
-	if err != nil {
-		return fmt.Errorf("failed to load connections: %w", err)
-	}
+	connections := configManager.ListConnections()
 
 	if len(connections) == 0 {
 		fmt.Println(i18nMgr.Get("no_saved_connections_found"))
@@ -385,21 +369,23 @@ func listConnections() error {
 	}
 
 	fmt.Println(i18nMgr.Get("saved_connections_cli"))
-	for i, conn := range connections {
+	index := 1
+	for _, conn := range connections {
 		fmt.Printf("%d. %s (%s) - %s://%s:%d/%s\n",
-			i+1,
+			index,
 			conn.Name,
 			conn.DatabaseType,
 			conn.DatabaseType.String(),
 			conn.Host,
 			conn.Port,
 			conn.Database)
+		index++
 	}
 
 	return nil
 }
 
-func addConnection(cfg *core.ConnectionConfig) error {
+func addConnection(cfg *config.ConnectionConfig) error {
 	// Initialize i18n
 	i18nMgr, err := i18n.NewManager("en_au")
 	if err != nil {
@@ -408,7 +394,7 @@ func addConnection(cfg *core.ConnectionConfig) error {
 
 	fmt.Printf(i18nMgr.Get("testing_connection_cli"), cfg.Name)
 
-	conn, err := core.NewConnection(cfg)
+	conn, err := database.NewConnection(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}

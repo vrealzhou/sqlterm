@@ -1,9 +1,9 @@
-package core
+package database
 
 import (
 	"testing"
 
-	"sqlterm/internal/i18n"
+	"github.com/vrealzhou/sqlterm/internal/i18n"
 )
 
 func TestNewMarkdownRenderer(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"sqlterm/internal/core"
+	"github.com/vrealzhou/sqlterm/internal/config"
 )
 
 func TestAutoCompleter_NewAutoCompleter(t *testing.T) {
@@ -180,11 +180,11 @@ func TestAutoCompleter_getTableCandidates(t *testing.T) {
 	mockConn := &mockConnection{
 		tables:    []string{"users", "user_profiles", "posts"},
 		connected: true,
-		dbType:    core.PostgreSQL,
+		dbType:    config.PostgreSQL,
 		name:      "test-db",
 	}
 
-	config := &core.ConnectionConfig{
+	config := &config.ConnectionConfig{
 		Name: "test-db",
 	}
 
