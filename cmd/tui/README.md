@@ -55,22 +55,32 @@ go run ./cmd/tui
 - Ctrl+C: Exit application
 
 ### Table View
+- Ctrl+Q: Switch to query view
 - Esc: Return to connection view
+- Ctrl+C: Exit application
+
+### Query View
+- Tab / Shift+Tab: Cycle focus between tables, editor, and chat panels
+- Ctrl+R or F5: Execute the current query (Ctrl+Enter/Cmd+Enter/ Ctrl+E also work where supported)
+- Ctrl+T: Return to the table view
+- Esc: Return to the table view
 - Ctrl+C: Exit application
 
 ## Implementation Details
 
 The application follows the Bubble Tea architecture with a state-based model:
 
-1. **State Management**: The application has two main states (`connectionState` and `tableState`) that determine which view is displayed.
+1. **State Management**: The application now tracks three states (`connectionState`, `tableState`, and `queryState`) that determine which view is displayed.
 
 2. **Views**:
    - `connectionView()`: Displays a split-screen view with connections list on the left and connection details on the right
    - `tableView()`: Displays a split-screen view with tables list on the left and table details on the right
+   - `queryView()`: Displays the tables list, SQL editor, live results, and chat hint panels
 
 3. **Updates**:
    - `updateConnections()`: Handles updates for the connection view including list navigation and text input handling
    - `updateTables()`: Handles updates for the table view
+   - `updateQuery()`: Handles updates for the query editor, result refresh, and table list while in query mode
 
 4. **Components**:
    - Uses `list.Model` for displaying connections and tables
